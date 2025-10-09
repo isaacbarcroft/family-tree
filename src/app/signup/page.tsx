@@ -1,9 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createUserWithEmailAndPassword } from "firebase/auth"
 import { auth } from "@/lib/firebase"
+import { useAuth } from "@/components/AuthProvider"
+
 
 export default function SignupPage() {
   const [email, setEmail] = useState("")
@@ -11,6 +13,11 @@ export default function SignupPage() {
   const [confirm, setConfirm] = useState("")
   const [error, setError] = useState("")
   const router = useRouter()
+  const { user } = useAuth()
+
+  useEffect(() => {
+  if (user) router.push("/")
+}, [user])
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
