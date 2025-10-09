@@ -3,7 +3,7 @@ import { getAuth } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 import { getAnalytics, isSupported } from "firebase/analytics";
 
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN!,
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
@@ -13,7 +13,7 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID!,
 }
 
-const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig)
+export const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig)
 const analytics = isSupported().then(yes => yes ? getAnalytics(app) : null);
 
 export const auth = getAuth(app)
