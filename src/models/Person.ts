@@ -2,6 +2,7 @@ import type { RoleType } from "@/constants/enums"
 
 export interface Person {
   id: string
+  userId?: string
   firstName: string
   middleName?: string
   lastName: string
@@ -30,4 +31,9 @@ export interface Person {
   createdBy: string
   createdAt: string
   updatedAt?: string
+  birthPlace?: string
+  searchName?: string
+  deathPlace?: string
+  familyIds?: string[] 
+  spouseDetails?: { personId: string; startDate?: string; endDate?: string }[]
 }
