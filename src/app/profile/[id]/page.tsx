@@ -16,11 +16,20 @@ import { useAuth } from "@/components/AuthProvider"
 import { uploadProfilePhoto } from "@/lib/storage"
 import { v4 as uuidv4 } from "uuid"
 import { stringToColor } from "@/utils/colors"
+import FamilyList from "@/components/FamilyList"
+import AddMemberModal from "@/components/AddMemberModal"
+import { useSearchParams } from "next/navigation"
+import FamilyListCompact from "@/components/FamilyListCompact"
+import AddFamilyModal from "@/components/AddFamilyModal"
+
+const obituaryKeywords = ["obituary", "obituaries", "legacy", "memorial"]
 
 export default function ProfilePage() {
   const { user } = useAuth()
   const router = useRouter()
   const params = useParams()
+  const searchParams = useSearchParams()
+  
   const personId = params?.id as string
 
   const [person, setPerson] = useState<Person | null>(null)
@@ -31,6 +40,12 @@ export default function ProfilePage() {
   const [photoUploading, setPhotoUploading] = useState(false)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [showFamilyModal, setShowFamilyModal] = useState(false)
+  const [showAddFamilyModal, setShowAddFamilyModal] = useState(false)
+  
+  useEffect(() => {
+    if (searchParams.get("edit") === "true") setEditing(true)
+  }, [searchParams])
 
   useEffect(() => {
     const fetchData = async () => {
@@ -42,6 +57,7 @@ export default function ProfilePage() {
         const related = allEvents.filter((e) => e.peopleIds.includes(personId))
         setEvents(related)
       } catch (err: unknown) {
+        console.log(err)
         setError("Unable to load profile data.")
       } finally {
         setLoading(false)
@@ -93,6 +109,7 @@ export default function ProfilePage() {
         setPerson((prev) => ({ ...prev!, ...updates }))
       }
     } catch (err: unknown) {
+      console.log(err)
       setError("Error saving profile.")
     }
     setEditing(false)
@@ -107,13 +124,12 @@ export default function ProfilePage() {
       await updatePerson(personId, { profilePhotoUrl: url })
       setPerson((prev) => ({ ...prev!, profilePhotoUrl: url }))
     } catch (err: unknown) {
+      console.log(err)
       setError("Photo upload failed.")
     } finally {
       setPhotoUploading(false)
     }
   }
-
-  const obituaryKeywords = ["obituary", "obituaries", "legacy", "memorial"]
 
   const obituary =
     person && person.websiteUrl
@@ -232,6 +248,36 @@ export default function ProfilePage() {
                 </p>
               )}
             </div>
+            <section>
+              <h2 className="text-xl font-semibold mb-3 text-white">Family</h2>
+              <FamilyList title="Parents" ids={person.parentIds} />
+              <FamilyList title="Spouses" ids={person.spouseIds} />
+              <FamilyList title="Children" ids={person.childIds} />
+
+              {editing && (
+                <button
+                  onClick={() => setShowFamilyModal(true)}
+                  className="mt-2 bg-gray-700 hover:bg-gray-600 text-white text-sm px-3 py-1 rounded"
+                >
+                  + Add Family Member
+                </button>
+              )}
+            </section>
+            <section>
+              <h2 className="text-xl font-semibold mb-3 text-white">
+                Families
+              </h2>
+              <FamilyListCompact ids={person.familyIds} />
+              {editing && (
+                <button
+                  onClick={() => setShowAddFamilyModal(true)}
+                  className="mt-2 bg-gray-700 hover:bg-gray-600 text-white text-sm px-3 py-1 rounded"
+                >
+                  + Add to Family
+                </button>
+              )}
+            </section>
+
             {/* Online Presence */}
             <section>
               {!person.facebookUrl && !person.websiteUrl ? (
@@ -283,6 +329,39 @@ export default function ProfilePage() {
         {/* --- Profile Body --- */}
         {editing ? (
           <>
+            <section>
+              <h2 className="text-xl font-semibold mb-2 text-white">
+                Basic Info
+              </h2>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm mb-1 text-gray-400">
+                    First Name
+                  </label>
+                  <input
+                    type="text"
+                    name="firstName"
+                    value={form.firstName || ""}
+                    onChange={handleChange}
+                    placeholder="First Name"
+                    className="border border-gray-700 bg-gray-800 text-gray-100 p-2 rounded w-full"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm mb-1 text-gray-400">
+                    Last Name
+                  </label>
+                  <input
+                    type="text"
+                    name="lastName"
+                    value={form.lastName || ""}
+                    onChange={handleChange}
+                    placeholder="Last Name"
+                    className="border border-gray-700 bg-gray-800 text-gray-100 p-2 rounded w-full"
+                  />
+                </div>
+              </div>
+            </section>
             {/* Editable Biography */}
             <section>
               <h2 className="text-xl font-semibold mb-2 text-white">
@@ -450,6 +529,18 @@ export default function ProfilePage() {
           </>
         )}
       </div>
+      {showFamilyModal && (
+        <AddMemberModal
+          onClose={() => setShowFamilyModal(false)}
+          currentPersonId={person.id}
+        />
+      )}
+      {showAddFamilyModal && (
+        <AddFamilyModal
+          onClose={() => setShowAddFamilyModal(false)}
+          currentPersonId={person.id}
+        />
+      )}
     </ProtectedRoute>
   )
 }

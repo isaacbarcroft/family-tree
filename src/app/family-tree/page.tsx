@@ -108,55 +108,61 @@ export default function FamilyTreePage() {
           <p>Loading...</p>
         ) : (
           <ul className="space-y-3">
-  {people.map((p) => (
-    <li
-      key={p.id}
-      className="flex items-center justify-between border border-gray-700 rounded-lg p-3 hover:bg-gray-800 transition"
-    >
-      {/* Left section: avatar + name */}
-      <div className="flex items-center gap-3">
-        {/* Avatar */}
-        {p.profilePhotoUrl ? (
-          <Image
-            src={p.profilePhotoUrl}
-            alt={`${p.firstName} ${p.lastName}`}
-            width={40}
-            height={40}
-            className="rounded-full object-cover w-10 h-10 border border-gray-600"
-          />
-        ) : (
-          <div
-            className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold"
-            style={{
-              backgroundColor: stringToColor(p.firstName + p.lastName),
-            }}
-          >
-            {p.firstName[0]}
-            {p.lastName[0]}
-          </div>
-        )}
+            {people.map((p) => (
+              <li
+                key={p.id}
+                className="flex items-center justify-between border border-gray-700 rounded-lg p-3 hover:bg-gray-800 transition"
+              >
+                {/* Left section: avatar + name */}
+                <div className="flex items-center gap-3">
+                  {/* Avatar */}
+                  {p.profilePhotoUrl ? (
+                    <Image
+                      src={p.profilePhotoUrl}
+                      alt={`${p.firstName} ${p.lastName}`}
+                      width={40}
+                      height={40}
+                      className="rounded-full object-cover w-10 h-10 border border-gray-600"
+                    />
+                  ) : (
+                    <div
+                      className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold"
+                      style={{
+                        backgroundColor: stringToColor(
+                          p.firstName + p.lastName
+                        ),
+                      }}
+                    >
+                      {p.firstName[0]}
+                      {p.lastName[0]}
+                    </div>
+                  )}
 
-        {/* Name + Role */}
-        <div>
-          <Link
-            href={`/profile/${p.id}`}
-            className="font-semibold text-white hover:underline"
-          >
-            {p.firstName} {p.lastName}
-          </Link>
-          <span className="text-gray-400 text-sm ml-1">({p.roleType})</span>
-        </div>
-      </div>
+                  {/* Name + Role */}
+                  <div>
+                    <Link
+                      href={`/profile/${p.id}`}
+                      className="font-semibold text-white hover:underline"
+                    >
+                      {p.firstName} {p.lastName}
+                    </Link>
+                    <span className="text-gray-400 text-sm ml-1">
+                      ({p.roleType})
+                    </span>
+                  </div>
+                </div>
 
-      {/* Right section: created date */}
-      <div className="text-sm text-gray-400">
-        {p.createdAt
-          ? new Date(p.createdAt).toLocaleDateString()
-          : <span className="text-gray-500">—</span>}
-      </div>
-    </li>
-  ))}
-</ul>
+                {/* Right section: created date */}
+                <div className="text-sm text-gray-400">
+                  {p.createdAt ? (
+                    new Date(p.createdAt).toLocaleDateString()
+                  ) : (
+                    <span className="text-gray-500">—</span>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     </ProtectedRoute>

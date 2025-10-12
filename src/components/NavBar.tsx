@@ -18,7 +18,10 @@ export default function NavBar() {
   return (
     <nav className="bg-gray-900 text-white p-4 shadow-sm">
       <div className="container mx-auto flex justify-between items-center">
-        <Link href="/" className="font-bold text-xl hover:text-blue-300 transition">
+        <Link
+          href="/"
+          className="font-bold text-xl hover:text-blue-300 transition"
+        >
           Family Legacy
         </Link>
 
@@ -33,6 +36,9 @@ export default function NavBar() {
               </Link>
               <Link href="/memories" className="hover:text-blue-300">
                 Memories
+              </Link>
+              <Link href="/families" className="hover:underline text-gray-300">
+                Families
               </Link>
               <button
                 onClick={handleLogout}
