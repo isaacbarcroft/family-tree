@@ -11,6 +11,7 @@ import {
   orderBy,
   updateDoc,
   setDoc,
+  arrayUnion,
 } from "firebase/firestore"
 import type { Person } from "@/models/Person"
 import type { Event } from "@/models/Event"
@@ -39,14 +40,28 @@ export async function getPersonById(id: string) {
 // Create or update a person
 export async function savePerson(person: Person) {
   const docRef = doc(db, "people", person.id)
-  await setDoc(docRef, person, { merge: true })
+  await setDoc(docRef, {...person,   searchName: `${person.firstName} ${person.lastName}`.toLowerCase().trim(),
+}, { merge: true })
   return person
 }
 
-// Update existing person fields
 export async function updatePerson(id: string, updates: Partial<Person>) {
   const docRef = doc(db, "people", id)
+
+  if (updates.firstName !== undefined || updates.lastName !== undefined) {
+    const first = updates.firstName || ""
+    const last = updates.lastName || ""
+    updates.searchName = `${first} ${last}`.toLowerCase().trim()
+  }
+
   await updateDoc(docRef, updates)
+}
+export async function linkPersonToFamily(personId: string, familyId: string) {
+  const ref = doc(db, "people", personId)
+  await updateDoc(ref, { familyIds: arrayUnion(familyId) })
+
+  const familyRef = doc(db, "families", familyId)
+  await updateDoc(familyRef, { members: arrayUnion(personId) })
 }
 
 export async function uploadProfilePhoto(userId: string, personId: string, file: File) {
@@ -59,6 +74,25 @@ export async function uploadMemoryPhoto(personId: string, file: File) {
   const fileRef = ref(storage, `people/${personId}/memories/${file.name}`)
   await uploadBytes(fileRef, file)
   return await getDownloadURL(fileRef)
+}
+export async function linkParentChild(parentId: string, childId: string) {
+  const parentRef = doc(db, "people", parentId)
+  const childRef = doc(db, "people", childId)
+  await updateDoc(parentRef, {
+    childIds: arrayUnion(childId),
+  })
+  await updateDoc(childRef, {
+    parentIds: arrayUnion(parentId),
+  })
+}
+
+export async function linkSpouses(personAId: string, personBId: string) {
+  const aRef = doc(db, "people", personAId)
+  const bRef = doc(db, "people", personBId)
+  await Promise.all([
+    updateDoc(aRef, { spouseIds: arrayUnion(personBId) }),
+    updateDoc(bRef, { spouseIds: arrayUnion(personAId) }),
+  ])
 }
 
 // ---- Events ----
