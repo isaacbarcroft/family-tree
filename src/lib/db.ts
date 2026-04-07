@@ -108,6 +108,11 @@ export async function linkSpouses(personAId: string, personBId: string) {
   ])
 }
 
+export async function deletePerson(id: string) {
+  const { error } = await supabase.from("people").delete().eq("id", id)
+  if (error) throw error
+}
+
 // ---- Events ----
 export async function addEvent(event: Omit<Event, "id">) {
   const { data, error } = await supabase
@@ -130,6 +135,16 @@ export async function listEvents() {
   return (data ?? []) as Event[]
 }
 
+export async function updateEvent(id: string, updates: Partial<Event>) {
+  const { error } = await supabase.from("events").update(updates).eq("id", id)
+  if (error) throw error
+}
+
+export async function deleteEvent(id: string) {
+  const { error } = await supabase.from("events").delete().eq("id", id)
+  if (error) throw error
+}
+
 // ---- Memories ----
 export async function addMemory(memory: Omit<Memory, "id">) {
   const { data, error } = await supabase
@@ -146,4 +161,38 @@ export async function listMemories() {
   const { data, error } = await supabase.from("memories").select("*")
   if (error) throw error
   return (data ?? []) as Memory[]
+}
+
+export async function updateMemory(id: string, updates: Partial<Memory>) {
+  const { error } = await supabase.from("memories").update(updates).eq("id", id)
+  if (error) throw error
+}
+
+export async function deleteMemory(id: string) {
+  const { error } = await supabase.from("memories").delete().eq("id", id)
+  if (error) throw error
+}
+
+export async function deleteFamily(id: string) {
+  const { error } = await supabase.from("families").delete().eq("id", id)
+  if (error) throw error
+}
+
+export async function listMemoriesForPerson(personId: string) {
+  const { data, error } = await supabase
+    .from("memories")
+    .select("*")
+    .contains("peopleIds", [personId])
+  if (error) throw error
+  return (data ?? []) as Memory[]
+}
+
+export async function listEventsForPerson(personId: string) {
+  const { data, error } = await supabase
+    .from("events")
+    .select("*")
+    .contains("peopleIds", [personId])
+    .order("date", { ascending: true })
+  if (error) throw error
+  return (data ?? []) as Event[]
 }

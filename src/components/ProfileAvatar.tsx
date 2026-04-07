@@ -40,7 +40,12 @@ export function ProfileAvatar({
           backgroundColor: stringToColor(fallbackLetters),
         }}
       >
-        {fallbackLetters.slice(0, 2)}
+        {fallbackLetters
+          .split(/(?=[A-Z])|[\s]+/)
+          .filter(Boolean)
+          .map((w) => w[0].toUpperCase())
+          .slice(0, 2)
+          .join("")}
       </div>
     )
   }
@@ -49,7 +54,6 @@ export function ProfileAvatar({
 
   if (useNativeImg) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element -- Supabase storage URLs fail with Next/Image optimizer; native img + referrerPolicy fixes "failed to load response data"
       <img
         src={displayUrl}
         alt={alt}

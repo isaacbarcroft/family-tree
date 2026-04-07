@@ -6,6 +6,7 @@ export interface AppUser {
 
 interface AppSession {
   access_token: string
+  refresh_token?: string
   user: AppUser
 }
 
@@ -54,8 +55,73 @@ function emitAuth(event: "SIGNED_IN" | "SIGNED_OUT", session: AppSession | null)
   }
 }
 
+let refreshPromise: Promise<AppSession | null> | null = null
+
+async function refreshSession(): Promise<AppSession | null> {
+  const session = getStoredSession()
+  if (!session?.refresh_token) return null
+
+  const response = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=refresh_token`, {
+    method: "POST",
+    headers: {
+      apikey: supabaseAnonKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ refresh_token: session.refresh_token }),
+  })
+
+  if (!response.ok) {
+    setStoredSession(null)
+    emitAuth("SIGNED_OUT", null)
+    return null
+  }
+
+  const payload = await response.json()
+  const newSession: AppSession = {
+    access_token: payload.access_token,
+    refresh_token: payload.refresh_token,
+    user: payload.user ?? session.user,
+  }
+  setStoredSession(newSession)
+  emitAuth("SIGNED_IN", newSession)
+  return newSession
+}
+
+function isTokenExpired(token: string): boolean {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]))
+    return payload.exp * 1000 < Date.now() - 30_000 // 30s buffer
+  } catch {
+    return false
+  }
+}
+
+async function getFreshSession(): Promise<AppSession | null> {
+  const session = getStoredSession()
+  if (!session) return null
+
+  if (!isTokenExpired(session.access_token)) return session
+
+  // Deduplicate concurrent refresh calls
+  if (!refreshPromise) {
+    refreshPromise = refreshSession().finally(() => {
+      refreshPromise = null
+    })
+  }
+  return refreshPromise
+}
+
 function getAuthHeaders(contentTypeJson = false) {
   const session = getStoredSession()
+  return {
+    apikey: supabaseAnonKey,
+    Authorization: `Bearer ${session?.access_token ?? supabaseAnonKey}`,
+    ...(contentTypeJson ? { "Content-Type": "application/json" } : {}),
+  }
+}
+
+async function getFreshAuthHeaders(contentTypeJson = false) {
+  const session = await getFreshSession()
   return {
     apikey: supabaseAnonKey,
     Authorization: `Bearer ${session?.access_token ?? supabaseAnonKey}`,
@@ -89,7 +155,7 @@ function normalizeError(status: number, payload: unknown) {
 class QueryBuilder {
   private readonly table: string
   private readonly params = new URLSearchParams()
-  private method: "GET" | "POST" | "PATCH" = "GET"
+  private method: "GET" | "POST" | "PATCH" | "DELETE" = "GET"
   private body: unknown
   private preferHeaders: string[] = []
   private isSingle = false
@@ -149,6 +215,11 @@ class QueryBuilder {
     return this
   }
 
+  delete() {
+    this.method = "DELETE"
+    return this
+  }
+
   upsert(payload: unknown, options?: { onConflict?: string }) {
     this.method = "POST"
     this.body = payload
@@ -186,7 +257,7 @@ class QueryBuilder {
 
     const query = this.params.toString()
     const url = `${supabaseUrl}/rest/v1/${this.table}${query ? `?${query}` : ""}`
-    const headers: Record<string, string> = getAuthHeaders(this.method !== "GET")
+    const headers: Record<string, string> = await getFreshAuthHeaders(this.method !== "GET")
 
     if (this.preferHeaders.length > 0) {
       headers.Prefer = this.preferHeaders.join(",")
@@ -263,7 +334,11 @@ export const supabase = {
         return { data: null, error: normalizeError(response.status, payload) }
       }
 
-      const session = payload as AppSession
+      const session: AppSession = {
+        access_token: payload.access_token,
+        refresh_token: payload.refresh_token,
+        user: payload.user,
+      }
       setStoredSession(session)
       emitAuth("SIGNED_IN", session)
       return { data: session, error: null }
@@ -301,11 +376,11 @@ export const supabase = {
         return { data: null, error: normalizeError(response.status, payload) }
       }
 
-      const maybeSession = payload as Partial<AppSession>
-      if (maybeSession.access_token && maybeSession.user) {
+      if (payload.access_token && payload.user) {
         const session: AppSession = {
-          access_token: maybeSession.access_token,
-          user: maybeSession.user,
+          access_token: payload.access_token,
+          refresh_token: payload.refresh_token,
+          user: payload.user,
         }
         setStoredSession(session)
         emitAuth("SIGNED_IN", session)
@@ -322,14 +397,14 @@ export const supabase = {
         return { error: null }
       }
 
-      const response = await fetch(`${supabaseUrl}/auth/v1/logout`, {
-        method: "POST",
-        headers: getAuthHeaders(true),
-      })
-
-      if (!response.ok && response.status !== 401) {
-        const payload = await response.json().catch(() => null)
-        return { error: normalizeError(response.status, payload) }
+      // Try to notify the server, but always clear local session
+      try {
+        await fetch(`${supabaseUrl}/auth/v1/logout`, {
+          method: "POST",
+          headers: getAuthHeaders(true),
+        })
+      } catch {
+        // Ignore network errors - we still want to sign out locally
       }
 
       setStoredSession(null)
@@ -350,12 +425,19 @@ export const supabase = {
           if (configError) return { error: configError }
 
           const uploadUrl = `${supabaseUrl}/storage/v1/object/${bucket}/${path}`
+          const freshHeaders = await getFreshAuthHeaders()
+          const contentType = options?.contentType || file.type || "application/octet-stream"
+
+          // Supabase Storage expects the raw file body with content-type header
+          // Use PUT for upsert (overwrites existing), POST for create-only
+          const method = options?.upsert ? "PUT" : "POST"
+
           const response = await fetch(uploadUrl, {
-            method: "POST",
+            method,
             headers: {
-              ...getAuthHeaders(),
-              "Content-Type": options?.contentType || file.type || "application/octet-stream",
-              ...(options?.upsert ? { "x-upsert": "true" } : {}),
+              ...freshHeaders,
+              "Content-Type": contentType,
+              "x-upsert": options?.upsert ? "true" : "false",
             },
             body: file,
           })

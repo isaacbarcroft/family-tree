@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { linkParentChild, linkSpouses, addPerson } from "@/lib/firestore"
+import { linkParentChild, linkSpouses, addPerson } from "@/lib/db"
 import type { Person } from "@/models/Person"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/AuthProvider"
@@ -85,11 +85,11 @@ const AddMemberModal = ({ onClose, currentPersonId }: AddMemberModalProps) => {
         <h3 className="text-lg font-semibold mb-4 text-white">Add Family Member</h3>
 
         <div className="mb-4">
-          <label className="block text-sm text-gray-400 mb-1">Relationship Type</label>
+          <label className="block text-base text-gray-300 mb-1">Relationship Type</label>
           <select
             value={relationship}
             onChange={(e) => setRelationship(e.target.value as "parent" | "child" | "spouse")}
-            className="border border-gray-700 bg-gray-800 text-gray-100 p-2 rounded w-full"
+            className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
           >
             <option value="parent">Parent</option>
             <option value="child">Child</option>
@@ -98,18 +98,18 @@ const AddMemberModal = ({ onClose, currentPersonId }: AddMemberModalProps) => {
         </div>
 
         <div className="mb-4">
-          <label className="block text-sm text-gray-400 mb-1">Search by Name</label>
+          <label className="block text-base text-gray-300 mb-1">Search by Name</label>
           <input
             type="text"
             placeholder="Enter a name..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="border border-gray-700 bg-gray-800 text-gray-100 p-2 rounded w-full"
+            className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
           />
         </div>
 
         {loading ? (
-          <p className="text-gray-400 text-sm">Searching...</p>
+          <p className="text-gray-300 text-base">Searching...</p>
         ) : results.length > 0 ? (
           <ul className="space-y-2 max-h-40 overflow-y-auto mb-4">
             {results.map((r) => (
@@ -124,7 +124,7 @@ const AddMemberModal = ({ onClose, currentPersonId }: AddMemberModalProps) => {
           </ul>
         ) : (
           search && (
-            <p className="text-gray-400 text-sm mb-4">No existing people found for “{search}”.</p>
+            <p className="text-gray-300 text-base mb-4">No existing people found for “{search}”.</p>
           )
         )}
 
@@ -132,7 +132,7 @@ const AddMemberModal = ({ onClose, currentPersonId }: AddMemberModalProps) => {
           <button
             onClick={handleCreate}
             disabled={creating}
-            className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded mb-4"
+            className="bg-green-600 hover:bg-green-500 text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px] mb-4"
           >
             {creating ? "Creating..." : `Create “${search}” and Link`}
           </button>
@@ -141,7 +141,7 @@ const AddMemberModal = ({ onClose, currentPersonId }: AddMemberModalProps) => {
         <div className="flex justify-end">
           <button
             onClick={onClose}
-            className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded"
+            className="bg-gray-700 hover:bg-gray-600 text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px]"
           >
             Close
           </button>

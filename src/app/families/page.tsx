@@ -1,10 +1,12 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useAuth } from "@/components/AuthProvider"
 import type { Family } from "@/models/Family"
 import Link from "next/link"
 import AddFamilyModal from "@/components/AddFamilyModal"
 import { supabase } from "@/lib/supabase"
+import { deleteFamily } from "@/lib/db"
 import ProtectedRoute from "@/components/ProtectedRoute"
 
 export default function FamiliesPage() {
@@ -12,6 +14,8 @@ export default function FamiliesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const { user } = useAuth()
 
   const fetchFamilies = async () => {
     try {
@@ -55,7 +59,7 @@ export default function FamiliesPage() {
           <h1 className="text-4xl font-bold text-white mb-4 sm:mb-0">Families</h1>
           <button
             onClick={() => setShowAddModal(true)}
-            className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded"
+            className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px]"
           >
             + Add Family
           </button>
@@ -66,33 +70,62 @@ export default function FamiliesPage() {
         ) : (
           <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {families.map((f) => (
-              <li
-                key={f.id}
-                className="border border-gray-700 bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition flex flex-col justify-between"
-              >
-                <div>
-                  <h2 className="text-xl font-semibold text-white mb-1">
-                    <Link
-                      href={`/family/${f.id}`}
-                      className="text-blue-400 hover:text-blue-300 hover:underline"
-                    >
+              <li key={f.id} className="relative">
+                <Link
+                  href={`/family/${f.id}`}
+                  className="block border border-gray-700 bg-gray-800 rounded-xl p-5 hover:bg-gray-700 hover:border-gray-600 transition cursor-pointer flex flex-col justify-between h-full"
+                >
+                  <div>
+                    <h2 className="text-xl font-semibold text-white mb-1 pr-16">
                       {f.name}
-                    </Link>
-                  </h2>
-                  {f.origin && <p className="text-gray-400 text-sm mb-2">🏡 {f.origin}</p>}
-                  {f.description && (
-                    <p className="text-gray-300 text-sm line-clamp-3">{f.description}</p>
-                  )}
-                </div>
+                    </h2>
+                    {f.origin && <p className="text-gray-300 text-base mb-2">🏡 {f.origin}</p>}
+                    {f.description && (
+                      <p className="text-gray-300 text-base line-clamp-3">{f.description}</p>
+                    )}
+                  </div>
 
-                <div className="mt-3 text-gray-400 text-xs flex justify-between items-center">
-                  <p>Created {new Date(f.createdAt).toLocaleDateString()}</p>
-                  {f.members && (
-                    <p>
-                      {f.members.length} member{f.members.length !== 1 && "s"}
-                    </p>
+                  <div className="mt-3 text-gray-300 text-sm flex justify-between items-center">
+                    <p>Created {new Date(f.createdAt).toLocaleDateString()}</p>
+                    {f.members && (
+                      <p>
+                        {f.members.length} member{f.members.length !== 1 && "s"}
+                      </p>
+                    )}
+                  </div>
+                </Link>
+                {/* Delete button - only for creator */}
+                {user?.id === f.createdBy && (
+                <div className="absolute top-3 right-3">
+                  {confirmDeleteId === f.id ? (
+                    <div className="flex gap-1 bg-gray-900 rounded-lg p-1">
+                      <button
+                        onClick={async () => {
+                          await deleteFamily(f.id)
+                          setConfirmDeleteId(null)
+                          fetchFamilies()
+                        }}
+                        className="text-red-400 hover:text-red-300 text-sm px-2 py-1 rounded hover:bg-gray-800 transition"
+                      >
+                        Yes
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="text-gray-400 hover:text-white text-sm px-2 py-1 rounded hover:bg-gray-800 transition"
+                      >
+                        No
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={(e) => { e.preventDefault(); setConfirmDeleteId(f.id) }}
+                      className="text-gray-500 hover:text-red-400 text-sm px-2 py-1 rounded hover:bg-gray-900 transition"
+                    >
+                      Delete
+                    </button>
                   )}
                 </div>
+                )}
               </li>
             ))}
           </ul>

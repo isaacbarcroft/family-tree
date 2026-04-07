@@ -3,7 +3,7 @@
 import Link from "next/link"
 import type { Person } from "@/models/Person"
 import { useEffect, useState } from "react"
-import { getPersonById } from "@/lib/firestore"
+import { getPersonById } from "@/lib/db"
 import { ProfileAvatar } from "@/components/ProfileAvatar"
 
 interface FamilyListProps {
