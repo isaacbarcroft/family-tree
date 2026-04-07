@@ -1,23 +1,23 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { createUserWithEmailAndPassword } from "firebase/auth"
-import { auth } from "@/lib/firebase"
 import { useAuth } from "@/components/AuthProvider"
-
+import { supabase } from "@/lib/supabase"
 
 export default function SignupPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirm, setConfirm] = useState("")
   const [error, setError] = useState("")
+  const [pendingEmailConfirmation, setPendingEmailConfirmation] = useState(false)
   const router = useRouter()
   const { user } = useAuth()
 
   useEffect(() => {
-  if (user) router.push("/")
-}, [user])
+    if (user) router.push("/")
+  }, [user, router])
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -26,12 +26,48 @@ export default function SignupPage() {
       return
     }
 
-    try {
-      await createUserWithEmailAndPassword(auth, email, password)
-      router.push("/") 
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "An error occurred")
+    setError("")
+
+    const emailRedirectTo =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/login?confirmed=1`
+        : undefined
+
+    const { data, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: emailRedirectTo ? { emailRedirectTo } : undefined,
+    })
+
+    if (signUpError) {
+      setError(signUpError.message)
+      return
     }
+
+    if (data?.access_token) {
+      router.push("/")
+      return
+    }
+
+    setPendingEmailConfirmation(true)
+  }
+
+  if (pendingEmailConfirmation) {
+    return (
+      <div className="max-w-md mx-auto mt-16 border border-gray-700 rounded p-6 bg-gray-900 text-gray-100">
+        <h1 className="text-2xl font-bold mb-3">Confirm your email</h1>
+        <p className="text-gray-300 mb-4">
+          We sent a confirmation link to <span className="font-semibold">{email}</span>.
+          Please confirm your email, then sign in.
+        </p>
+        <Link
+          href="/login?verify=1"
+          className="inline-block bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
+          Go to Login
+        </Link>
+      </div>
+    )
   }
 
   return (

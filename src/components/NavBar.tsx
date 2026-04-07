@@ -1,27 +1,27 @@
 "use client"
 
 import Link from "next/link"
-import { signOut } from "firebase/auth"
-import { auth } from "@/lib/firebase"
 import { useAuth } from "./AuthProvider"
 import { useRouter } from "next/navigation"
+import { supabase } from "@/lib/supabase"
 
 export default function NavBar() {
   const { user } = useAuth()
   const router = useRouter()
 
   const handleLogout = async () => {
-    await signOut(auth)
+    const { error } = await supabase.auth.signOut()
+    if (error) {
+      console.error("Logout failed", error)
+      return
+    }
     router.push("/login")
   }
 
   return (
     <nav className="bg-gray-900 text-white p-4 shadow-sm">
       <div className="container mx-auto flex justify-between items-center">
-        <Link
-          href="/"
-          className="font-bold text-xl hover:text-blue-300 transition"
-        >
+        <Link href="/" className="font-bold text-xl hover:text-blue-300 transition">
           Family Legacy
         </Link>
 

@@ -11,16 +11,16 @@ import {
 } from "@/lib/firestore"
 import type { Person } from "@/models/Person"
 import type { Event } from "@/models/Event"
-import Image from "next/image"
 import { useAuth } from "@/components/AuthProvider"
+import { ProfileAvatar } from "@/components/ProfileAvatar"
 import { uploadProfilePhoto } from "@/lib/storage"
 import { v4 as uuidv4 } from "uuid"
-import { stringToColor } from "@/utils/colors"
 import FamilyList from "@/components/FamilyList"
 import AddMemberModal from "@/components/AddMemberModal"
 import { useSearchParams } from "next/navigation"
 import FamilyListCompact from "@/components/FamilyListCompact"
 import AddFamilyModal from "@/components/AddFamilyModal"
+import { convertHeicToJpeg, isHeicFile, isHeicFileByMagic } from "@/utils/heic"
 
 const obituaryKeywords = ["obituary", "obituaries", "legacy", "memorial"]
 
@@ -39,6 +39,7 @@ export default function ProfilePage() {
   const [form, setForm] = useState<Partial<Person>>({})
   const [photoUploading, setPhotoUploading] = useState(false)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [photoError, setPhotoError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showFamilyModal, setShowFamilyModal] = useState(false)
   const [showAddFamilyModal, setShowAddFamilyModal] = useState(false)
@@ -96,7 +97,7 @@ export default function ProfilePage() {
           birthDate: form.birthDate || "",
           deathDate: form.deathDate || "",
           bio: form.bio || "",
-          createdBy: user.uid,
+          createdBy: user.id,
           createdAt: now,
         }
         await savePerson(newPerson)
@@ -117,15 +118,27 @@ export default function ProfilePage() {
 
   const handlePhotoUpload = async (file: File) => {
     if (!file || !user) return
+    setPhotoError(null)
+
     setPhotoUploading(true)
     try {
-      const url = await uploadProfilePhoto(user.uid, personId, file)
+      let uploadFile = file
+
+      const needsConversion = isHeicFile(file) || (await isHeicFileByMagic(file))
+      if (needsConversion) {
+        uploadFile = await convertHeicToJpeg(file)
+      }
+
+      setPhotoPreview(URL.createObjectURL(uploadFile))
+      const url = await uploadProfilePhoto(user.id, personId, uploadFile)
       setPhotoPreview(url)
       await updatePerson(personId, { profilePhotoUrl: url })
       setPerson((prev) => ({ ...prev!, profilePhotoUrl: url }))
     } catch (err: unknown) {
       console.log(err)
-      setError("Photo upload failed.")
+      setPhotoError(
+        "Photo upload failed. If this is a HEIC image, conversion may have failed. Please try again."
+      )
     } finally {
       setPhotoUploading(false)
     }
@@ -175,35 +188,20 @@ export default function ProfilePage() {
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 border-b border-gray-800 pb-6">
           {/* Avatar */}
           <div className="relative w-32 h-32 flex-shrink-0">
-            {person.profilePhotoUrl || photoPreview ? (
-              <Image
-                src={photoPreview || person.profilePhotoUrl!}
-                alt={`${person.firstName} ${person.lastName}`}
-                width={128}
-                height={128}
-                className="rounded-full object-cover w-32 h-32 border border-gray-700"
-                loading="lazy"
-              />
-            ) : (
-              <div
-                className="w-32 h-32 rounded-full flex items-center justify-center text-3xl font-bold text-white"
-                style={{
-                  backgroundColor: stringToColor(
-                    person.firstName + person.lastName
-                  ),
-                }}
-              >
-                {person.firstName?.[0]}
-                {person.lastName?.[0]}
-              </div>
-            )}
+            <ProfileAvatar
+              src={photoPreview || person.profilePhotoUrl}
+              alt={`${person.firstName} ${person.lastName}`}
+              fallbackLetters={person.firstName + person.lastName}
+              size="lg"
+              className="w-32 h-32 border border-gray-700"
+            />
 
             {editing && (
               <label className="absolute bottom-0 right-0 bg-blue-600 text-white text-xs px-2 py-1 rounded cursor-pointer hover:bg-blue-500">
-                Upload
+                {photoUploading ? "Uploading..." : "Upload"}
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/*,.heic,.heif"
                   className="hidden"
                   onChange={(e) => {
                     const file = e.target.files?.[0]
@@ -211,6 +209,9 @@ export default function ProfilePage() {
                   }}
                 />
               </label>
+            )}
+            {editing && photoError && (
+              <p className="text-red-400 text-xs mt-2 max-w-64">{photoError}</p>
             )}
           </div>
 

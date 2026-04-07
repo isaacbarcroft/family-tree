@@ -1,22 +1,27 @@
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
-import { getApps, initializeApp } from "firebase/app"
-import { firebaseConfig } from "./firebase"
+import { supabase } from "./supabase"
 
-// ✅ Reuse your initialized Firebase app
-import { app } from "./firebase" // if you already export 'app' from firebase.ts
+const bucket = process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET || "media"
 
-const storage = getStorage(app)
+async function uploadFile(path: string, file: File) {
+  const { error } = await supabase.storage
+    .from(bucket)
+    .upload(path, file, { upsert: true, contentType: file.type })
 
-// Upload a profile photo
-export async function uploadProfilePhoto(userId: string, personId: string, file: File) {
-  const fileRef = ref(storage, `people/${personId}/profile/${file.name}`)
-  await uploadBytes(fileRef, file)
-  return await getDownloadURL(fileRef)
+  if (error) throw error
+
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from(bucket).getPublicUrl(path)
+
+  return publicUrl
 }
 
-// Upload a memory photo
+export async function uploadProfilePhoto(_userId: string, personId: string, file: File) {
+  const path = `people/${personId}/profile/${Date.now()}-${file.name}`
+  return uploadFile(path, file)
+}
+
 export async function uploadMemoryPhoto(personId: string, file: File) {
-  const fileRef = ref(storage, `people/${personId}/memories/${file.name}`)
-  await uploadBytes(fileRef, file)
-  return await getDownloadURL(fileRef)
+  const path = `people/${personId}/memories/${Date.now()}-${file.name}`
+  return uploadFile(path, file)
 }

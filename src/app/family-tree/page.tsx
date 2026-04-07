@@ -5,9 +5,8 @@ import Link from "next/link"
 import ProtectedRoute from "@/components/ProtectedRoute"
 import { addPerson, listPeople } from "@/lib/firestore"
 import type { Person } from "@/models/Person"
-import Image from "next/image"
 import { useAuth } from "@/components/AuthProvider"
-import { stringToColor } from "@/utils/colors"
+import { ProfileAvatar } from "@/components/ProfileAvatar"
 
 export default function FamilyTreePage() {
   const { user } = useAuth()
@@ -42,7 +41,7 @@ export default function FamilyTreePage() {
       firstName: form.firstName,
       lastName: form.lastName,
       roleType: form.roleType as Person["roleType"],
-      createdBy: user.uid,
+      createdBy: user.id,
       createdAt: new Date().toISOString(),
     }
 
@@ -116,27 +115,13 @@ export default function FamilyTreePage() {
                 {/* Left section: avatar + name */}
                 <div className="flex items-center gap-3">
                   {/* Avatar */}
-                  {p.profilePhotoUrl ? (
-                    <Image
-                      src={p.profilePhotoUrl}
-                      alt={`${p.firstName} ${p.lastName}`}
-                      width={40}
-                      height={40}
-                      className="rounded-full object-cover w-10 h-10 border border-gray-600"
-                    />
-                  ) : (
-                    <div
-                      className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold"
-                      style={{
-                        backgroundColor: stringToColor(
-                          p.firstName + p.lastName
-                        ),
-                      }}
-                    >
-                      {p.firstName[0]}
-                      {p.lastName[0]}
-                    </div>
-                  )}
+                  <ProfileAvatar
+                    src={p.profilePhotoUrl}
+                    alt={`${p.firstName} ${p.lastName}`}
+                    fallbackLetters={p.firstName + p.lastName}
+                    size="xs"
+                    className="w-10 h-10 border border-gray-600"
+                  />
 
                   {/* Name + Role */}
                   <div>
