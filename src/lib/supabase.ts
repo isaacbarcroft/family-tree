@@ -389,6 +389,41 @@ export const supabase = {
       return { data: payload, error: null }
     },
 
+    async verifyOtp({ token_hash, type }: { token_hash: string; type: string }) {
+      const configError = getConfigError()
+      if (configError) {
+        return { data: null, error: configError }
+      }
+
+      const response = await fetch(`${supabaseUrl}/auth/v1/verify`, {
+        method: "POST",
+        headers: {
+          apikey: supabaseAnonKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ token_hash, type }),
+      })
+
+      const payload = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        return { data: null, error: normalizeError(response.status, payload) }
+      }
+
+      if (payload.access_token && payload.user) {
+        const session: AppSession = {
+          access_token: payload.access_token,
+          refresh_token: payload.refresh_token,
+          user: payload.user,
+        }
+        setStoredSession(session)
+        emitAuth("SIGNED_IN", session)
+        return { data: session, error: null }
+      }
+
+      return { data: payload, error: null }
+    },
+
     async signOut() {
       const configError = getConfigError()
       if (configError) {

@@ -41,7 +41,7 @@ function SignupContent() {
 
     const emailRedirectTo =
       typeof window !== "undefined"
-        ? `${window.location.origin}/login?confirmed=1`
+        ? `${window.location.origin}/auth/callback`
         : undefined
 
     const { data, error: signUpError } = await supabase.auth.signUp({
