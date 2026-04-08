@@ -1,7 +1,7 @@
 "use client"
 
 import Image from "next/image"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { isSupabaseStorageUrl, toDisplayImageUrl } from "@/utils/imageUrl"
 import { stringToColor } from "@/utils/colors"
 
@@ -9,7 +9,7 @@ interface ProfileAvatarProps {
   src: string | null | undefined
   alt: string
   fallbackLetters: string
-  size?: "xs" | "sm" | "md" | "lg"
+  size?: "xs" | "sm" | "md" | "lg" | "xl"
   className?: string
 }
 
@@ -17,7 +17,8 @@ const sizeClasses = {
   xs: "w-10 h-10 text-sm",
   sm: "w-9 h-9 text-sm",
   md: "w-12 h-12 text-lg",
-  lg: "w-32 h-32 text-3xl",
+  lg: "w-36 h-36 text-3xl",
+  xl: "w-48 h-48 text-5xl",
 }
 
 export function ProfileAvatar({
@@ -28,6 +29,12 @@ export function ProfileAvatar({
   className = "",
 }: ProfileAvatarProps) {
   const [error, setError] = useState(false)
+
+  // Reset error when src changes (e.g. after photo upload)
+  useEffect(() => {
+    setError(false)
+  }, [src])
+
   const displayUrl = toDisplayImageUrl(src)
   const useNativeImg = isSupabaseStorageUrl(src) || (typeof src === "string" && src.startsWith("blob:"))
   const showFallback = !displayUrl || error
@@ -50,7 +57,7 @@ export function ProfileAvatar({
     )
   }
 
-  const sizePx = size === "xs" ? 40 : size === "sm" ? 36 : size === "md" ? 48 : 128
+  const sizePx = size === "xs" ? 40 : size === "sm" ? 36 : size === "md" ? 48 : size === "lg" ? 144 : 192
 
   if (useNativeImg) {
     return (

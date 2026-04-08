@@ -7,6 +7,7 @@ import { addPerson, listPeople, deletePerson } from "@/lib/db"
 import type { Person } from "@/models/Person"
 import { useAuth } from "@/components/AuthProvider"
 import { ProfileAvatar } from "@/components/ProfileAvatar"
+import { formatDate } from "@/utils/dates"
 
 export default function FamilyTreePage() {
   const { user } = useAuth()
@@ -151,9 +152,9 @@ export default function FamilyTreePage() {
                   </div>
                   <div className="text-sm text-gray-300">
                     {p.birthDate
-                      ? new Date(p.birthDate).toLocaleDateString()
+                      ? formatDate(p.birthDate)
                       : p.createdAt
-                        ? `Added ${new Date(p.createdAt).toLocaleDateString()}`
+                        ? `Added ${formatDate(p.createdAt)}`
                         : ""}
                   </div>
                 </Link>

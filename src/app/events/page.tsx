@@ -8,6 +8,7 @@ import ProtectedRoute from "@/components/ProtectedRoute"
 import AddEventModal from "@/components/AddEventModal"
 import { supabase } from "@/lib/supabase"
 import type { Person } from "@/models/Person"
+import { formatDate } from "@/utils/dates"
 import Link from "next/link"
 import { EVENT_TYPES } from "@/constants/enums"
 import type { EventType } from "@/constants/enums"
@@ -185,7 +186,7 @@ export default function EventsPage() {
                         </span>
                       </div>
                       <p className="text-base text-gray-300 mb-2">
-                        {new Date(e.date).toLocaleDateString()}
+                        {formatDate(e.date)}
                       </p>
                       {e.description && (
                         <p className="text-gray-300 text-base">{e.description}</p>

@@ -84,6 +84,11 @@ export default function LoginPage() {
         >
           Log In
         </button>
+        <p className="text-center">
+          <Link href="/forgot-password" className="text-blue-400 hover:text-blue-300 text-base">
+            Forgot your password?
+          </Link>
+        </p>
         <p className="text-center text-gray-300 text-base">
           Don&apos;t have an account?{" "}
           <Link href="/signup" className="text-blue-400 hover:text-blue-300">

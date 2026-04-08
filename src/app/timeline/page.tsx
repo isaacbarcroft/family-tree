@@ -6,6 +6,7 @@ import type { Event } from "@/models/Event"
 import type { Memory } from "@/models/Memory"
 import type { Person } from "@/models/Person"
 import ProtectedRoute from "@/components/ProtectedRoute"
+import { formatDate } from "@/utils/dates"
 import Link from "next/link"
 
 interface TimelineItem {
@@ -170,7 +171,7 @@ export default function TimelinePage() {
                             {item.type === "memory" ? "Memory" : item.eventType || "Event"}
                           </span>
                           <span className="text-sm text-gray-300">
-                            {new Date(item.date).toLocaleDateString()}
+                            {formatDate(item.date)}
                           </span>
                         </div>
                         <h3 className="font-semibold text-white">{item.title}</h3>

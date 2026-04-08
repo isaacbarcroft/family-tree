@@ -8,6 +8,7 @@ import type { Memory } from "@/models/Memory"
 import type { Event } from "@/models/Event"
 import Link from "next/link"
 import { ProfileAvatar } from "@/components/ProfileAvatar"
+import { formatDate } from "@/utils/dates"
 import { supabase } from "@/lib/supabase"
 
 function getNextBirthday(birthDate: string): { date: Date; daysUntil: number } {
@@ -257,7 +258,7 @@ export default function Home() {
                 )}
                 <div className="p-4">
                   <p className="text-white text-base font-medium truncate">{m.title}</p>
-                  <p className="text-gray-300 text-sm mt-1">{new Date(m.date).toLocaleDateString()}</p>
+                  <p className="text-gray-300 text-sm mt-1">{formatDate(m.date)}</p>
                 </div>
               </Link>
             ))}
@@ -296,7 +297,7 @@ export default function Home() {
                 className="flex items-center gap-4 bg-gray-800 border border-gray-700 rounded-xl p-4 hover:bg-gray-700 hover:border-gray-600 transition"
               >
                 <div className="text-gray-300 text-sm font-medium w-24 flex-shrink-0">
-                  {new Date(e.date).toLocaleDateString()}
+                  {formatDate(e.date)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-white text-base font-medium truncate">{e.title}</p>

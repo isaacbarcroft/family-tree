@@ -424,6 +424,55 @@ export const supabase = {
       return { data: payload, error: null }
     },
 
+    async resetPasswordForEmail(email: string, options?: { redirectTo?: string }) {
+      const configError = getConfigError()
+      if (configError) {
+        return { error: configError }
+      }
+
+      const response = await fetch(`${supabaseUrl}/auth/v1/recover`, {
+        method: "POST",
+        headers: {
+          apikey: supabaseAnonKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          ...(options?.redirectTo ? { redirect_to: options.redirectTo } : {}),
+        }),
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null)
+        return { error: normalizeError(response.status, payload) }
+      }
+
+      return { error: null }
+    },
+
+    async updateUser({ password }: { password: string }) {
+      const configError = getConfigError()
+      if (configError) {
+        return { error: configError }
+      }
+
+      const headers = await getFreshAuthHeaders(true)
+
+      const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({ password }),
+      })
+
+      const payload = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        return { error: normalizeError(response.status, payload) }
+      }
+
+      return { data: payload, error: null }
+    },
+
     async signOut() {
       const configError = getConfigError()
       if (configError) {

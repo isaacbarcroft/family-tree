@@ -5,6 +5,7 @@ import { useAuth } from "@/components/AuthProvider"
 import type { Family } from "@/models/Family"
 import Link from "next/link"
 import AddFamilyModal from "@/components/AddFamilyModal"
+import { formatDate } from "@/utils/dates"
 import { supabase } from "@/lib/supabase"
 import { deleteFamily } from "@/lib/db"
 import ProtectedRoute from "@/components/ProtectedRoute"
@@ -86,7 +87,7 @@ export default function FamiliesPage() {
                   </div>
 
                   <div className="mt-3 text-gray-300 text-sm flex justify-between items-center">
-                    <p>Created {new Date(f.createdAt).toLocaleDateString()}</p>
+                    <p>Created {formatDate(f.createdAt)}</p>
                     {f.members && (
                       <p>
                         {f.members.length} member{f.members.length !== 1 && "s"}

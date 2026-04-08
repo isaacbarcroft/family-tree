@@ -8,6 +8,7 @@ import ProtectedRoute from "@/components/ProtectedRoute"
 import AddMemoryModal from "@/components/AddMemoryModal"
 import { supabase } from "@/lib/supabase"
 import type { Person } from "@/models/Person"
+import { formatDate } from "@/utils/dates"
 import Link from "next/link"
 
 export default function MemoriesPage() {
@@ -224,7 +225,7 @@ export default function MemoriesPage() {
                           )}
                         </div>
                         <p className="text-base text-gray-300 mb-2">
-                          {new Date(m.date).toLocaleDateString()}
+                          {formatDate(m.date)}
                           {m.peopleIds.length > 0 && ` \u00B7 ${m.peopleIds.length} tagged`}
                         </p>
 

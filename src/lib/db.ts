@@ -3,8 +3,8 @@ import type { Person } from "@/models/Person"
 import type { Event } from "@/models/Event"
 import type { Memory } from "@/models/Memory"
 
-function buildSearchName(firstName?: string, lastName?: string) {
-  return `${firstName ?? ""} ${lastName ?? ""}`.toLowerCase().trim()
+function buildSearchName(firstName?: string, middleName?: string, lastName?: string) {
+  return [firstName, middleName, lastName].filter(Boolean).join(" ").toLowerCase().trim()
 }
 
 async function appendUnique(
@@ -13,30 +13,41 @@ async function appendUnique(
   field: string,
   value: string
 ) {
+  // Use select("*") to avoid issues with column name quoting in PostgREST
   const { data, error } = await supabase
     .from(table)
-    .select(field)
+    .select("*")
     .eq("id", id)
     .single()
 
-  if (error) throw error
+  if (error) {
+    console.error(`appendUnique: failed to fetch ${table}/${id}`, error)
+    throw error
+  }
 
-  const existing = ((data as Record<string, unknown>)?.[field] as string[] | null) ?? []
-  const next = Array.from(new Set([...existing, value]))
+  const record = data as Record<string, unknown>
+  const existing = (record?.[field] as string[] | null) ?? []
+
+  if (existing.includes(value)) return // already linked
+
+  const next = [...existing, value]
 
   const { error: updateError } = await supabase
     .from(table)
     .update({ [field]: next })
     .eq("id", id)
 
-  if (updateError) throw updateError
+  if (updateError) {
+    console.error(`appendUnique: failed to update ${table}/${id}.${field}`, updateError)
+    throw updateError
+  }
 }
 
 // ---- Person ----
 export async function addPerson(person: Omit<Person, "id">) {
   const payload = {
     ...person,
-    searchName: buildSearchName(person.firstName, person.lastName),
+    searchName: buildSearchName(person.firstName, person.middleName, person.lastName),
   }
 
   const { data, error } = await supabase
@@ -46,7 +57,53 @@ export async function addPerson(person: Omit<Person, "id">) {
     .single()
 
   if (error) throw error
-  return data as Person
+  const created = data as Person
+
+  // Auto-link to family by last name
+  if (created.lastName) {
+    try {
+      await autoLinkToFamilyByLastName(created)
+    } catch (err) {
+      console.error("Auto-link to family failed (non-blocking):", err)
+    }
+  }
+
+  return created
+}
+
+async function autoLinkToFamilyByLastName(person: Person) {
+  const lastName = person.lastName.trim()
+  if (!lastName) return
+
+  // Check if a family with this last name already exists
+  const { data: familiesRaw } = await supabase
+    .from("families")
+    .select("*")
+    .ilike("name", lastName)
+    .limit(1)
+
+  const families = (familiesRaw ?? []) as { id: string }[]
+
+  if (families.length > 0) {
+    // Family exists — link this person to it
+    await linkPersonToFamily(person.id, families[0].id)
+  } else if (person.createdBy) {
+    // No family exists — create one and link
+    const { data: newFamily, error: createError } = await supabase
+      .from("families")
+      .insert({
+        name: lastName,
+        "createdBy": person.createdBy,
+        members: [person.id],
+      })
+      .select("*")
+      .single()
+
+    if (!createError && newFamily) {
+      const created = newFamily as { id: string }
+      await appendUnique("people", person.id, "familyIds", created.id)
+    }
+  }
 }
 
 export async function listPeople() {
@@ -69,7 +126,7 @@ export async function getPersonById(id: string) {
 export async function savePerson(person: Person) {
   const payload = {
     ...person,
-    searchName: buildSearchName(person.firstName, person.lastName),
+    searchName: buildSearchName(person.firstName, person.middleName, person.lastName),
   }
 
   const { error } = await supabase.from("people").upsert(payload, { onConflict: "id" })
@@ -80,11 +137,12 @@ export async function savePerson(person: Person) {
 export async function updatePerson(id: string, updates: Partial<Person>) {
   const normalizedUpdates: Partial<Person> = { ...updates }
 
-  if (updates.firstName !== undefined || updates.lastName !== undefined) {
+  if (updates.firstName !== undefined || updates.middleName !== undefined || updates.lastName !== undefined) {
     const current = await getPersonById(id)
     const firstName = updates.firstName ?? current?.firstName ?? ""
+    const middleName = updates.middleName ?? current?.middleName
     const lastName = updates.lastName ?? current?.lastName ?? ""
-    normalizedUpdates.searchName = buildSearchName(firstName, lastName)
+    normalizedUpdates.searchName = buildSearchName(firstName, middleName, lastName)
   }
 
   const { error } = await supabase.from("people").update(normalizedUpdates).eq("id", id)
@@ -96,16 +154,26 @@ export async function linkPersonToFamily(personId: string, familyId: string) {
   await appendUnique("families", familyId, "members", personId)
 }
 
+export async function listFamiliesForPerson(personId: string) {
+  // Look up families where this person is in the members array
+  // This is more reliable than person.familyIds which can get out of sync
+  const { data, error } = await supabase
+    .from("families")
+    .select("*")
+    .contains("members", [personId])
+
+  if (error) throw error
+  return (data ?? []) as import("@/models/Family").Family[]
+}
+
 export async function linkParentChild(parentId: string, childId: string) {
   await appendUnique("people", parentId, "childIds", childId)
   await appendUnique("people", childId, "parentIds", parentId)
 }
 
 export async function linkSpouses(personAId: string, personBId: string) {
-  await Promise.all([
-    appendUnique("people", personAId, "spouseIds", personBId),
-    appendUnique("people", personBId, "spouseIds", personAId),
-  ])
+  await appendUnique("people", personAId, "spouseIds", personBId)
+  await appendUnique("people", personBId, "spouseIds", personAId)
 }
 
 export async function deletePerson(id: string) {

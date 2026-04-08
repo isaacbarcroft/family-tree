@@ -8,6 +8,7 @@ import Link from "next/link"
 import { getPersonById } from "@/lib/db"
 import FamilyTreeView from "@/components/FamilyTreeView"
 import { supabase } from "@/lib/supabase"
+import { formatDate } from "@/utils/dates"
 import ProtectedRoute from "@/components/ProtectedRoute"
 import { ProfileAvatar } from "@/components/ProfileAvatar"
 
@@ -93,7 +94,7 @@ export default function FamilyPage() {
           {family.origin && <p className="text-gray-300 text-base mt-1">🏡 Origin: {family.origin}</p>}
           <div className="flex items-center gap-3 mt-3">
             <p className="text-gray-300 text-sm">
-              Created {new Date(family.createdAt).toLocaleDateString()}
+              Created {formatDate(family.createdAt)}
             </p>
             <button
               onClick={copyInviteLink}
