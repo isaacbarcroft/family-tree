@@ -11,9 +11,18 @@ import { ProfileAvatar } from "@/components/ProfileAvatar"
 import { formatDate } from "@/utils/dates"
 import { supabase } from "@/lib/supabase"
 
+/** Parse a date string as local time (avoids UTC timezone shift for "YYYY-MM-DD" strings) */
+function parseLocalDate(dateStr: string): Date {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const [year, month, day] = dateStr.split("-").map(Number)
+    return new Date(year, month - 1, day)
+  }
+  return new Date(dateStr)
+}
+
 function getNextBirthday(birthDate: string): { date: Date; daysUntil: number } {
   const today = new Date()
-  const birth = new Date(birthDate)
+  const birth = parseLocalDate(birthDate)
   const next = new Date(today.getFullYear(), birth.getMonth(), birth.getDate())
   if (next < today) next.setFullYear(next.getFullYear() + 1)
   const diff = Math.ceil((next.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
@@ -22,7 +31,7 @@ function getNextBirthday(birthDate: string): { date: Date; daysUntil: number } {
 
 function getAge(birthDate: string): number {
   const today = new Date()
-  const birth = new Date(birthDate)
+  const birth = parseLocalDate(birthDate)
   let age = today.getFullYear() - birth.getFullYear()
   const m = today.getMonth() - birth.getMonth()
   if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--
