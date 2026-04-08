@@ -2,9 +2,8 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { getDoc, doc } from "firebase/firestore"
-import { db } from "@/lib/firebase"
 import type { Family } from "@/models/Family"
+import { supabase } from "@/lib/supabase"
 
 interface FamilyListCompactProps {
   ids?: string[]
@@ -15,16 +14,21 @@ const FamilyListCompact = ({ ids = [] }: FamilyListCompactProps) => {
 
   useEffect(() => {
     const fetchFamilies = async () => {
-      if (!ids.length) return
-      const fetched: Family[] = []
-      for (const id of ids) {
-        const snap = await getDoc(doc(db, "families", id))
-        if (snap.exists()) {
-          fetched.push({ id: snap.id, ...snap.data() } as Family)
-        }
+      if (!ids.length) {
+        setFamilies([])
+        return
       }
-      setFamilies(fetched)
+
+      const { data, error } = await supabase.from("families").select("*").in("id", ids)
+      if (error) {
+        console.error("Failed to load families", error)
+        setFamilies([])
+        return
+      }
+
+      setFamilies((data ?? []) as Family[])
     }
+
     fetchFamilies()
   }, [ids])
 

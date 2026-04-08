@@ -1,11 +1,10 @@
 "use client"
 
 import Link from "next/link"
-import Image from "next/image"
 import type { Person } from "@/models/Person"
 import { useEffect, useState } from "react"
-import { getPersonById } from "@/lib/firestore"
-import { stringToColor } from "@/utils/colors"
+import { getPersonById } from "@/lib/db"
+import { ProfileAvatar } from "@/components/ProfileAvatar"
 
 interface FamilyListProps {
   title: string
@@ -39,23 +38,13 @@ export default function FamilyList({ title, ids = [] }: FamilyListProps) {
             key={p.id}
             className="flex items-center gap-3 bg-gray-800 border border-gray-700 rounded p-2 hover:bg-gray-700 transition"
           >
-            {p.profilePhotoUrl ? (
-              <Image
-                src={p.profilePhotoUrl}
-                alt={`${p.firstName} ${p.lastName}`}
-                width={36}
-                height={36}
-                className="rounded-full object-cover w-9 h-9 border border-gray-600"
-              />
-            ) : (
-              <div
-                className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white"
-                style={{ backgroundColor: stringToColor(p.firstName + p.lastName) }}
-              >
-                {p.firstName[0]}
-                {p.lastName[0]}
-              </div>
-            )}
+            <ProfileAvatar
+              src={p.profilePhotoUrl}
+              alt={`${p.firstName} ${p.lastName}`}
+              fallbackLetters={p.firstName + p.lastName}
+              size="sm"
+              className="w-9 h-9 border border-gray-600"
+            />
             <Link
               href={`/profile/${p.id}`}
               className="text-blue-400 hover:text-blue-300 font-medium"

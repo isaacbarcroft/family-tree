@@ -1,27 +1,38 @@
-import { db } from "@/lib/firebase"
-import { collection, addDoc, query, where, getDocs } from "firebase/firestore"
-import type { User } from "firebase/auth"
+import { supabase } from "@/lib/supabase"
+import type { AppUser } from "@/lib/supabase"
 
-export async function getOrCreatePersonForUser(user: User) {
-  // look up existing person linked to this Firebase user
-  const q = query(collection(db, "people"), where("userId", "==", user.uid))
-  const snap = await getDocs(q)
+export async function getOrCreatePersonForUser(user: AppUser) {
+  const { data: existing, error: existingError } = await supabase
+    .from("people")
+    .select("*")
+    .eq("userId", user.id)
+    .limit(1)
+    .maybeSingle()
 
-  if (!snap.empty) {
-    return { id: snap.docs[0].id, ...snap.docs[0].data() }
-  }
+  if (existingError) throw existingError
+  if (existing) return existing
 
-  // none found → create new Person record
-  const [firstName, lastName = ""] = user.displayName?.split(" ") || ["", ""]
-  const docRef = await addDoc(collection(db, "people"), {
-    firstName,
+  const fullName = String(user.user_metadata?.full_name || user.user_metadata?.name || "")
+  const [firstName, ...rest] = fullName.split(" ")
+  const lastName = rest.join(" ")
+
+  const payload = {
+    firstName: firstName || "",
     lastName,
     email: user.email || "",
-    userId: user.uid,
-    roleType: "member",
-    createdBy: user.uid,
+    userId: user.id,
+    roleType: "family member",
+    createdBy: user.id,
     createdAt: new Date().toISOString(),
-    searchName: `${firstName} ${lastName}`.toLowerCase().trim(),
-  })
-  return { id: docRef.id, firstName, lastName, email: user.email }
+    searchName: `${firstName || ""} ${lastName}`.toLowerCase().trim(),
+  }
+
+  const { data, error } = await supabase
+    .from("people")
+    .insert(payload)
+    .select("*")
+    .single()
+
+  if (error) throw error
+  return data
 }

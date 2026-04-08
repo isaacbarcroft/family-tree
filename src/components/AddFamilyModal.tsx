@@ -1,18 +1,22 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { collection, getDocs, query, orderBy, where, limit, addDoc } from "firebase/firestore"
-import { db } from "@/lib/firebase"
-import { linkPersonToFamily } from "@/lib/firestore"
+import { linkPersonToFamily } from "@/lib/db"
 import type { Family } from "@/models/Family"
 import { useAuth } from "@/components/AuthProvider"
+import { supabase } from "@/lib/supabase"
 
 interface AddFamilyModalProps {
   onClose: () => void
-  currentPersonId: string
+  onCreated?: () => void
+  currentPersonId?: string
 }
 
-const AddFamilyModal = ({ onClose, currentPersonId }: AddFamilyModalProps) => {
+const AddFamilyModal = ({
+  onClose,
+  onCreated,
+  currentPersonId,
+}: AddFamilyModalProps) => {
   const { user } = useAuth()
   const [search, setSearch] = useState("")
   const [results, setResults] = useState<Family[]>([])
@@ -21,56 +25,87 @@ const AddFamilyModal = ({ onClose, currentPersonId }: AddFamilyModalProps) => {
 
   useEffect(() => {
     const fetchFamilies = async () => {
-      if (!search.trim()) return setResults([])
+      if (!search.trim()) {
+        setResults([])
+        return
+      }
+
       setLoading(true)
-      const term = search.toLowerCase()
-      const q = query(
-        collection(db, "families"),
-        orderBy("name"),
-        where("name", ">=", term),
-        where("name", "<=", term + "\uf8ff"),
-        limit(10)
-      )
-      const snap = await getDocs(q)
-      const families = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Family[]
-      setResults(families)
+      const term = search.trim()
+      const { data, error } = await supabase
+        .from("families")
+        .select("*")
+        .ilike("name", `${term}%`)
+        .order("name", { ascending: true })
+        .limit(10)
+
+      if (error) {
+        console.error(error)
+        setResults([])
+      } else {
+        setResults((data ?? []) as Family[])
+      }
       setLoading(false)
     }
+
     fetchFamilies()
   }, [search])
 
   const handleLink = async (familyId: string) => {
+    if (!currentPersonId) return
     await linkPersonToFamily(currentPersonId, familyId)
+    onCreated?.()
     onClose()
   }
 
   const handleCreate = async () => {
     if (!search.trim() || !user) return
+
     setCreating(true)
-    const docRef = await addDoc(collection(db, "families"), {
-      name: search.trim(),
-      createdBy: user.uid,
-      createdAt: new Date().toISOString(),
-      members: [currentPersonId],
-    })
-    await linkPersonToFamily(currentPersonId, docRef.id)
-    setCreating(false)
-    onClose()
+    try {
+      const payload: Omit<Family, "id"> = {
+        name: search.trim(),
+        createdBy: user.id,
+        createdAt: new Date().toISOString(),
+        members: currentPersonId ? [currentPersonId] : [],
+      }
+
+      const { data, error } = await supabase
+        .from("families")
+        .insert(payload)
+        .select("*")
+        .single()
+
+      if (error) throw error
+
+      if (currentPersonId) {
+        await linkPersonToFamily(currentPersonId, data.id)
+      }
+
+      onCreated?.()
+      onClose()
+    } catch (err) {
+      console.error("Failed to create family", err)
+    } finally {
+      setCreating(false)
+    }
   }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 w-full max-w-md text-gray-100 shadow-lg">
-        <h3 className="text-lg font-semibold mb-4 text-white">Add to Family</h3>
+        <h3 className="text-lg font-semibold mb-4 text-white">
+          {currentPersonId ? "Add to Family" : "Create Family"}
+        </h3>
         <input
           type="text"
           placeholder="Search or create family..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="border border-gray-700 bg-gray-800 text-gray-100 p-2 rounded w-full mb-4"
+          className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full mb-4"
         />
         {loading ? (
-          <p className="text-gray-400 text-sm">Searching...</p>
+          <p className="text-gray-300 text-base">Searching...</p>
         ) : results.length > 0 ? (
           <ul className="space-y-2 mb-4 max-h-40 overflow-y-auto">
             {results.map((f) => (
@@ -85,22 +120,28 @@ const AddFamilyModal = ({ onClose, currentPersonId }: AddFamilyModalProps) => {
           </ul>
         ) : (
           search && (
-            <p className="text-gray-400 text-sm mb-4">No families found for “{search}”.</p>
+            <p className="text-gray-300 text-base mb-4">No families found for “{search}”.</p>
           )
         )}
-        {search && results.length === 0 && (
+
+        {search && (results.length === 0 || !currentPersonId) && (
           <button
             onClick={handleCreate}
             disabled={creating}
-            className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded mb-4"
+            className="bg-green-600 hover:bg-green-500 text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px] mb-4"
           >
-            {creating ? "Creating..." : `Create “${search}” and Link`}
+            {creating
+              ? "Creating..."
+              : currentPersonId
+                ? `Create “${search}” and Link`
+                : `Create “${search}”`}
           </button>
         )}
+
         <div className="flex justify-end">
           <button
             onClick={onClose}
-            className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded"
+            className="bg-gray-700 hover:bg-gray-600 text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px]"
           >
             Close
           </button>
