@@ -38,7 +38,7 @@ export default function ForgotPasswordPage() {
   if (sent) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center">
-        <div className="w-full max-w-sm bg-gray-900 border border-gray-800 rounded-xl p-8 text-center">
+        <div className="w-full max-w-sm bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl card-shadow p-8 text-center">
           <h1 className="text-2xl font-bold text-white mb-3">Check Your Email</h1>
           <p className="text-gray-300 mb-6">
             We sent a password reset link to{" "}
@@ -47,7 +47,7 @@ export default function ForgotPasswordPage() {
           </p>
           <Link
             href="/login"
-            className="inline-block bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-500 font-medium transition"
+            className="inline-block bg-[var(--accent)] text-white px-6 py-2.5 rounded-lg hover:bg-[var(--accent-hover)] font-medium transition"
           >
             Back to Login
           </Link>
@@ -60,7 +60,7 @@ export default function ForgotPasswordPage() {
     <div className="min-h-[80vh] flex items-center justify-center">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-sm bg-gray-900 border border-gray-800 rounded-xl p-8 space-y-4"
+        className="w-full max-w-sm bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl card-shadow p-8 space-y-4"
       >
         <h1 className="text-2xl font-bold text-white text-center">
           Reset Password
@@ -83,13 +83,13 @@ export default function ForgotPasswordPage() {
         <button
           type="submit"
           disabled={loading}
-          className="bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-500 w-full text-base font-medium min-h-[44px] transition disabled:opacity-50"
+          className="bg-[var(--accent)] text-white py-2.5 rounded-lg hover:bg-[var(--accent-hover)] w-full text-base font-medium min-h-[44px] transition disabled:opacity-50"
         >
           {loading ? "Sending..." : "Send Reset Link"}
         </button>
         <p className="text-center text-gray-300 text-base">
           Remember your password?{" "}
-          <Link href="/login" className="text-blue-400 hover:text-blue-300">
+          <Link href="/login" className="text-[var(--accent)] hover:text-[var(--accent-hover)]">
             Log in
           </Link>
         </p>

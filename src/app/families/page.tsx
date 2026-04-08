@@ -6,27 +6,29 @@ import type { Family } from "@/models/Family"
 import Link from "next/link"
 import AddFamilyModal from "@/components/AddFamilyModal"
 import { formatDate } from "@/utils/dates"
-import { supabase } from "@/lib/supabase"
-import { deleteFamily } from "@/lib/db"
+import { deleteFamily, listFamilies } from "@/lib/db"
 import ProtectedRoute from "@/components/ProtectedRoute"
+import ConfirmDialog from "@/components/ConfirmDialog"
+import { SkeletonCard } from "@/components/SkeletonLoader"
 
 export default function FamiliesPage() {
+  const PAGE_SIZE = 24
   const [families, setFamilies] = useState<Family[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const { user } = useAuth()
 
-  const fetchFamilies = async () => {
+  const fetchFamilies = async (pageNum = 1, replace = true) => {
     try {
-      const { data, error: queryError } = await supabase
-        .from("families")
-        .select("*")
-        .order("name", { ascending: true })
-
-      if (queryError) throw queryError
-      setFamilies((data ?? []) as Family[])
+      const result = await listFamilies({ page: pageNum, pageSize: PAGE_SIZE, paginate: true })
+      setFamilies((prev) => replace ? result.data : [...prev, ...result.data])
+      setTotal(result.total)
+      setPage(pageNum)
     } catch (err: unknown) {
       console.error(err)
       setError("Unable to load families.")
@@ -39,10 +41,22 @@ export default function FamiliesPage() {
     fetchFamilies()
   }, [])
 
+  const hasMore = total !== null && families.length < total
+
+  const loadMore = async () => {
+    setLoadingMore(true)
+    await fetchFamilies(page + 1, false)
+    setLoadingMore(false)
+  }
+
   if (loading)
     return (
       <ProtectedRoute>
-        <div className="text-center py-16 text-gray-400 text-lg">Loading families...</div>
+        <div className="max-w-5xl mx-auto p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1,2,3].map((i) => <SkeletonCard key={i} className="h-36" />)}
+          </div>
+        </div>
       </ProtectedRoute>
     )
 
@@ -55,12 +69,12 @@ export default function FamiliesPage() {
 
   return (
     <ProtectedRoute>
-      <div className="max-w-5xl mx-auto p-6 bg-gray-900 text-gray-100 rounded-xl shadow-lg">
+      <div className="max-w-5xl mx-auto p-6 bg-[var(--card-bg)] text-[var(--foreground)] rounded-xl card-shadow">
         <div className="flex flex-col sm:flex-row justify-between items-center mb-6">
           <h1 className="text-4xl font-bold text-white mb-4 sm:mb-0">Families</h1>
           <button
             onClick={() => setShowAddModal(true)}
-            className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px]"
+            className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px]"
           >
             + Add Family
           </button>
@@ -69,18 +83,24 @@ export default function FamiliesPage() {
         {families.length === 0 ? (
           <p className="text-gray-400 text-center">No families found.</p>
         ) : (
+          <>
+          {total !== null && (
+            <p className="text-gray-400 text-sm mb-3">
+              Showing {families.length} of {total} families
+            </p>
+          )}
           <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {families.map((f) => (
               <li key={f.id} className="relative">
                 <Link
                   href={`/family/${f.id}`}
-                  className="block border border-gray-700 bg-gray-800 rounded-xl p-5 hover:bg-gray-700 hover:border-gray-600 transition cursor-pointer flex flex-col justify-between h-full"
+                  className="block border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-5 hover:bg-gray-700 hover:border-gray-600 transition cursor-pointer flex flex-col justify-between h-full"
                 >
                   <div>
                     <h2 className="text-xl font-semibold text-white mb-1 pr-16">
                       {f.name}
                     </h2>
-                    {f.origin && <p className="text-gray-300 text-base mb-2">🏡 {f.origin}</p>}
+                    {f.origin && <p className="text-gray-300 text-base mb-2">Origin:{f.origin}</p>}
                     {f.description && (
                       <p className="text-gray-300 text-base line-clamp-3">{f.description}</p>
                     )}
@@ -99,24 +119,14 @@ export default function FamiliesPage() {
                 {user?.id === f.createdBy && (
                 <div className="absolute top-3 right-3">
                   {confirmDeleteId === f.id ? (
-                    <div className="flex gap-1 bg-gray-900 rounded-lg p-1">
-                      <button
-                        onClick={async () => {
-                          await deleteFamily(f.id)
-                          setConfirmDeleteId(null)
-                          fetchFamilies()
-                        }}
-                        className="text-red-400 hover:text-red-300 text-sm px-2 py-1 rounded hover:bg-gray-800 transition"
-                      >
-                        Yes
-                      </button>
-                      <button
-                        onClick={() => setConfirmDeleteId(null)}
-                        className="text-gray-400 hover:text-white text-sm px-2 py-1 rounded hover:bg-gray-800 transition"
-                      >
-                        No
-                      </button>
-                    </div>
+                    <ConfirmDialog
+                      onConfirm={async () => {
+                        await deleteFamily(f.id)
+                        setConfirmDeleteId(null)
+                        fetchFamilies()
+                      }}
+                      onCancel={() => setConfirmDeleteId(null)}
+                    />
                   ) : (
                     <button
                       onClick={(e) => { e.preventDefault(); setConfirmDeleteId(f.id) }}
@@ -130,6 +140,18 @@ export default function FamiliesPage() {
               </li>
             ))}
           </ul>
+          {hasMore && (
+            <div className="text-center mt-6">
+              <button
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="bg-gray-800 hover:bg-gray-700 text-white px-6 py-2.5 rounded-lg text-base font-medium min-h-[44px] transition disabled:opacity-50"
+              >
+                {loadingMore ? "Loading..." : "Load More"}
+              </button>
+            </div>
+          )}
+          </>
         )}
 
         {showAddModal && (

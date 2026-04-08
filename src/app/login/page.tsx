@@ -58,7 +58,7 @@ export default function LoginPage() {
     <div className="min-h-[80vh] flex items-center justify-center">
       <form
         onSubmit={handleLogin}
-        className="w-full max-w-sm bg-gray-900 border border-gray-800 rounded-xl p-8 space-y-4"
+        className="w-full max-w-sm bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl card-shadow p-8 space-y-4"
       >
         <h1 className="text-2xl font-bold text-white text-center">Welcome Back</h1>
         {info && <p className="text-blue-400 text-base text-center">{info}</p>}
@@ -80,18 +80,18 @@ export default function LoginPage() {
         />
         <button
           type="submit"
-          className="bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-500 w-full text-base font-medium min-h-[44px] transition"
+          className="bg-[var(--accent)] text-white py-2.5 rounded-lg hover:bg-[var(--accent-hover)] w-full text-base font-medium min-h-[44px] transition"
         >
           Log In
         </button>
         <p className="text-center">
-          <Link href="/forgot-password" className="text-blue-400 hover:text-blue-300 text-base">
+          <Link href="/forgot-password" className="text-[var(--accent)] hover:text-[var(--accent-hover)] text-base">
             Forgot your password?
           </Link>
         </p>
         <p className="text-center text-gray-300 text-base">
           Don&apos;t have an account?{" "}
-          <Link href="/signup" className="text-blue-400 hover:text-blue-300">
+          <Link href="/signup" className="text-[var(--accent)] hover:text-[var(--accent-hover)]">
             Sign up
           </Link>
         </p>

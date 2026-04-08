@@ -77,16 +77,16 @@ export default function NavBar() {
   ]
 
   return (
-    <nav className="bg-gray-900 text-white p-4 shadow-sm">
+    <nav className="bg-[var(--card-bg)] text-white p-4 border-b border-[var(--card-border)]">
       <div className="container mx-auto flex justify-between items-center">
-        <Link href="/" className="font-bold text-xl hover:text-blue-300 transition">
-          Family Legacy
+        <Link href="/" className="font-bold text-xl hover:text-[var(--accent)] transition">
+          <span className="warm-gradient">Family Legacy</span>
         </Link>
 
         {user && (
           <div className="hidden md:flex items-center space-x-4 flex-1 justify-end">
             {navLinks.map((link) => (
-              <Link key={link.href} href={link.href} className="hover:text-blue-300 text-base">
+              <Link key={link.href} href={link.href} className="hover:text-[var(--accent)] text-base transition">
                 {link.label}
               </Link>
             ))}

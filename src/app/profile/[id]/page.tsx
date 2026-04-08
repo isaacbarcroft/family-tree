@@ -10,10 +10,14 @@ import {
   listEventsForPerson,
   listMemoriesForPerson,
   listFamiliesForPerson,
+  listRelationshipsForPerson,
+  unlinkParentChild,
+  unlinkSpouses,
 } from "@/lib/db"
 import type { Person } from "@/models/Person"
 import type { Event } from "@/models/Event"
 import type { Memory } from "@/models/Memory"
+import type { Relationship } from "@/models/Relationship"
 import AddMemoryModal from "@/components/AddMemoryModal"
 import { useAuth } from "@/components/AuthProvider"
 import { ProfileAvatar } from "@/components/ProfileAvatar"
@@ -23,8 +27,8 @@ import Link from "next/link"
 import FamilyList from "@/components/FamilyList"
 import AddMemberModal from "@/components/AddMemberModal"
 import { useSearchParams } from "next/navigation"
-import FamilyListCompact from "@/components/FamilyListCompact"
 import AddFamilyModal from "@/components/AddFamilyModal"
+import ProfileEditForm from "@/components/ProfileEditForm"
 import { convertHeicToJpeg, isHeicFile, isHeicFileByMagic } from "@/utils/heic"
 import { formatDate } from "@/utils/dates"
 
@@ -69,6 +73,7 @@ function ProfileContent() {
   const [showAddFamilyModal, setShowAddFamilyModal] = useState(false)
   const [showMemoryModal, setShowMemoryModal] = useState(false)
   const [showDeceased, setShowDeceased] = useState(false)
+  const [relationships, setRelationships] = useState<Relationship[]>([])
 
   useEffect(() => {
     if (searchParams.get("edit") === "true") setEditing(true)
@@ -81,16 +86,18 @@ function ProfileContent() {
         setPerson(p)
         setForm(p || {})
         if (p?.deathDate) setShowDeceased(true)
-        const [related, personMemories, families] = await Promise.all([
+        const [related, personMemories, families, rels] = await Promise.all([
           listEventsForPerson(personId),
           listMemoriesForPerson(personId),
           listFamiliesForPerson(personId),
+          listRelationshipsForPerson(personId).catch(() => [] as Relationship[]),
         ])
         setEvents(related)
         setMemories(personMemories)
         setPersonFamilies(families)
+        setRelationships(rels)
       } catch (err: unknown) {
-        console.log(err)
+        console.error(err)
         setError("Unable to load profile data.")
       } finally {
         setLoading(false)
@@ -119,7 +126,7 @@ function ProfileContent() {
           id: newId,
           firstName: form.firstName || "",
           lastName: form.lastName || "",
-          roleType: (form.roleType as Person["roleType"]) || "member",
+          roleType: (form.roleType as Person["roleType"]) || "family member",
           email: form.email || "",
           phone: form.phone || "",
           address: form.address || "",
@@ -142,7 +149,7 @@ function ProfileContent() {
         setPerson((prev) => ({ ...prev!, ...updates }))
       }
     } catch (err: unknown) {
-      console.log(err)
+      console.error(err)
       setError("Error saving profile.")
     }
     setEditing(false)
@@ -168,13 +175,38 @@ function ProfileContent() {
       await updatePerson(personId, { profilePhotoUrl: url })
       setPerson((prev) => ({ ...prev!, profilePhotoUrl: url }))
     } catch (err: unknown) {
-      console.log(err)
+      console.error(err)
       setPhotoError(
         "Photo upload failed. If this is a HEIC image, conversion may have failed. Please try again.",
       )
     } finally {
       setPhotoUploading(false)
     }
+  }
+
+  const refreshPerson = async () => {
+    const p = await getPersonById(personId)
+    if (p) {
+      setPerson(p)
+      setForm(p)
+    }
+    const rels = await listRelationshipsForPerson(personId).catch(() => [] as Relationship[])
+    setRelationships(rels)
+  }
+
+  const handleRemoveParent = async (parentId: string) => {
+    await unlinkParentChild(parentId, personId)
+    await refreshPerson()
+  }
+
+  const handleRemoveChild = async (childId: string) => {
+    await unlinkParentChild(personId, childId)
+    await refreshPerson()
+  }
+
+  const handleRemoveSpouse = async (spouseId: string) => {
+    await unlinkSpouses(personId, spouseId)
+    await refreshPerson()
   }
 
   const obituary =
@@ -233,7 +265,7 @@ function ProfileContent() {
 
       <div className="max-w-3xl mx-auto p-6 space-y-6">
         {/* --- Profile Header --- */}
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+        <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl card-shadow p-6">
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
             {/* Avatar */}
             <div className="relative flex-shrink-0">
@@ -269,7 +301,7 @@ function ProfileContent() {
                 </div>
               )}
               {editing && !photoUploading && (
-                <label className="absolute bottom-2 right-2 bg-blue-600 text-white text-sm px-3 py-1.5 rounded-full cursor-pointer hover:bg-blue-500 shadow-lg font-medium transition">
+                <label className="absolute bottom-2 right-2 bg-[var(--accent)] text-white text-sm px-3 py-1.5 rounded-full cursor-pointer hover:bg-[var(--accent-hover)] shadow-lg font-medium transition">
                   Edit
                   <input
                     type="file"
@@ -332,7 +364,7 @@ function ProfileContent() {
                   className={`px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px] transition ${
                     editing
                       ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                      : "bg-blue-600 text-white hover:bg-blue-500"
+                      : "bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]"
                   }`}
                 >
                   {editing ? "Cancel" : "Edit Profile"}
@@ -352,240 +384,35 @@ function ProfileContent() {
 
         {/* --- Edit Mode --- */}
         {editing ? (
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-6">
-            <section>
-              <h2 className="text-lg font-semibold mb-3 text-white">
-                Basic Info
-              </h2>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-base mb-1 text-gray-300">
-                    First Name
-                  </label>
-                  <input
-                    type="text"
-                    name="firstName"
-                    value={form.firstName || ""}
-                    onChange={handleChange}
-                    className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
-                  />
-                </div>
-                <div>
-                  <label className="block text-base mb-1 text-gray-300">
-                    Middle Name
-                  </label>
-                  <input
-                    type="text"
-                    name="middleName"
-                    value={form.middleName || ""}
-                    onChange={handleChange}
-                    className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
-                  />
-                </div>
-                <div>
-                  <label className="block text-base mb-1 text-gray-300">
-                    Last Name
-                  </label>
-                  <input
-                    type="text"
-                    name="lastName"
-                    value={form.lastName || ""}
-                    onChange={handleChange}
-                    className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
-                  />
-                </div>
-              </div>
-            </section>
-
-            <section>
-              <h2 className="text-lg font-semibold mb-3 text-white">
-                Biography
-              </h2>
-              <textarea
-                name="bio"
-                rows={4}
-                value={form.bio || ""}
-                onChange={handleChange}
-                placeholder="Tell their story..."
-                className="border border-gray-700 bg-gray-800 text-white p-3 rounded-lg w-full"
-              />
-            </section>
-
-            <section>
-              <h2 className="text-lg font-semibold mb-3 text-white">
-                Contact Info
-              </h2>
-              <div className="grid grid-cols-2 gap-4">
-                {["email", "phone", "address", "city", "state", "country"].map(
-                  (field) => (
-                    <div key={field}>
-                      <label className="block text-sm mb-1 capitalize text-gray-400">
-                        {field}
-                      </label>
-                      <input
-                        type="text"
-                        name={field}
-                        value={(form[field as keyof Person] as string) || ""}
-                        onChange={handleChange}
-                        className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
-                      />
-                    </div>
-                  ),
-                )}
-              </div>
-            </section>
-
-            <section>
-              <h2 className="text-lg font-semibold mb-3 text-white">
-                Life Dates
-              </h2>
-              <div className="space-y-4">
-                <div className="max-w-xs">
-                  <label className="block text-base mb-1 text-gray-300">
-                    Birth Date
-                  </label>
-                  <input
-                    type="date"
-                    name="birthDate"
-                    value={(form.birthDate as string) || ""}
-                    onChange={handleChange}
-                    className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
-                  />
-                </div>
-                <label className="inline-flex items-center gap-2 cursor-pointer text-gray-300">
-                  <input
-                    type="checkbox"
-                    checked={showDeceased}
-                    onChange={(e) => {
-                      setShowDeceased(e.target.checked)
-                      if (!e.target.checked) {
-                        setForm((prev) => ({ ...prev, deathDate: "" }))
-                      }
-                    }}
-                    className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-base">In heaven</span>
-                </label>
-                {showDeceased && (
-                  <div className="max-w-xs">
-                    <label className="block text-base mb-1 text-gray-300">
-                      Date of Passing
-                    </label>
-                    <input
-                      type="date"
-                      name="deathDate"
-                      value={(form.deathDate as string) || ""}
-                      onChange={handleChange}
-                      className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
-                    />
-                  </div>
-                )}
-              </div>
-            </section>
-
-            <section>
-              <h2 className="text-lg font-semibold mb-3 text-white">Role</h2>
-              <select
-                name="roleType"
-                value={form.roleType || "member"}
-                onChange={handleChange}
-                className="border border-gray-700 bg-gray-800 text-white p-3 text-base rounded-lg"
-              >
-                <option value="member">Family Member</option>
-                <option value="friend">Friend</option>
-                <option value="neighbor">Neighbor</option>
-                <option value="pastor">Pastor</option>
-                <option value="other">Other</option>
-              </select>
-            </section>
-
-            <section>
-              <h2 className="text-lg font-semibold mb-3 text-white">
-                Online Presence
-              </h2>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-base mb-1 text-gray-300">
-                    Facebook URL
-                  </label>
-                  <input
-                    type="url"
-                    name="facebookUrl"
-                    placeholder="https://facebook.com/username"
-                    value={form.facebookUrl || ""}
-                    onChange={handleChange}
-                    className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
-                  />
-                </div>
-                <div>
-                  <label className="block text-base mb-1 text-gray-300">
-                    Website / Memorial URL
-                  </label>
-                  <input
-                    type="url"
-                    name="websiteUrl"
-                    placeholder="https://example.com"
-                    value={form.websiteUrl || ""}
-                    onChange={handleChange}
-                    className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
-                  />
-                </div>
-              </div>
-            </section>
-
-            {/* Family relationships - edit mode */}
-            <section>
-              <h2 className="text-lg font-semibold mb-3 text-white">
-                Family Relationships
-              </h2>
-              <FamilyList title="Parents" ids={person.parentIds} />
-              <FamilyList title="Spouses" ids={person.spouseIds} />
-              <FamilyList title="Children" ids={person.childIds} />
-              <button
-                onClick={() => setShowFamilyModal(true)}
-                className="mt-3 bg-gray-800 hover:bg-gray-700 text-gray-300 text-base px-5 py-2.5 rounded-lg border border-gray-700 min-h-[44px] font-medium transition"
-              >
-                + Add Family Member
-              </button>
-            </section>
-
-            <section>
-              <h2 className="text-lg font-semibold mb-3 text-white">
-                Family Groups
-              </h2>
-              <FamilyListCompact ids={person.familyIds} />
-              <button
-                onClick={() => setShowAddFamilyModal(true)}
-                className="mt-3 bg-gray-800 hover:bg-gray-700 text-gray-300 text-base px-5 py-2.5 rounded-lg border border-gray-700 min-h-[44px] font-medium transition"
-              >
-                + Add to Family
-              </button>
-            </section>
-
-            <div className="flex justify-end pt-2">
-              <button
-                onClick={handleSave}
-                className="bg-green-600 text-white px-6 py-2.5 rounded-lg hover:bg-green-500 text-base font-medium min-h-[44px] transition"
-              >
-                Save Changes
-              </button>
-            </div>
-          </div>
+          <ProfileEditForm
+            form={form}
+            person={person}
+            showDeceased={showDeceased}
+            onChange={handleChange}
+            onShowDeceasedChange={setShowDeceased}
+            onFormUpdate={setForm}
+            onSave={handleSave}
+            onRemoveParent={handleRemoveParent}
+            onRemoveSpouse={handleRemoveSpouse}
+            onRemoveChild={handleRemoveChild}
+            onAddFamilyMember={() => setShowFamilyModal(true)}
+            onAddToFamily={() => setShowAddFamilyModal(true)}
+          />
         ) : (
           <>
             {/* --- View Mode Content Cards --- */}
 
             {/* Family + Groups Row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl card-shadow p-5">
                 <h2 className="text-lg font-semibold mb-3 text-white">
                   Family
                 </h2>
                 {hasFamily ? (
                   <div className="space-y-2">
-                    <FamilyList title="Parents" ids={person.parentIds} />
-                    <FamilyList title="Spouses" ids={person.spouseIds} />
-                    <FamilyList title="Children" ids={person.childIds} />
+                    <FamilyList title="Parents" ids={person.parentIds} relationships={relationships} currentPersonId={person.id} />
+                    <FamilyList title="Spouses" ids={person.spouseIds} relationships={relationships} currentPersonId={person.id} />
+                    <FamilyList title="Children" ids={person.childIds} relationships={relationships} currentPersonId={person.id} />
                   </div>
                 ) : (
                   <p className="text-gray-300 text-base">
@@ -595,7 +422,7 @@ function ProfileContent() {
                 )}
               </div>
 
-              <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl card-shadow p-5">
                 <h2 className="text-lg font-semibold mb-3 text-white">
                   Family Groups
                 </h2>
@@ -605,7 +432,7 @@ function ProfileContent() {
                       <li key={f.id}>
                         <Link
                           href={`/family/${f.id}`}
-                          className="text-blue-400 hover:text-blue-300 font-medium hover:underline text-base"
+                          className="text-[var(--accent)] hover:text-blue-300 font-medium hover:underline text-base"
                         >
                           {f.name}
                         </Link>
@@ -630,7 +457,7 @@ function ProfileContent() {
                           href={person.facebookUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="block text-blue-400 hover:text-blue-300 text-base"
+                          className="block text-[var(--accent)] hover:text-blue-300 text-base"
                         >
                           Facebook Profile
                         </a>
@@ -640,7 +467,7 @@ function ProfileContent() {
                           href={person.websiteUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="block text-blue-400 hover:text-blue-300 text-base"
+                          className="block text-[var(--accent)] hover:text-blue-300 text-base"
                         >
                           {obituary ? "Obituary" : "Website"}
                         </a>
@@ -652,7 +479,7 @@ function ProfileContent() {
             </div>
 
             {/* Biography */}
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl card-shadow p-5">
               <h2 className="text-lg font-semibold mb-3 text-white">
                 Biography
               </h2>
@@ -669,7 +496,7 @@ function ProfileContent() {
             </div>
 
             {/* Life Events */}
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl card-shadow p-5">
               <h2 className="text-lg font-semibold mb-3 text-white">
                 Life Events
               </h2>
@@ -702,12 +529,12 @@ function ProfileContent() {
             </div>
 
             {/* Memories */}
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl card-shadow p-5">
               <div className="flex justify-between items-center mb-3">
                 <h2 className="text-lg font-semibold text-white">Memories</h2>
                 <button
                   onClick={() => setShowMemoryModal(true)}
-                  className="text-blue-400 hover:text-blue-300 text-base font-medium"
+                  className="text-[var(--accent)] hover:text-blue-300 text-base font-medium"
                 >
                   + Add Memory
                 </button>
@@ -756,13 +583,7 @@ function ProfileContent() {
         <AddMemberModal
           onClose={() => setShowFamilyModal(false)}
           currentPersonId={person.id}
-          onLinked={async () => {
-            const p = await getPersonById(personId)
-            if (p) {
-              setPerson(p)
-              setForm(p)
-            }
-          }}
+          onLinked={refreshPerson}
         />
       )}
       {showAddFamilyModal && (

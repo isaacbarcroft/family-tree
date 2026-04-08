@@ -5,7 +5,6 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/components/AuthProvider"
 import { supabase } from "@/lib/supabase"
-import { linkPersonToFamily, addPerson } from "@/lib/db"
 
 export default function SignupPage() {
   return (
@@ -16,6 +15,8 @@ export default function SignupPage() {
 }
 
 function SignupContent() {
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirm, setConfirm] = useState("")
@@ -47,7 +48,14 @@ function SignupContent() {
     const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
-      options: emailRedirectTo ? { emailRedirectTo } : undefined,
+      options: {
+        ...(emailRedirectTo ? { emailRedirectTo } : {}),
+        data: {
+          first_name: firstName,
+          last_name: lastName,
+          ...(familyId ? { family_id: familyId } : {}),
+        },
+      },
     })
 
     if (signUpError) {
@@ -56,22 +64,6 @@ function SignupContent() {
     }
 
     if (data?.access_token) {
-      // If invited to a family, create person and link
-      if (familyId && data.user?.id) {
-        try {
-          const person = await addPerson({
-            firstName: email.split("@")[0],
-            lastName: "",
-            roleType: "family member",
-            email,
-            createdBy: data.user.id,
-            createdAt: new Date().toISOString(),
-          })
-          await linkPersonToFamily(person.id, familyId)
-        } catch (err) {
-          console.error("Failed to link to family:", err)
-        }
-      }
       router.push("/")
       return
     }
@@ -82,7 +74,7 @@ function SignupContent() {
   if (pendingEmailConfirmation) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center">
-        <div className="w-full max-w-sm bg-gray-900 border border-gray-800 rounded-xl p-8 text-center">
+        <div className="w-full max-w-sm bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl card-shadow p-8 text-center">
           <h1 className="text-2xl font-bold text-white mb-3">Confirm Your Email</h1>
           <p className="text-gray-300 mb-6">
             We sent a confirmation link to <span className="font-semibold text-white">{email}</span>.
@@ -90,7 +82,7 @@ function SignupContent() {
           </p>
           <Link
             href="/login?verify=1"
-            className="inline-block bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-500 font-medium transition"
+            className="inline-block bg-[var(--accent)] text-white px-6 py-2.5 rounded-lg hover:bg-blue-500 font-medium transition"
           >
             Go to Login
           </Link>
@@ -103,7 +95,7 @@ function SignupContent() {
     <div className="min-h-[80vh] flex items-center justify-center">
       <form
         onSubmit={handleSignup}
-        className="w-full max-w-sm bg-gray-900 border border-gray-800 rounded-xl p-8 space-y-4"
+        className="w-full max-w-sm bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl card-shadow p-8 space-y-4"
       >
         <h1 className="text-2xl font-bold text-white text-center">Create Account</h1>
         {familyId && (
@@ -111,6 +103,24 @@ function SignupContent() {
         )}
         {error && <p className="text-red-400 text-base text-center">{error}</p>}
 
+        <div className="grid grid-cols-2 gap-3">
+          <input
+            type="text"
+            placeholder="First name"
+            className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            required
+          />
+          <input
+            type="text"
+            placeholder="Last name"
+            className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            required
+          />
+        </div>
         <input
           type="email"
           placeholder="Email"
@@ -134,13 +144,13 @@ function SignupContent() {
         />
         <button
           type="submit"
-          className="bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-500 w-full text-base font-medium min-h-[44px] transition"
+          className="bg-[var(--accent)] text-white py-2.5 rounded-lg hover:bg-blue-500 w-full text-base font-medium min-h-[44px] transition"
         >
           Sign Up
         </button>
         <p className="text-center text-gray-300 text-base">
           Already have an account?{" "}
-          <Link href="/login" className="text-blue-400 hover:text-blue-300">
+          <Link href="/login" className="text-[var(--accent)] hover:text-[var(--accent-hover)]">
             Log in
           </Link>
         </p>

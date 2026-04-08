@@ -8,6 +8,7 @@ import type { Person } from "@/models/Person"
 import ProtectedRoute from "@/components/ProtectedRoute"
 import { formatDate } from "@/utils/dates"
 import Link from "next/link"
+import { SkeletonLine, SkeletonCard } from "@/components/SkeletonLoader"
 
 interface TimelineItem {
   id: string
@@ -91,13 +92,16 @@ export default function TimelinePage() {
   if (loading)
     return (
       <ProtectedRoute>
-        <div className="text-center py-16 text-gray-400 text-lg">Loading timeline...</div>
+        <div className="max-w-3xl mx-auto p-6 space-y-4">
+          <SkeletonLine className="w-40 h-8 mb-4" />
+          {[1,2,3,4].map((i) => <SkeletonCard key={i} />)}
+        </div>
       </ProtectedRoute>
     )
 
   return (
     <ProtectedRoute>
-      <div className="max-w-3xl mx-auto p-6 bg-gray-900 text-gray-100 rounded-xl shadow-lg">
+      <div className="max-w-3xl mx-auto p-6 bg-[var(--card-bg)] text-[var(--foreground)] rounded-xl card-shadow">
         <h1 className="text-4xl font-bold text-white mb-6">Timeline</h1>
 
         {/* Filters */}
@@ -109,8 +113,8 @@ export default function TimelinePage() {
                 onClick={() => setFilterType(t)}
                 className={`px-4 py-2 rounded-lg text-base font-medium min-h-[44px] ${
                   filterType === t
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                    ? "bg-[var(--accent)] text-white"
+                    : "bg-gray-800/50 text-gray-300 hover:bg-gray-700/50"
                 }`}
               >
                 {t === "all" ? "All" : t === "event" ? "Events" : "Memories"}
@@ -136,7 +140,7 @@ export default function TimelinePage() {
         ) : (
           <div className="relative">
             {/* Timeline line */}
-            <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-700" />
+            <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-700/50" />
 
             <div className="space-y-6">
               {filtered.map((item) => (
@@ -148,7 +152,7 @@ export default function TimelinePage() {
                     }`}
                   />
 
-                  <div className="border border-gray-700 bg-gray-800 rounded-lg p-4">
+                  <div className="border border-[var(--card-border)] bg-[var(--card-bg)] rounded-lg p-4">
                     <div className="flex items-start gap-3">
                       {/* Memory thumbnail */}
                       {item.imageUrl && (
@@ -188,7 +192,7 @@ export default function TimelinePage() {
                                 <Link
                                   key={pid}
                                   href={`/profile/${pid}`}
-                                  className="text-blue-400 hover:text-blue-300 text-sm"
+                                  className="text-[var(--accent)] hover:text-[var(--accent-hover)] text-sm"
                                 >
                                   {person.firstName}
                                 </Link>

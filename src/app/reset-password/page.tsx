@@ -89,7 +89,7 @@ function ResetPasswordContent() {
   if (success) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center">
-        <div className="w-full max-w-sm bg-gray-900 border border-gray-800 rounded-xl p-8 text-center">
+        <div className="w-full max-w-sm bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl card-shadow p-8 text-center">
           <h1 className="text-2xl font-bold text-white mb-3">
             Password Updated
           </h1>
@@ -104,12 +104,12 @@ function ResetPasswordContent() {
   if (error && !sessionReady) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center">
-        <div className="w-full max-w-sm bg-gray-900 border border-gray-800 rounded-xl p-8 text-center">
+        <div className="w-full max-w-sm bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl card-shadow p-8 text-center">
           <h1 className="text-2xl font-bold text-white mb-3">Reset Failed</h1>
           <p className="text-red-400 mb-6">{error}</p>
           <Link
             href="/forgot-password"
-            className="inline-block bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-500 font-medium transition"
+            className="inline-block bg-[var(--accent)] text-white px-6 py-2.5 rounded-lg hover:bg-[var(--accent-hover)] font-medium transition"
           >
             Request New Link
           </Link>
@@ -122,7 +122,7 @@ function ResetPasswordContent() {
     <div className="min-h-[80vh] flex items-center justify-center">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-sm bg-gray-900 border border-gray-800 rounded-xl p-8 space-y-4"
+        className="w-full max-w-sm bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl card-shadow p-8 space-y-4"
       >
         <h1 className="text-2xl font-bold text-white text-center">
           Set New Password
@@ -151,7 +151,7 @@ function ResetPasswordContent() {
         <button
           type="submit"
           disabled={loading || !sessionReady}
-          className="bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-500 w-full text-base font-medium min-h-[44px] transition disabled:opacity-50"
+          className="bg-[var(--accent)] text-white py-2.5 rounded-lg hover:bg-[var(--accent-hover)] w-full text-base font-medium min-h-[44px] transition disabled:opacity-50"
         >
           {loading ? "Updating..." : "Update Password"}
         </button>

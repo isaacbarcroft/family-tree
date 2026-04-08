@@ -1,11 +1,13 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { linkParentChild, linkSpouses, addPerson } from "@/lib/db"
+import { linkParentChild, linkSpouses, addPerson, addRelationship } from "@/lib/db"
 import type { Person } from "@/models/Person"
+import type { RelationshipSubtype, MarriageStatus } from "@/models/Relationship"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/AuthProvider"
 import { supabase } from "@/lib/supabase"
+import { RELATIONSHIP_SUBTYPES, MARRIAGE_STATUSES } from "@/constants/enums"
 
 interface AddMemberModalProps {
   onClose: () => void
@@ -17,6 +19,9 @@ const AddMemberModal = ({ onClose, currentPersonId, onLinked }: AddMemberModalPr
   const [relationship, setRelationship] = useState<
     "parent" | "child" | "spouse"
   >("parent")
+  const [subtype, setSubtype] = useState<RelationshipSubtype>("biological")
+  const [marriageStatus, setMarriageStatus] = useState<MarriageStatus>("married")
+  const [marriageDate, setMarriageDate] = useState("")
   const [search, setSearch] = useState("")
   const [results, setResults] = useState<Person[]>([])
   const [loading, setLoading] = useState(false)
@@ -65,6 +70,30 @@ const AddMemberModal = ({ onClose, currentPersonId, onLinked }: AddMemberModalPr
     if (relationship === "child")
       await linkParentChild(currentPersonId, targetId)
     if (relationship === "spouse") await linkSpouses(currentPersonId, targetId)
+
+    // Create a Relationship metadata record
+    try {
+      const relType = relationship === "spouse" ? "spouse" as const : "parent-child" as const
+      const personAId = relationship === "parent" ? targetId : currentPersonId
+      const personBId = relationship === "parent" ? currentPersonId : targetId
+
+      await addRelationship({
+        personAId,
+        personBId,
+        type: relType,
+        subtype,
+        ...(relationship === "spouse" && {
+          marriageStatus,
+          ...(marriageDate && { startDate: marriageDate }),
+        }),
+        createdBy: user?.id || "system",
+        createdAt: new Date().toISOString(),
+      })
+    } catch (err) {
+      // Non-blocking — the array-based link is the primary relationship storage
+      console.error("Failed to create relationship metadata:", err)
+    }
+
     onLinked?.()
     onClose()
   }
@@ -113,9 +142,52 @@ const AddMemberModal = ({ onClose, currentPersonId, onLinked }: AddMemberModalPr
           >
             <option value="parent">Parent</option>
             <option value="child">Child</option>
-            <option value="spouse">Spouse</option>
+            <option value="spouse">Spouse / Partner</option>
           </select>
         </div>
+
+        {(relationship === "parent" || relationship === "child") && (
+          <div className="mb-4">
+            <label className="block text-base text-gray-300 mb-1">
+              Relationship
+            </label>
+            <select
+              value={subtype}
+              onChange={(e) => setSubtype(e.target.value as RelationshipSubtype)}
+              className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
+            >
+              {RELATIONSHIP_SUBTYPES.map((s) => (
+                <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {relationship === "spouse" && (
+          <div className="mb-4 space-y-3">
+            <div>
+              <label className="block text-base text-gray-300 mb-1">Status</label>
+              <select
+                value={marriageStatus}
+                onChange={(e) => setMarriageStatus(e.target.value as MarriageStatus)}
+                className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
+              >
+                {MARRIAGE_STATUSES.map((s) => (
+                  <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-base text-gray-300 mb-1">Date (optional)</label>
+              <input
+                type="date"
+                value={marriageDate}
+                onChange={(e) => setMarriageDate(e.target.value)}
+                className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
+              />
+            </div>
+          </div>
+        )}
 
         <div className="mb-4">
           <label className="block text-base text-gray-300 mb-1">

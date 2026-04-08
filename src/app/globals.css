@@ -1,13 +1,23 @@
 @import "tailwindcss";
 
 :root {
-  --background: #030712;
-  --foreground: #f3f4f6;
+  --background: #0c0f17;
+  --foreground: #e8e6e3;
+  --accent: #c4956a;
+  --accent-hover: #d4a57a;
+  --card-bg: #141821;
+  --card-border: #1e2433;
+  --card-hover: #1a1f2e;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-card-bg: var(--card-bg);
+  --color-card-border: var(--card-border);
+  --color-card-hover: var(--card-hover);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -25,7 +35,7 @@ html {
 
 /* Better focus styles */
 *:focus-visible {
-  outline: 2px solid #3b82f6;
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -35,14 +45,40 @@ html {
 }
 
 ::-webkit-scrollbar-track {
-  background: #1f2937;
+  background: #141821;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #4b5563;
+  background: #2a3040;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
+  background: #3a4050;
+}
+
+/* Skeleton loading animation */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #1a1f2e 25%, #242a3a 50%, #1a1f2e 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 0.5rem;
+}
+
+/* Subtle card shadow */
+.card-shadow {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* Warm gradient for headers */
+.warm-gradient {
+  background: linear-gradient(135deg, #c4956a 0%, #a67c52 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }

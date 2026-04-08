@@ -75,12 +75,12 @@ function CallbackContent() {
   if (error) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center">
-        <div className="w-full max-w-sm bg-gray-900 border border-gray-800 rounded-xl p-8 text-center">
+        <div className="w-full max-w-sm bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl card-shadow p-8 text-center">
           <h1 className="text-2xl font-bold text-white mb-3">Verification Failed</h1>
           <p className="text-red-400 mb-6">{error}</p>
           <a
             href="/login"
-            className="inline-block bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-500 font-medium transition"
+            className="inline-block bg-[var(--accent)] text-white px-6 py-2.5 rounded-lg hover:bg-[var(--accent-hover)] font-medium transition"
           >
             Go to Login
           </a>

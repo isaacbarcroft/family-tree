@@ -2,6 +2,7 @@ import { supabase } from "./supabase"
 import type { Person } from "@/models/Person"
 import type { Event } from "@/models/Event"
 import type { Memory } from "@/models/Memory"
+import type { Relationship } from "@/models/Relationship"
 
 function buildSearchName(firstName?: string, middleName?: string, lastName?: string) {
   return [firstName, middleName, lastName].filter(Boolean).join(" ").toLowerCase().trim()
@@ -39,6 +40,41 @@ async function appendUnique(
 
   if (updateError) {
     console.error(`appendUnique: failed to update ${table}/${id}.${field}`, updateError)
+    throw updateError
+  }
+}
+
+async function removeFromArray(
+  table: "people" | "families",
+  id: string,
+  field: string,
+  value: string
+) {
+  const { data, error } = await supabase
+    .from(table)
+    .select("*")
+    .eq("id", id)
+    .single()
+
+  if (error) {
+    console.error(`removeFromArray: failed to fetch ${table}/${id}`, error)
+    throw error
+  }
+
+  const record = data as Record<string, unknown>
+  const existing = (record?.[field] as string[] | null) ?? []
+
+  if (!existing.includes(value)) return // not present
+
+  const next = existing.filter((v) => v !== value)
+
+  const { error: updateError } = await supabase
+    .from(table)
+    .update({ [field]: next })
+    .eq("id", id)
+
+  if (updateError) {
+    console.error(`removeFromArray: failed to update ${table}/${id}.${field}`, updateError)
     throw updateError
   }
 }
@@ -106,7 +142,37 @@ async function autoLinkToFamilyByLastName(person: Person) {
   }
 }
 
-export async function listPeople() {
+export interface PaginationOptions {
+  page?: number
+  pageSize?: number
+}
+
+export interface PaginatedResult<T> {
+  data: T[]
+  total: number | null
+  page: number
+  pageSize: number
+}
+
+export async function listPeople(options?: PaginationOptions): Promise<Person[]>
+export async function listPeople(options: PaginationOptions & { paginate: true }): Promise<PaginatedResult<Person>>
+export async function listPeople(options?: PaginationOptions & { paginate?: boolean }) {
+  if (options?.paginate) {
+    const page = options.page ?? 1
+    const pageSize = options.pageSize ?? 25
+    const from = (page - 1) * pageSize
+    const to = from + pageSize - 1
+
+    const { data, error, count } = await supabase
+      .from("people")
+      .select("*")
+      .order("lastName", { ascending: true })
+      .range(from, to)
+
+    if (error) throw error
+    return { data: (data ?? []) as Person[], total: count, page, pageSize }
+  }
+
   const { data, error } = await supabase.from("people").select("*")
   if (error) throw error
   return (data ?? []) as Person[]
@@ -176,7 +242,38 @@ export async function linkSpouses(personAId: string, personBId: string) {
   await appendUnique("people", personBId, "spouseIds", personAId)
 }
 
+export async function unlinkParentChild(parentId: string, childId: string) {
+  await removeFromArray("people", parentId, "childIds", childId)
+  await removeFromArray("people", childId, "parentIds", parentId)
+}
+
+export async function unlinkSpouses(personAId: string, personBId: string) {
+  await removeFromArray("people", personAId, "spouseIds", personBId)
+  await removeFromArray("people", personBId, "spouseIds", personAId)
+}
+
 export async function deletePerson(id: string) {
+  // Clean up bi-directional references before deleting
+  const person = await getPersonById(id)
+  if (person) {
+    // Remove from parents' childIds
+    for (const parentId of person.parentIds ?? []) {
+      try { await removeFromArray("people", parentId, "childIds", id) } catch { /* parent may already be deleted */ }
+    }
+    // Remove from children's parentIds
+    for (const childId of person.childIds ?? []) {
+      try { await removeFromArray("people", childId, "parentIds", id) } catch { /* child may already be deleted */ }
+    }
+    // Remove from spouses' spouseIds
+    for (const spouseId of person.spouseIds ?? []) {
+      try { await removeFromArray("people", spouseId, "spouseIds", id) } catch { /* spouse may already be deleted */ }
+    }
+    // Remove from family members arrays
+    for (const familyId of person.familyIds ?? []) {
+      try { await removeFromArray("families", familyId, "members", id) } catch { /* family may already be deleted */ }
+    }
+  }
+
   const { error } = await supabase.from("people").delete().eq("id", id)
   if (error) throw error
 }
@@ -193,7 +290,25 @@ export async function addEvent(event: Omit<Event, "id">) {
   return data as Event
 }
 
-export async function listEvents() {
+export async function listEvents(options?: PaginationOptions): Promise<Event[]>
+export async function listEvents(options: PaginationOptions & { paginate: true }): Promise<PaginatedResult<Event>>
+export async function listEvents(options?: PaginationOptions & { paginate?: boolean }) {
+  if (options?.paginate) {
+    const page = options.page ?? 1
+    const pageSize = options.pageSize ?? 25
+    const from = (page - 1) * pageSize
+    const to = from + pageSize - 1
+
+    const { data, error, count } = await supabase
+      .from("events")
+      .select("*")
+      .order("date", { ascending: true })
+      .range(from, to)
+
+    if (error) throw error
+    return { data: (data ?? []) as Event[], total: count, page, pageSize }
+  }
+
   const { data, error } = await supabase
     .from("events")
     .select("*")
@@ -225,7 +340,25 @@ export async function addMemory(memory: Omit<Memory, "id">) {
   return data as Memory
 }
 
-export async function listMemories() {
+export async function listMemories(options?: PaginationOptions): Promise<Memory[]>
+export async function listMemories(options: PaginationOptions & { paginate: true }): Promise<PaginatedResult<Memory>>
+export async function listMemories(options?: PaginationOptions & { paginate?: boolean }) {
+  if (options?.paginate) {
+    const page = options.page ?? 1
+    const pageSize = options.pageSize ?? 25
+    const from = (page - 1) * pageSize
+    const to = from + pageSize - 1
+
+    const { data, error, count } = await supabase
+      .from("memories")
+      .select("*")
+      .order("date", { ascending: false })
+      .range(from, to)
+
+    if (error) throw error
+    return { data: (data ?? []) as Memory[], total: count, page, pageSize }
+  }
+
   const { data, error } = await supabase.from("memories").select("*")
   if (error) throw error
   return (data ?? []) as Memory[]
@@ -246,6 +379,33 @@ export async function deleteFamily(id: string) {
   if (error) throw error
 }
 
+export async function listFamilies(options?: PaginationOptions): Promise<import("@/models/Family").Family[]>
+export async function listFamilies(options: PaginationOptions & { paginate: true }): Promise<PaginatedResult<import("@/models/Family").Family>>
+export async function listFamilies(options?: PaginationOptions & { paginate?: boolean }) {
+  if (options?.paginate) {
+    const page = options.page ?? 1
+    const pageSize = options.pageSize ?? 25
+    const from = (page - 1) * pageSize
+    const to = from + pageSize - 1
+
+    const { data, error, count } = await supabase
+      .from("families")
+      .select("*")
+      .order("name", { ascending: true })
+      .range(from, to)
+
+    if (error) throw error
+    return { data: (data ?? []) as import("@/models/Family").Family[], total: count, page, pageSize }
+  }
+
+  const { data, error } = await supabase
+    .from("families")
+    .select("*")
+    .order("name", { ascending: true })
+  if (error) throw error
+  return (data ?? []) as import("@/models/Family").Family[]
+}
+
 export async function listMemoriesForPerson(personId: string) {
   const { data, error } = await supabase
     .from("memories")
@@ -263,4 +423,42 @@ export async function listEventsForPerson(personId: string) {
     .order("date", { ascending: true })
   if (error) throw error
   return (data ?? []) as Event[]
+}
+
+// ---- Relationships ----
+export async function addRelationship(rel: Omit<Relationship, "id">) {
+  const { data, error } = await supabase
+    .from("relationships")
+    .insert(rel)
+    .select("*")
+    .single()
+  if (error) throw error
+  return data as Relationship
+}
+
+export async function listRelationshipsForPerson(personId: string) {
+  // PostgREST doesn't support OR directly — fetch both directions
+  const { data: asA, error: errA } = await supabase
+    .from("relationships")
+    .select("*")
+    .eq("personAId", personId)
+  if (errA) throw errA
+
+  const { data: asB, error: errB } = await supabase
+    .from("relationships")
+    .select("*")
+    .eq("personBId", personId)
+  if (errB) throw errB
+
+  return [...((asA ?? []) as Relationship[]), ...((asB ?? []) as Relationship[])]
+}
+
+export async function updateRelationship(id: string, updates: Partial<Relationship>) {
+  const { error } = await supabase.from("relationships").update(updates).eq("id", id)
+  if (error) throw error
+}
+
+export async function deleteRelationship(id: string) {
+  const { error } = await supabase.from("relationships").delete().eq("id", id)
+  if (error) throw error
 }

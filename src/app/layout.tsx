@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/components/AuthProvider";
 import NavBar from "@/components/NavBar"
+import ErrorBoundary from "@/components/ErrorBoundary"
 
 export const metadata: Metadata = {
   title: "Family Legacy",
@@ -15,10 +16,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="bg-gray-950 text-gray-100">
+      <body className="bg-[var(--background)] text-[var(--foreground)]">
         <AuthProvider>
           <NavBar />
-          <main className="container mx-auto p-4">{children}</main>
+          <main className="container mx-auto p-4">
+            <ErrorBoundary>{children}</ErrorBoundary>
+          </main>
         </AuthProvider>
       </body>
     </html>

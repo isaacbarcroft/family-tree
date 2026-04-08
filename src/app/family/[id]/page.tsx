@@ -5,10 +5,11 @@ import { useParams } from "next/navigation"
 import type { Family } from "@/models/Family"
 import type { Person } from "@/models/Person"
 import Link from "next/link"
-import { getPersonById } from "@/lib/db"
+
 import FamilyTreeView from "@/components/FamilyTreeView"
 import { supabase } from "@/lib/supabase"
 import { formatDate } from "@/utils/dates"
+import { downloadGedcom } from "@/utils/gedcom"
 import ProtectedRoute from "@/components/ProtectedRoute"
 import { ProfileAvatar } from "@/components/ProfileAvatar"
 
@@ -44,12 +45,12 @@ export default function FamilyPage() {
         setFamily(fetchedFamily)
 
         if (fetchedFamily.members?.length) {
-          const people: Person[] = []
-          for (const id of fetchedFamily.members) {
-            const p = await getPersonById(id)
-            if (p) people.push(p)
-          }
-          setMembers(people)
+          const { data: peopleData, error: peopleError } = await supabase
+            .from("people")
+            .select("*")
+            .in("id", fetchedFamily.members)
+          if (peopleError) throw peopleError
+          setMembers((peopleData ?? []) as Person[])
         } else {
           setMembers([])
         }
@@ -87,11 +88,11 @@ export default function FamilyPage() {
 
   return (
     <ProtectedRoute>
-      <div className="max-w-4xl mx-auto p-6 bg-gray-900 text-gray-100 rounded-xl shadow-lg">
+      <div className="max-w-4xl mx-auto p-6 bg-[var(--card-bg)] text-[var(--foreground)] rounded-xl card-shadow">
         <div className="border-b border-gray-800 pb-6 mb-6 text-center sm:text-left">
           <h1 className="text-4xl font-bold text-white mb-2">{family.name}</h1>
           {family.description && <p className="text-gray-300 text-lg">{family.description}</p>}
-          {family.origin && <p className="text-gray-300 text-base mt-1">🏡 Origin: {family.origin}</p>}
+          {family.origin && <p className="text-gray-300 text-base mt-1">Origin:{family.origin}</p>}
           <div className="flex items-center gap-3 mt-3">
             <p className="text-gray-300 text-sm">
               Created {formatDate(family.createdAt)}
@@ -101,6 +102,12 @@ export default function FamilyPage() {
               className="bg-gray-700 hover:bg-gray-600 text-white text-base px-4 py-2 rounded-lg font-medium min-h-[44px]"
             >
               {copied ? "Copied!" : "Copy Invite Link"}
+            </button>
+            <button
+              onClick={() => downloadGedcom(members, family ? [family] : [], `${family?.name || "family"}-tree.ged`)}
+              className="bg-gray-700 hover:bg-gray-600 text-white text-base px-4 py-2 rounded-lg font-medium min-h-[44px]"
+            >
+              Export GEDCOM
             </button>
           </div>
         </div>
@@ -126,7 +133,7 @@ export default function FamilyPage() {
                     />
 
                     <div>
-                      <span className="font-semibold text-blue-400">
+                      <span className="font-semibold text-[var(--accent)]">
                         {p.firstName} {p.lastName}
                       </span>
                       {p.roleType && <p className="text-base text-gray-300">{p.roleType}</p>}
@@ -144,7 +151,7 @@ export default function FamilyPage() {
         </section>
 
         <div className="text-center sm:text-right mt-8">
-          <Link href="/family-tree" className="text-blue-400 hover:text-blue-300 hover:underline text-base">
+          <Link href="/family-tree" className="text-[var(--accent)] hover:text-[var(--accent-hover)] hover:underline text-base">
             ← Back to People
           </Link>
         </div>

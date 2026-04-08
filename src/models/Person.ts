@@ -6,7 +6,6 @@ export interface Person {
   firstName: string
   middleName?: string
   lastName: string
-  preferredName?: string
   birthDate?: string
   deathDate?: string
   roleType: RoleType
@@ -19,21 +18,15 @@ export interface Person {
   parentIds?: string[]
   spouseIds?: string[]
   childIds?: string[]
-  eventIds?: string[]  
   profilePhotoUrl?: string
-  coverPhotoUrl?: string
   facebookUrl?: string
-  instagramUrl?: string
-  churchUrl?: string
-  websiteUrl?: string   
+  websiteUrl?: string
   bio?: string
-  notes?: string 
   createdBy: string
   createdAt: string
   updatedAt?: string
   birthPlace?: string
   searchName?: string
   deathPlace?: string
-  familyIds?: string[] 
-  spouseDetails?: { personId: string; startDate?: string; endDate?: string }[]
+  familyIds?: string[]
 }

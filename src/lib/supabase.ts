@@ -160,6 +160,7 @@ class QueryBuilder {
   private preferHeaders: string[] = []
   private isSingle = false
   private isMaybeSingle = false
+  private rangeHeader: string | null = null
 
   constructor(table: string) {
     this.table = table
@@ -190,6 +191,11 @@ class QueryBuilder {
     return this
   }
 
+  is(column: string, value: null | boolean) {
+    this.params.append(column, `is.${value}`)
+    return this
+  }
+
   order(column: string, options?: { ascending?: boolean }) {
     const direction = options?.ascending === false ? "desc" : "asc"
     this.params.set("order", `${column}.${direction}`)
@@ -198,6 +204,12 @@ class QueryBuilder {
 
   limit(count: number) {
     this.params.set("limit", String(count))
+    return this
+  }
+
+  range(from: number, to: number) {
+    this.rangeHeader = `${from}-${to}`
+    this.preferHeaders.push("count=exact")
     return this
   }
 
@@ -243,7 +255,7 @@ class QueryBuilder {
   }
 
   then<TResult1 = unknown, TResult2 = never>(
-    onfulfilled?: ((value: { data: unknown; error: { message: string; status: number } | null }) => TResult1 | PromiseLike<TResult1>) | null,
+    onfulfilled?: ((value: { data: unknown; error: { message: string; status: number } | null; count: number | null }) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
   ): Promise<TResult1 | TResult2> {
     return this.execute().then(onfulfilled as never, onrejected as never)
@@ -267,6 +279,10 @@ class QueryBuilder {
       headers.Accept = "application/vnd.pgrst.object+json"
     }
 
+    if (this.rangeHeader) {
+      headers.Range = this.rangeHeader
+    }
+
     const response = await fetch(url, {
       method: this.method,
       headers,
@@ -274,21 +290,31 @@ class QueryBuilder {
     })
 
     if (this.isMaybeSingle && response.status === 406) {
-      return { data: null, error: null }
+      return { data: null, error: null, count: null }
     }
 
     const payload = await response.json().catch(() => null)
 
-    if (!response.ok) {
+    if (!response.ok && response.status !== 206) {
       return {
         data: null,
         error: normalizeError(response.status, payload),
+        count: null,
       }
+    }
+
+    // Parse Content-Range header for total count (e.g., "0-24/100")
+    let count: number | null = null
+    const contentRange = response.headers.get("content-range")
+    if (contentRange) {
+      const match = contentRange.match(/\/(\d+)/)
+      if (match) count = parseInt(match[1], 10)
     }
 
     return {
       data: payload,
       error: null,
+      count,
     }
   }
 }
@@ -351,7 +377,7 @@ export const supabase = {
     }: {
       email: string
       password: string
-      options?: { emailRedirectTo?: string }
+      options?: { emailRedirectTo?: string; data?: Record<string, string> }
     }) {
       const configError = getConfigError()
       if (configError) {
@@ -367,6 +393,7 @@ export const supabase = {
           ...(options?.emailRedirectTo
             ? { email_redirect_to: options.emailRedirectTo }
             : {}),
+          ...(options?.data ? { data: options.data } : {}),
         }),
       })
 

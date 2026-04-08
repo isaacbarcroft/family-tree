@@ -3,32 +3,55 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import ProtectedRoute from "@/components/ProtectedRoute"
-import { addPerson, listPeople, deletePerson } from "@/lib/db"
+import { addPerson, listPeople, deletePerson, type PaginatedResult } from "@/lib/db"
 import type { Person } from "@/models/Person"
 import { useAuth } from "@/components/AuthProvider"
 import { ProfileAvatar } from "@/components/ProfileAvatar"
 import { formatDate } from "@/utils/dates"
+import ConfirmDialog from "@/components/ConfirmDialog"
+import EmptyState from "@/components/EmptyState"
+import { SkeletonPage } from "@/components/SkeletonLoader"
+import ImportGedcomModal from "@/components/ImportGedcomModal"
 
 export default function FamilyTreePage() {
   const { user } = useAuth()
+  const PAGE_SIZE = 25
   const [people, setPeople] = useState<Person[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState<number | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
-    roleType: "member",
+    roleType: "family member",
   })
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [showImportModal, setShowImportModal] = useState(false)
+
+  const fetchPage = async (pageNum: number, replace = false) => {
+    const result = await listPeople({ page: pageNum, pageSize: PAGE_SIZE, paginate: true })
+    setPeople((prev) => replace ? result.data : [...prev, ...result.data])
+    setTotal(result.total)
+    setPage(pageNum)
+  }
 
   useEffect(() => {
     const fetchData = async () => {
-      const data = await listPeople()
-      setPeople(data)
+      await fetchPage(1, true)
       setLoading(false)
     }
     fetchData()
   }, [])
+
+  const hasMore = total !== null && people.length < total
+
+  const loadMore = async () => {
+    setLoadingMore(true)
+    await fetchPage(page + 1)
+    setLoadingMore(false)
+  }
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -49,9 +72,8 @@ export default function FamilyTreePage() {
     }
 
     await addPerson(newPerson)
-    const updated = await listPeople()
-    setPeople(updated)
-    setForm({ firstName: "", lastName: "", roleType: "member" })
+    await fetchPage(1, true)
+    setForm({ firstName: "", lastName: "", roleType: "family member" })
     setShowForm(false)
   }
 
@@ -60,19 +82,27 @@ export default function FamilyTreePage() {
       <div className="max-w-3xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-white">People</h1>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px] transition"
-          >
-            {showForm ? "Cancel" : "+ Add Person"}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="bg-gray-700 hover:bg-gray-600 text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px] transition"
+            >
+              Import GEDCOM
+            </button>
+            <button
+              onClick={() => setShowForm(!showForm)}
+              className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px] transition"
+            >
+              {showForm ? "Cancel" : "+ Add Person"}
+            </button>
+          </div>
         </div>
 
         {/* Add Person Form */}
         {showForm && (
           <form
             onSubmit={handleSubmit}
-            className="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6 space-y-4"
+            className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl card-shadow p-5 mb-6 space-y-4"
           >
             <div className="grid grid-cols-2 gap-4">
               <input
@@ -100,7 +130,7 @@ export default function FamilyTreePage() {
               onChange={handleChange}
               className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
             >
-              <option value="member">Family Member</option>
+              <option value="family member">Family Member</option>
               <option value="friend">Friend</option>
               <option value="neighbor">Neighbor</option>
               <option value="pastor">Pastor</option>
@@ -117,82 +147,95 @@ export default function FamilyTreePage() {
 
         {/* People List */}
         {loading ? (
-          <p className="text-gray-400 text-center py-8">Loading...</p>
+          <SkeletonPage rows={5} />
         ) : people.length === 0 ? (
-          <div className="text-center py-16 bg-gray-900 border border-gray-800 rounded-xl">
-            <p className="text-gray-400 text-lg mb-2">No family members yet.</p>
-            <p className="text-gray-300 text-base">Click &ldquo;+ Add Person&rdquo; to start building your family tree.</p>
-          </div>
+          <EmptyState
+            message="No family members yet."
+            description="Click &ldquo;+ Add Person&rdquo; to start building your family tree."
+          />
         ) : (
-          <ul className="space-y-2">
-            {people.map((p) => (
-              <li key={p.id} className="relative">
-                <Link
-                  href={`/profile/${p.id}`}
-                  className="flex items-center justify-between bg-gray-900 border border-gray-800 rounded-xl p-4 pr-20 hover:bg-gray-800 hover:border-gray-700 transition cursor-pointer"
-                >
-                  <div className="flex items-center gap-3">
-                    <ProfileAvatar
-                      src={p.profilePhotoUrl}
-                      alt={`${p.firstName} ${p.lastName}`}
-                      fallbackLetters={`${p.firstName} ${p.lastName}`}
-                      size="sm"
-                      className="w-10 h-10"
-                    />
-                    <div>
-                      <span className="font-medium text-white">
-                        {p.firstName} {p.lastName}
-                      </span>
-                      {p.roleType && (
-                        <span className="text-gray-300 text-base ml-2 capitalize">
-                          {p.roleType}
+          <>
+            {total !== null && (
+              <p className="text-gray-400 text-sm mb-3">
+                Showing {people.length} of {total} people
+              </p>
+            )}
+            <ul className="space-y-2">
+              {people.map((p) => (
+                <li key={p.id} className="relative">
+                  <Link
+                    href={`/profile/${p.id}`}
+                    className="flex items-center justify-between bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl card-shadow p-4 pr-20 hover:bg-gray-800 hover:border-gray-700 transition cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <ProfileAvatar
+                        src={p.profilePhotoUrl}
+                        alt={`${p.firstName} ${p.lastName}`}
+                        fallbackLetters={`${p.firstName} ${p.lastName}`}
+                        size="sm"
+                        className="w-10 h-10"
+                      />
+                      <div>
+                        <span className="font-medium text-white">
+                          {p.firstName} {p.lastName}
                         </span>
-                      )}
+                        {p.roleType && (
+                          <span className="text-gray-300 text-base ml-2 capitalize">
+                            {p.roleType}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-sm text-gray-300">
-                    {p.birthDate
-                      ? formatDate(p.birthDate)
-                      : p.createdAt
-                        ? `Added ${formatDate(p.createdAt)}`
-                        : ""}
-                  </div>
-                </Link>
-                {user?.id === p.createdBy && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  {confirmDeleteId === p.id ? (
-                    <div className="flex gap-1 bg-gray-950 rounded-lg p-1">
-                      <button
-                        onClick={async () => {
+                    <div className="text-sm text-gray-300">
+                      {p.birthDate
+                        ? formatDate(p.birthDate)
+                        : p.createdAt
+                          ? `Added ${formatDate(p.createdAt)}`
+                          : ""}
+                    </div>
+                  </Link>
+                  {user?.id === p.createdBy && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    {confirmDeleteId === p.id ? (
+                      <ConfirmDialog
+                        onConfirm={async () => {
                           await deletePerson(p.id)
                           setConfirmDeleteId(null)
-                          const updated = await listPeople()
-                          setPeople(updated)
+                          await fetchPage(1, true)
                         }}
-                        className="text-red-400 hover:text-red-300 text-sm px-2 py-1 rounded hover:bg-gray-800 transition"
-                      >
-                        Yes
-                      </button>
+                        onCancel={() => setConfirmDeleteId(null)}
+                      />
+                    ) : (
                       <button
-                        onClick={() => setConfirmDeleteId(null)}
-                        className="text-gray-400 hover:text-white text-sm px-2 py-1 rounded hover:bg-gray-800 transition"
+                        onClick={(e) => { e.preventDefault(); setConfirmDeleteId(p.id) }}
+                        className="text-gray-500 hover:text-red-400 text-sm px-2 py-1 rounded hover:bg-gray-800 transition"
                       >
-                        No
+                        Delete
                       </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={(e) => { e.preventDefault(); setConfirmDeleteId(p.id) }}
-                      className="text-gray-500 hover:text-red-400 text-sm px-2 py-1 rounded hover:bg-gray-800 transition"
-                    >
-                      Delete
-                    </button>
+                    )}
+                  </div>
                   )}
-                </div>
-                )}
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
+            {hasMore && (
+              <div className="text-center mt-6">
+                <button
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="bg-gray-800 hover:bg-gray-700 text-white px-6 py-2.5 rounded-lg text-base font-medium min-h-[44px] transition disabled:opacity-50"
+                >
+                  {loadingMore ? "Loading..." : "Load More"}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+        {showImportModal && (
+          <ImportGedcomModal
+            onClose={() => setShowImportModal(false)}
+            onImported={() => fetchPage(1, true)}
+          />
         )}
       </div>
     </ProtectedRoute>

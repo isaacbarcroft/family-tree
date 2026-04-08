@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useAuth } from "@/components/AuthProvider"
-import { listMemories, updateMemory, deleteMemory } from "@/lib/db"
+import { listMemories, updateMemory, deleteMemory, type PaginatedResult } from "@/lib/db"
 import type { Memory } from "@/models/Memory"
 import ProtectedRoute from "@/components/ProtectedRoute"
 import AddMemoryModal from "@/components/AddMemoryModal"
@@ -10,10 +10,15 @@ import { supabase } from "@/lib/supabase"
 import type { Person } from "@/models/Person"
 import { formatDate } from "@/utils/dates"
 import Link from "next/link"
+import { SkeletonLine, SkeletonCard } from "@/components/SkeletonLoader"
 
 export default function MemoriesPage() {
+  const PAGE_SIZE = 24
   const [memories, setMemories] = useState<Memory[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -23,28 +28,33 @@ export default function MemoriesPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const { user } = useAuth()
 
-  const fetchMemories = async () => {
-    try {
-      const data = await listMemories()
-      const sorted = data.sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-      )
-      setMemories(sorted)
-
-      const allPeopleIds = Array.from(new Set(sorted.flatMap((m) => m.peopleIds)))
-      if (allPeopleIds.length > 0) {
-        const { data: people } = await supabase
-          .from("people")
-          .select("*")
-          .in("id", allPeopleIds)
-        if (people) {
-          const map = new Map<string, Person>()
+  const fetchPeopleForMemories = async (memData: Memory[]) => {
+    const allPeopleIds = Array.from(new Set(memData.flatMap((m) => m.peopleIds)))
+    if (allPeopleIds.length > 0) {
+      const { data: people } = await supabase
+        .from("people")
+        .select("*")
+        .in("id", allPeopleIds)
+      if (people) {
+        setPeopleMap((prev) => {
+          const map = new Map(prev)
           for (const p of people as Person[]) {
             map.set(p.id, p)
           }
-          setPeopleMap(map)
-        }
+          return map
+        })
       }
+    }
+  }
+
+  const fetchMemories = async (pageNum = 1, replace = true) => {
+    try {
+      const result = await listMemories({ page: pageNum, pageSize: PAGE_SIZE, paginate: true })
+      const data = result.data
+      setMemories((prev) => replace ? data : [...prev, ...data])
+      setTotal(result.total)
+      setPage(pageNum)
+      await fetchPeopleForMemories(data)
     } catch (err) {
       console.error(err)
       setError("Unable to load memories.")
@@ -56,6 +66,14 @@ export default function MemoriesPage() {
   useEffect(() => {
     fetchMemories()
   }, [])
+
+  const hasMore = total !== null && memories.length < total
+
+  const loadMore = async () => {
+    setLoadingMore(true)
+    await fetchMemories(page + 1, false)
+    setLoadingMore(false)
+  }
 
   const handleEdit = (m: Memory, e: React.MouseEvent) => {
     e.stopPropagation()
@@ -91,7 +109,12 @@ export default function MemoriesPage() {
   if (loading)
     return (
       <ProtectedRoute>
-        <div className="text-center py-16 text-gray-400 text-lg">Loading memories...</div>
+        <div className="max-w-5xl mx-auto p-6 space-y-4">
+          <SkeletonLine className="w-36 h-8 mb-4" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1,2,3].map((i) => <SkeletonCard key={i} className="h-48" />)}
+          </div>
+        </div>
       </ProtectedRoute>
     )
 
@@ -104,12 +127,12 @@ export default function MemoriesPage() {
 
   return (
     <ProtectedRoute>
-      <div className="max-w-5xl mx-auto p-6 bg-gray-900 text-gray-100 rounded-xl shadow-lg">
+      <div className="max-w-5xl mx-auto p-6 bg-[var(--card-bg)] text-[var(--foreground)] rounded-xl card-shadow">
         <div className="flex flex-col sm:flex-row justify-between items-center mb-6">
           <h1 className="text-4xl font-bold text-white mb-4 sm:mb-0">Memories</h1>
           <button
             onClick={() => setShowAddModal(true)}
-            className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px]"
+            className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px]"
           >
             + Add Memory
           </button>
@@ -121,6 +144,12 @@ export default function MemoriesPage() {
             <p className="text-gray-300">Be the first to share a family memory!</p>
           </div>
         ) : (
+          <>
+          {total !== null && (
+            <p className="text-gray-400 text-sm mb-3">
+              Showing {memories.length} of {total} memories
+            </p>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {memories.map((m) => {
               const isExpanded = expandedId === m.id
@@ -128,7 +157,7 @@ export default function MemoriesPage() {
               return (
                 <div
                   key={m.id}
-                  className={`border border-gray-700 bg-gray-800 rounded-xl overflow-hidden hover:border-gray-600 transition cursor-pointer ${
+                  className={`border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl overflow-hidden hover:border-gray-600 transition cursor-pointer ${
                     isExpanded ? "sm:col-span-2 lg:col-span-3" : ""
                   }`}
                   onClick={() => {
@@ -173,7 +202,7 @@ export default function MemoriesPage() {
                         <div className="flex gap-2">
                           <button
                             onClick={handleSaveEdit}
-                            className="bg-green-600 hover:bg-green-500 text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px]"
+                            className="bg-green-700 hover:bg-green-600 text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px]"
                           >
                             Save
                           </button>
@@ -259,7 +288,7 @@ export default function MemoriesPage() {
                                       key={pid}
                                       href={`/profile/${pid}`}
                                       onClick={(e) => e.stopPropagation()}
-                                      className="text-blue-400 hover:text-blue-300 text-sm bg-gray-700 px-2.5 py-1 rounded-full"
+                                      className="text-[var(--accent)] hover:text-[var(--accent-hover)] text-sm bg-gray-700 px-2.5 py-1 rounded-full"
                                     >
                                       {person.firstName} {person.lastName}
                                     </Link>
@@ -276,6 +305,18 @@ export default function MemoriesPage() {
               )
             })}
           </div>
+          {hasMore && (
+            <div className="text-center mt-6">
+              <button
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="bg-gray-800 hover:bg-gray-700 text-white px-6 py-2.5 rounded-lg text-base font-medium min-h-[44px] transition disabled:opacity-50"
+              >
+                {loadingMore ? "Loading..." : "Load More"}
+              </button>
+            </div>
+          )}
+          </>
         )}
 
         {showAddModal && (
