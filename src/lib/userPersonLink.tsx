@@ -26,6 +26,53 @@ export async function getOrCreatePersonForUser(user: AppUser) {
   const lastName = String(
     meta.last_name || fullName.split(" ").slice(1).join(" ") || ""
   ).trim()
+  const email = user.email || ""
+  const familyId = String(meta.family_id || "").trim()
+
+  // 2.5 Direct claim via invite link — highest priority
+  const claimPersonId = String(meta.claim_person_id || "").trim()
+  if (claimPersonId) {
+    const { data: targetPerson } = await supabase
+      .from("people")
+      .select("*")
+      .eq("id", claimPersonId)
+      .is("userId", null)
+      .limit(1)
+      .maybeSingle()
+
+    if (targetPerson) {
+      const target = targetPerson as Person
+      const updates: Partial<Person> = {
+        userId: user.id,
+        email: email || target.email,
+      }
+      if (!target.firstName && firstName) updates.firstName = firstName
+      if (!target.lastName && lastName) updates.lastName = lastName
+      updates.searchName = buildSearchName(
+        updates.firstName ?? target.firstName,
+        target.middleName,
+        updates.lastName ?? target.lastName
+      )
+
+      const { error: claimError } = await supabase
+        .from("people")
+        .update(updates)
+        .eq("id", claimPersonId)
+
+      if (claimError) throw claimError
+
+      if (familyId) {
+        try {
+          await linkPersonToFamily(claimPersonId, familyId)
+        } catch (err) {
+          console.error("Failed to link claimed person to family:", err)
+        }
+      }
+
+      return { ...target, ...updates } as Person
+    }
+    // Target doesn't exist or already claimed — fall through to normal flow
+  }
 
   // If no name was provided (shouldn't happen with updated signup form),
   // don't create a blank record — bail out
@@ -37,7 +84,6 @@ export async function getOrCreatePersonForUser(user: AppUser) {
   // 3. Check for a claimable existing record:
   //    - userId is null (unclaimed)
   //    - matches by email OR by first+last name
-  const email = user.email || ""
   let claimable: Person | null = null
 
   if (email) {
@@ -87,8 +133,6 @@ export async function getOrCreatePersonForUser(user: AppUser) {
 
     if (claimError) throw claimError
 
-    // Handle family invite from signup
-    const familyId = String(meta.family_id || "").trim()
     if (familyId) {
       try {
         await linkPersonToFamily(claimable.id, familyId)
@@ -121,8 +165,6 @@ export async function getOrCreatePersonForUser(user: AppUser) {
   if (error) throw error
   const person = data as Person
 
-  // Handle family invite from signup
-  const familyId = String(meta.family_id || "").trim()
   if (familyId) {
     try {
       await linkPersonToFamily(person.id, familyId)

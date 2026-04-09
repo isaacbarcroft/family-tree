@@ -1,5 +1,11 @@
 "use client"
 
+/** Ensure a URL has a protocol prefix so it works as an href */
+function ensureProtocol(url: string): string {
+  if (/^https?:\/\//i.test(url)) return url
+  return `https://${url}`
+}
+
 import { Suspense, useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import ProtectedRoute from "@/components/ProtectedRoute"
@@ -64,6 +70,7 @@ function ProfileContent() {
   >([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
+  const [claimCopied, setClaimCopied] = useState(false)
   const [form, setForm] = useState<Partial<Person>>({})
   const [photoUploading, setPhotoUploading] = useState(false)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
@@ -377,6 +384,22 @@ function ProfileContent() {
                     Add Memory
                   </button>
                 )}
+                {!editing && !person.userId && (
+                  <button
+                    onClick={() => {
+                      const url = `${window.location.origin}/signup?claim=${person.id}${person.familyIds?.[0] ? `&family=${person.familyIds[0]}` : ""}`
+                      navigator.clipboard.writeText(url)
+                      setClaimCopied(true)
+                      setTimeout(() => setClaimCopied(false), 2000)
+                    }}
+                    className="px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px] bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700 transition flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                    </svg>
+                    {claimCopied ? "Link Copied!" : "Invite to Claim"}
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -454,7 +477,7 @@ function ProfileContent() {
                     <div className="space-y-1">
                       {person.facebookUrl && (
                         <a
-                          href={person.facebookUrl}
+                          href={ensureProtocol(person.facebookUrl!)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="block text-[var(--accent)] hover:text-blue-300 text-base"
@@ -464,7 +487,7 @@ function ProfileContent() {
                       )}
                       {person.websiteUrl && (
                         <a
-                          href={person.websiteUrl}
+                          href={ensureProtocol(person.websiteUrl!)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="block text-[var(--accent)] hover:text-blue-300 text-base"

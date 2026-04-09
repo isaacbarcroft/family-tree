@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/components/AuthProvider"
 import { supabase } from "@/lib/supabase"
+import AuthHero from "@/components/AuthHero"
 
 export default function SignupPage() {
   return (
@@ -25,6 +26,7 @@ function SignupContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const familyId = searchParams.get("family")
+  const claimPersonId = searchParams.get("claim")
   const { user } = useAuth()
 
   useEffect(() => {
@@ -54,6 +56,7 @@ function SignupContent() {
           first_name: firstName,
           last_name: lastName,
           ...(familyId ? { family_id: familyId } : {}),
+          ...(claimPersonId ? { claim_person_id: claimPersonId } : {}),
         },
       },
     })
@@ -92,69 +95,81 @@ function SignupContent() {
   }
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center">
-      <form
-        onSubmit={handleSignup}
-        className="w-full max-w-sm bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl card-shadow p-8 space-y-4"
-      >
-        <h1 className="text-2xl font-bold text-white text-center">Create Account</h1>
-        {familyId && (
-          <p className="text-blue-400 text-base text-center">You&apos;ve been invited to join a family!</p>
-        )}
-        {error && <p className="text-red-400 text-base text-center">{error}</p>}
-
-        <div className="grid grid-cols-2 gap-3">
-          <input
-            type="text"
-            placeholder="First name"
-            className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
-            required
-          />
-          <input
-            type="text"
-            placeholder="Last name"
-            className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
-            required
-          />
+    <div className="min-h-[80vh] flex items-center justify-center px-6">
+      <div className="w-full max-w-4xl grid md:grid-cols-2 gap-12 items-center">
+        {/* Hero - hidden on small screens */}
+        <div className="hidden md:block">
+          <AuthHero />
         </div>
-        <input
-          type="email"
-          placeholder="Email"
-          className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <input
-          type="password"
-          placeholder="Confirm Password"
-          className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
-          value={confirm}
-          onChange={(e) => setConfirm(e.target.value)}
-        />
-        <button
-          type="submit"
-          className="bg-[var(--accent)] text-white py-2.5 rounded-lg hover:bg-blue-500 w-full text-base font-medium min-h-[44px] transition"
+
+        {/* Form */}
+        <form
+          onSubmit={handleSignup}
+          className="w-full max-w-sm mx-auto bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl card-shadow p-8 space-y-4"
         >
-          Sign Up
-        </button>
-        <p className="text-center text-gray-300 text-base">
-          Already have an account?{" "}
-          <Link href="/login" className="text-[var(--accent)] hover:text-[var(--accent-hover)]">
-            Log in
-          </Link>
-        </p>
-      </form>
+          <h1 className="text-2xl font-bold text-white text-center">Create Account</h1>
+          {(familyId || claimPersonId) && (
+            <p className="text-[var(--accent)] text-base text-center">
+              {claimPersonId
+                ? "You\u2019ve been invited to claim your profile!"
+                : "You\u2019ve been invited to join a family!"}
+            </p>
+          )}
+          {error && <p className="text-red-400 text-base text-center">{error}</p>}
+
+          <div className="grid grid-cols-2 gap-3">
+            <input
+              type="text"
+              placeholder="First name"
+              className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              required
+            />
+            <input
+              type="text"
+              placeholder="Last name"
+              className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              required
+            />
+          </div>
+          <input
+            type="email"
+            placeholder="Email"
+            className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <input
+            type="password"
+            placeholder="Confirm Password"
+            className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+          />
+          <button
+            type="submit"
+            className="bg-[var(--accent)] text-white py-2.5 rounded-lg hover:bg-blue-500 w-full text-base font-medium min-h-[44px] transition"
+          >
+            Sign Up
+          </button>
+          <p className="text-center text-gray-300 text-base">
+            Already have an account?{" "}
+            <Link href="/login" className="text-[var(--accent)] hover:text-[var(--accent-hover)]">
+              Log in
+            </Link>
+          </p>
+        </form>
+      </div>
     </div>
   )
 }

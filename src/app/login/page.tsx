@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/AuthProvider"
 import { supabase } from "@/lib/supabase"
 import Link from "next/link"
+import AuthHero from "@/components/AuthHero"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -55,47 +56,55 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center">
-      <form
-        onSubmit={handleLogin}
-        className="w-full max-w-sm bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl card-shadow p-8 space-y-4"
-      >
-        <h1 className="text-2xl font-bold text-white text-center">Welcome Back</h1>
-        {info && <p className="text-blue-400 text-base text-center">{info}</p>}
-        {error && <p className="text-red-400 text-base text-center">{error}</p>}
+    <div className="min-h-[80vh] flex items-center justify-center px-6">
+      <div className="w-full max-w-4xl grid md:grid-cols-2 gap-12 items-center">
+        {/* Hero - hidden on small screens */}
+        <div className="hidden md:block">
+          <AuthHero />
+        </div>
 
-        <input
-          type="email"
-          placeholder="Email"
-          className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <button
-          type="submit"
-          className="bg-[var(--accent)] text-white py-2.5 rounded-lg hover:bg-[var(--accent-hover)] w-full text-base font-medium min-h-[44px] transition"
+        {/* Form */}
+        <form
+          onSubmit={handleLogin}
+          className="w-full max-w-sm mx-auto bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl card-shadow p-8 space-y-4"
         >
-          Log In
-        </button>
-        <p className="text-center">
-          <Link href="/forgot-password" className="text-[var(--accent)] hover:text-[var(--accent-hover)] text-base">
-            Forgot your password?
-          </Link>
-        </p>
-        <p className="text-center text-gray-300 text-base">
-          Don&apos;t have an account?{" "}
-          <Link href="/signup" className="text-[var(--accent)] hover:text-[var(--accent-hover)]">
-            Sign up
-          </Link>
-        </p>
-      </form>
+          <h1 className="text-2xl font-bold text-white text-center">Welcome Back</h1>
+          {info && <p className="text-blue-400 text-base text-center">{info}</p>}
+          {error && <p className="text-red-400 text-base text-center">{error}</p>}
+
+          <input
+            type="email"
+            placeholder="Email"
+            className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <button
+            type="submit"
+            className="bg-[var(--accent)] text-white py-2.5 rounded-lg hover:bg-[var(--accent-hover)] w-full text-base font-medium min-h-[44px] transition"
+          >
+            Log In
+          </button>
+          <p className="text-center">
+            <Link href="/forgot-password" className="text-[var(--accent)] hover:text-[var(--accent-hover)] text-base">
+              Forgot your password?
+            </Link>
+          </p>
+          <p className="text-center text-gray-300 text-base">
+            Don&apos;t have an account?{" "}
+            <Link href="/signup" className="text-[var(--accent)] hover:text-[var(--accent-hover)]">
+              Sign up
+            </Link>
+          </p>
+        </form>
+      </div>
     </div>
   )
 }
