@@ -189,6 +189,36 @@ export async function getPersonById(id: string) {
   return (data as Person | null) ?? null
 }
 
+/**
+ * Fetch multiple people in a single query, returning them in the same order
+ * as the input ids. Missing ids are skipped.
+ */
+export async function listPeopleByIds(ids: string[]): Promise<Person[]> {
+  if (!ids.length) return []
+
+  const { data, error } = await supabase
+    .from("people")
+    .select("*")
+    .in("id", ids)
+
+  if (error) throw error
+  return sortByIds((data ?? []) as Person[], ids, (p) => p.id)
+}
+
+/**
+ * Reorder `items` to match the order of `ids`. Items whose id isn't in `ids`
+ * are dropped; duplicate ids yield duplicate references.
+ */
+export function sortByIds<T>(items: T[], ids: string[], getId: (item: T) => string): T[] {
+  const byId = new Map(items.map((item) => [getId(item), item]))
+  const result: T[] = []
+  for (const id of ids) {
+    const item = byId.get(id)
+    if (item) result.push(item)
+  }
+  return result
+}
+
 export async function savePerson(person: Person) {
   const payload = {
     ...person,

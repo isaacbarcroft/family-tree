@@ -4,7 +4,7 @@ import Link from "next/link"
 import type { Person } from "@/models/Person"
 import type { Relationship } from "@/models/Relationship"
 import { useEffect, useState } from "react"
-import { getPersonById } from "@/lib/db"
+import { listPeopleByIds } from "@/lib/db"
 import { ProfileAvatar } from "@/components/ProfileAvatar"
 
 interface FamilyListProps {
@@ -47,16 +47,19 @@ export default function FamilyList({ title, ids = [], onRemove, relationships, c
   const [people, setPeople] = useState<Person[]>([])
 
   useEffect(() => {
+    let cancelled = false
     const fetchPeople = async () => {
-      if (!ids.length) return
-      const fetched: Person[] = []
-      for (const id of ids) {
-        const p = await getPersonById(id)
-        if (p) fetched.push(p)
+      if (!ids.length) {
+        setPeople([])
+        return
       }
-      setPeople(fetched)
+      const fetched = await listPeopleByIds(ids)
+      if (!cancelled) setPeople(fetched)
     }
     fetchPeople()
+    return () => {
+      cancelled = true
+    }
   }, [ids])
 
   if (!ids.length || people.length === 0) return null
