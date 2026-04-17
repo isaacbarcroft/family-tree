@@ -100,7 +100,7 @@ export default function NavBar() {
                 onFocus={() => searchResults.length > 0 && setShowResults(true)}
                 onKeyDown={(e) => e.key === "Escape" && setShowResults(false)}
                 placeholder="Search..."
-                className="bg-gray-800 border border-gray-700 text-gray-100 text-base px-3 py-2 rounded-lg w-44 focus:w-60 transition-all focus:outline-none focus:border-blue-500"
+                className="bg-gray-800 border border-gray-700 text-gray-100 text-base px-3 py-2 rounded-lg w-44 focus:w-60 transition-all focus:outline-none focus:border-[var(--accent)]"
               />
               {showResults && searchResults.length > 0 && (
                 <ul className="absolute top-full right-0 mt-1 w-64 bg-gray-800 border border-gray-700 rounded shadow-lg z-50 max-h-64 overflow-y-auto">
@@ -148,8 +148,8 @@ export default function NavBar() {
 
         {!user && (
           <div className="space-x-4 flex items-center">
-            <Link href="/login" className="hover:text-blue-300">Login</Link>
-            <Link href="/signup" className="hover:text-blue-300">Signup</Link>
+            <Link href="/login" className="hover:text-[var(--accent)]">Login</Link>
+            <Link href="/signup" className="hover:text-[var(--accent)]">Signup</Link>
           </div>
         )}
       </div>
@@ -166,7 +166,7 @@ export default function NavBar() {
               onFocus={() => searchResults.length > 0 && setShowResults(true)}
               onKeyDown={(e) => e.key === "Escape" && setShowResults(false)}
               placeholder="Search people & families..."
-              className="bg-gray-800 border border-gray-700 text-gray-100 text-base px-3 py-2.5 rounded-lg w-full focus:outline-none focus:border-blue-500"
+              className="bg-gray-800 border border-gray-700 text-gray-100 text-base px-3 py-2.5 rounded-lg w-full focus:outline-none focus:border-[var(--accent)]"
             />
             {showResults && searchResults.length > 0 && (
               <ul className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
@@ -197,7 +197,7 @@ export default function NavBar() {
               key={link.href}
               href={link.href}
               onClick={() => setMobileMenuOpen(false)}
-              className="block py-2.5 text-base hover:text-blue-300"
+              className="block py-2.5 text-base hover:text-[var(--accent)]"
             >
               {link.label}
             </Link>

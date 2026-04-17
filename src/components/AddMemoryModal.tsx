@@ -196,7 +196,7 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
                 {taggedPeople.map((p) => (
                   <span
                     key={p.id}
-                    className="bg-blue-600 text-white text-sm px-2.5 py-1 rounded-full flex items-center gap-1"
+                    className="bg-[var(--accent)] text-white text-sm px-2.5 py-1 rounded-full flex items-center gap-1"
                   >
                     {p.firstName} {p.lastName}
                     <button
@@ -245,7 +245,7 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
           <button
             onClick={handleSubmit}
             disabled={submitting || !title.trim()}
-            className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px]"
+            className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px]"
           >
             {submitting ? "Saving..." : "Save Memory"}
           </button>
