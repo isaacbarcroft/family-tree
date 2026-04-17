@@ -124,7 +124,7 @@ export default function ProfileEditForm({
                   onFormUpdate((prev) => ({ ...prev, deathDate: "" }))
                 }
               }}
-              className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-blue-600 focus:ring-blue-500"
+              className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-[var(--accent)] focus:ring-[var(--accent)]"
             />
             <span className="text-base">In heaven</span>
           </label>

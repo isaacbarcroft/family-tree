@@ -455,7 +455,7 @@ function ProfileContent() {
                       <li key={f.id}>
                         <Link
                           href={`/family/${f.id}`}
-                          className="text-[var(--accent)] hover:text-blue-300 font-medium hover:underline text-base"
+                          className="text-[var(--accent)] hover:text-[var(--accent-hover)] font-medium hover:underline text-base"
                         >
                           {f.name}
                         </Link>
@@ -480,7 +480,7 @@ function ProfileContent() {
                           href={ensureProtocol(person.facebookUrl!)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="block text-[var(--accent)] hover:text-blue-300 text-base"
+                          className="block text-[var(--accent)] hover:text-[var(--accent-hover)] text-base"
                         >
                           Facebook Profile
                         </a>
@@ -490,7 +490,7 @@ function ProfileContent() {
                           href={ensureProtocol(person.websiteUrl!)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="block text-[var(--accent)] hover:text-blue-300 text-base"
+                          className="block text-[var(--accent)] hover:text-[var(--accent-hover)] text-base"
                         >
                           {obituary ? "Obituary" : "Website"}
                         </a>
@@ -557,7 +557,7 @@ function ProfileContent() {
                 <h2 className="text-lg font-semibold text-white">Memories</h2>
                 <button
                   onClick={() => setShowMemoryModal(true)}
-                  className="text-[var(--accent)] hover:text-blue-300 text-base font-medium"
+                  className="text-[var(--accent)] hover:text-[var(--accent-hover)] text-base font-medium"
                 >
                   + Add Memory
                 </button>
