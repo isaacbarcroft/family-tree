@@ -197,7 +197,7 @@ export default function ImportGedcomModal({ onClose, onImported }: ImportGedcomM
             <div className="flex gap-3">
               <button
                 onClick={handleImport}
-                className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px] flex-1"
+                className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px] flex-1"
               >
                 Import {parseResult.people.length} People
               </button>
@@ -216,7 +216,7 @@ export default function ImportGedcomModal({ onClose, onImported }: ImportGedcomM
             <p className="text-white text-lg mb-4">Importing...</p>
             <div className="w-full bg-gray-700 rounded-full h-3 mb-3">
               <div
-                className="bg-blue-600 rounded-full h-3 transition-all duration-200"
+                className="bg-[var(--accent)] rounded-full h-3 transition-all duration-200"
                 style={{ width: `${progress.total ? (progress.current / progress.total) * 100 : 0}%` }}
               />
             </div>
@@ -234,7 +234,7 @@ export default function ImportGedcomModal({ onClose, onImported }: ImportGedcomM
             </p>
             <button
               onClick={handleDone}
-              className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-lg text-base font-medium min-h-[44px]"
+              className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white px-6 py-2.5 rounded-lg text-base font-medium min-h-[44px]"
             >
               Done
             </button>

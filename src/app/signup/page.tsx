@@ -85,7 +85,7 @@ function SignupContent() {
           </p>
           <Link
             href="/login?verify=1"
-            className="inline-block bg-[var(--accent)] text-white px-6 py-2.5 rounded-lg hover:bg-blue-500 font-medium transition"
+            className="inline-block bg-[var(--accent)] text-white px-6 py-2.5 rounded-lg hover:bg-[var(--accent-hover)] font-medium transition"
           >
             Go to Login
           </Link>
@@ -158,7 +158,7 @@ function SignupContent() {
           />
           <button
             type="submit"
-            className="bg-[var(--accent)] text-white py-2.5 rounded-lg hover:bg-blue-500 w-full text-base font-medium min-h-[44px] transition"
+            className="bg-[var(--accent)] text-white py-2.5 rounded-lg hover:bg-[var(--accent-hover)] w-full text-base font-medium min-h-[44px] transition"
           >
             Sign Up
           </button>

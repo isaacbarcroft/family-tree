@@ -18,7 +18,7 @@ export default function EmptyState({ message, description, actionLabel, actionHr
       {actionLabel && actionHref && (
         <Link
           href={actionHref}
-          className="inline-block bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px] transition"
+          className="inline-block bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px] transition"
         >
           {actionLabel}
         </Link>
@@ -26,7 +26,7 @@ export default function EmptyState({ message, description, actionLabel, actionHr
       {actionLabel && onAction && !actionHref && (
         <button
           onClick={onAction}
-          className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px] transition"
+          className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px] transition"
         >
           {actionLabel}
         </button>

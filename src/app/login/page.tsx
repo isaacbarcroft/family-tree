@@ -69,7 +69,7 @@ export default function LoginPage() {
           className="w-full max-w-sm mx-auto bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl card-shadow p-8 space-y-4"
         >
           <h1 className="text-2xl font-bold text-white text-center">Welcome Back</h1>
-          {info && <p className="text-blue-400 text-base text-center">{info}</p>}
+          {info && <p className="text-[var(--accent)] text-base text-center">{info}</p>}
           {error && <p className="text-red-400 text-base text-center">{error}</p>}
 
           <input

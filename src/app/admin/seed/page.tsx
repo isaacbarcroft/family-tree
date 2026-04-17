@@ -52,7 +52,7 @@ export default function SeedPage() {
           <button
             onClick={() => handleAction("POST")}
             disabled={status === "loading"}
-            className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-6 py-3 rounded-lg text-base font-medium min-h-[44px] transition"
+            className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white px-6 py-3 rounded-lg text-base font-medium min-h-[44px] transition"
           >
             {status === "loading" ? "Working..." : "Seed Database"}
           </button>
