@@ -196,7 +196,7 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
                 {taggedPeople.map((p) => (
                   <span
                     key={p.id}
-                    className="bg-blue-600 text-white text-sm px-2.5 py-1 rounded-full flex items-center gap-1"
+                    className="bg-[var(--accent)] text-white text-sm px-2.5 py-1 rounded-full flex items-center gap-1"
                   >
                     {p.firstName} {p.lastName}
                     <button
