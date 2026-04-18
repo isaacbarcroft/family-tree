@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
 import { buildNewUserNotificationHtml } from "@/lib/emails/new-user-notification"
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ""
-const webhookSecret = process.env.SUPABASE_WEBHOOK_SECRET || ""
-const resend = new Resend(process.env.RESEND_API_KEY)
+export const dynamic = "force-dynamic"
 
 interface WebhookPayload {
   type: "INSERT" | "UPDATE" | "DELETE"
@@ -24,6 +21,19 @@ interface WebhookPayload {
 }
 
 export async function POST(request: NextRequest) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const webhookSecret = process.env.SUPABASE_WEBHOOK_SECRET
+  const resendApiKey = process.env.RESEND_API_KEY
+
+  if (!supabaseUrl || !supabaseServiceKey || !webhookSecret || !resendApiKey) {
+    console.error("new-user webhook missing required env vars")
+    return NextResponse.json(
+      { error: "Server misconfigured" },
+      { status: 500 }
+    )
+  }
+
   const secret = request.headers.get("x-webhook-secret")
   if (secret !== webhookSecret) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -75,6 +85,7 @@ export async function POST(request: NextRequest) {
   const subject = `${[firstName, lastName].filter(Boolean).join(" ")} just joined the family tree!`
 
   try {
+    const resend = new Resend(resendApiKey)
     const BATCH_SIZE = 100
     for (let i = 0; i < recipientEmails.length; i += BATCH_SIZE) {
       const batch = recipientEmails.slice(i, i + BATCH_SIZE).map((email) => ({
