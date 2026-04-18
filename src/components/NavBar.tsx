@@ -2,21 +2,78 @@
 
 import Link from "next/link"
 import { useAuth } from "./AuthProvider"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { useState, useEffect, useRef } from "react"
 import type { Person } from "@/models/Person"
 import type { Family } from "@/models/Family"
 
+type NavLink = { href: string; label: string; icon: React.ReactNode }
+
+const navLinks: NavLink[] = [
+  {
+    href: "/family-tree",
+    label: "People",
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/timeline",
+    label: "Timeline",
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/memories",
+    label: "Memories",
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/events",
+    label: "Events",
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/families",
+    label: "Families",
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+      </svg>
+    ),
+  },
+]
+
 export default function NavBar() {
   const { user } = useAuth()
   const router = useRouter()
+  const pathname = usePathname()
   const [search, setSearch] = useState("")
   const [searchResults, setSearchResults] = useState<{ type: "person" | "family"; id: string; label: string }[]>([])
   const [showResults, setShowResults] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [myPersonId, setMyPersonId] = useState<string | null>(null)
   const searchRef = useRef<HTMLDivElement>(null)
+  const userMenuRef = useRef<HTMLDivElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const isActive = (href: string) =>
+    pathname === href || (pathname !== null && pathname.startsWith(href + "/"))
 
   useEffect(() => {
     if (!search.trim()) {
@@ -48,16 +105,48 @@ export default function NavBar() {
     }, 300)
   }, [search])
 
-  // Close dropdown on click outside
+  // Resolve current user's person record so the menu can link to their profile
+  useEffect(() => {
+    if (!user) {
+      setMyPersonId(null)
+      return
+    }
+    let cancelled = false
+    supabase
+      .from("people")
+      .select("id")
+      .eq("userId", user.id)
+      .limit(1)
+      .then(({ data }) => {
+        if (cancelled) return
+        const first = Array.isArray(data) && data.length > 0 ? (data[0] as { id: string }) : null
+        setMyPersonId(first?.id ?? null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [user])
+
+  // Close dropdowns on click outside
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
         setShowResults(false)
       }
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false)
+      }
     }
     document.addEventListener("mousedown", handleClick)
     return () => document.removeEventListener("mousedown", handleClick)
   }, [])
+
+  // Close menus on route change
+  useEffect(() => {
+    setMobileMenuOpen(false)
+    setUserMenuOpen(false)
+    setShowResults(false)
+  }, [pathname])
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut()
@@ -68,42 +157,64 @@ export default function NavBar() {
     router.push("/login")
   }
 
-  const navLinks = [
-    { href: "/family-tree", label: "People" },
-    { href: "/timeline", label: "Timeline" },
-    { href: "/memories", label: "Memories" },
-    { href: "/events", label: "Events" },
-    { href: "/families", label: "Families" },
-  ]
+  const userInitial = user?.email?.charAt(0).toUpperCase() ?? "?"
 
   return (
-    <nav className="bg-[var(--card-bg)] text-white p-4 border-b border-[var(--card-border)]">
-      <div className="container mx-auto flex justify-between items-center">
-        <Link href="/" className="font-bold text-xl hover:text-[var(--accent)] transition">
+    <nav className="sticky top-0 z-40 bg-[var(--background)]/80 backdrop-blur border-b border-[var(--card-border)]">
+      <div className="container mx-auto flex justify-between items-center px-4 h-16">
+        <Link
+          href="/"
+          className="font-bold text-xl tracking-tight transition-colors"
+          onClick={() => setMobileMenuOpen(false)}
+        >
           <span className="warm-gradient">Family Legacy</span>
         </Link>
 
         {user && (
-          <div className="hidden md:flex items-center space-x-4 flex-1 justify-end">
-            {navLinks.map((link) => (
-              <Link key={link.href} href={link.href} className="hover:text-[var(--accent)] text-base transition">
-                {link.label}
-              </Link>
-            ))}
+          <div className="hidden md:flex items-center gap-1 flex-1 justify-end">
+            <div className="flex items-center gap-1 mr-2">
+              {navLinks.map((link) => {
+                const active = isActive(link.href)
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-150 ${
+                      active
+                        ? "text-[var(--accent)] bg-[var(--accent)]/10"
+                        : "text-gray-300 hover:text-[var(--accent)] hover:bg-[var(--card-hover)]"
+                    }`}
+                  >
+                    <span className="hidden lg:inline-flex">{link.icon}</span>
+                    <span>{link.label}</span>
+                  </Link>
+                )
+              })}
+            </div>
 
             {/* Search */}
             <div ref={searchRef} className="relative">
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onFocus={() => searchResults.length > 0 && setShowResults(true)}
-                onKeyDown={(e) => e.key === "Escape" && setShowResults(false)}
-                placeholder="Search..."
-                className="bg-gray-800 border border-gray-700 text-gray-100 text-base px-3 py-2 rounded-lg w-44 focus:w-60 transition-all focus:outline-none focus:border-[var(--accent)]"
-              />
+              <div className="relative">
+                <svg
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
+                </svg>
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onFocus={() => searchResults.length > 0 && setShowResults(true)}
+                  onKeyDown={(e) => e.key === "Escape" && setShowResults(false)}
+                  placeholder="Search..."
+                  className="bg-[var(--card-bg)] border border-[var(--card-border)] text-gray-100 placeholder-gray-500 text-sm pl-9 pr-3 py-2 rounded-lg w-44 focus:w-64 transition-all duration-200 focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20"
+                />
+              </div>
               {showResults && searchResults.length > 0 && (
-                <ul className="absolute top-full right-0 mt-1 w-64 bg-gray-800 border border-gray-700 rounded shadow-lg z-50 max-h-64 overflow-y-auto">
+                <ul className="absolute top-full right-0 mt-2 w-72 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl shadow-xl z-50 max-h-72 overflow-y-auto py-1">
                   {searchResults.map((r) => (
                     <li key={`${r.type}-${r.id}`}>
                       <Link
@@ -112,12 +223,12 @@ export default function NavBar() {
                           setSearch("")
                           setShowResults(false)
                         }}
-                        className="block px-3 py-2.5 hover:bg-gray-700 text-base"
+                        className="flex items-center gap-2 px-3 py-2.5 hover:bg-[var(--card-hover)] text-sm transition-colors"
                       >
-                        <span className="text-gray-400 text-sm mr-2">
-                          {r.type === "person" ? "Person" : "Family"}
+                        <span className="text-xs font-medium uppercase tracking-wider text-[var(--accent)]/80 w-14">
+                          {r.type}
                         </span>
-                        {r.label}
+                        <span className="text-gray-100 truncate">{r.label}</span>
                       </Link>
                     </li>
                   ))}
@@ -125,12 +236,46 @@ export default function NavBar() {
               )}
             </div>
 
-            <button
-              onClick={handleLogout}
-              className="bg-gray-700 px-4 py-2 rounded-lg hover:bg-gray-600 text-base font-medium min-h-[44px]"
-            >
-              Logout
-            </button>
+            {/* User menu */}
+            <div ref={userMenuRef} className="relative ml-2">
+              <button
+                onClick={() => setUserMenuOpen((v) => !v)}
+                aria-label="Account menu"
+                aria-expanded={userMenuOpen}
+                className="w-9 h-9 rounded-full bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-[var(--accent)] font-semibold flex items-center justify-center hover:bg-[var(--accent)]/25 transition-colors duration-150"
+              >
+                {userInitial}
+              </button>
+              {userMenuOpen && (
+                <div className="absolute top-full right-0 mt-2 w-60 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl shadow-xl z-50 py-1 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-[var(--card-border)]">
+                    <p className="text-xs text-gray-500 uppercase tracking-wider">Signed in as</p>
+                    <p className="text-sm text-gray-100 truncate mt-0.5">{user.email}</p>
+                  </div>
+                  {myPersonId && (
+                    <Link
+                      href={`/profile/${myPersonId}`}
+                      onClick={() => setUserMenuOpen(false)}
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-200 hover:bg-[var(--card-hover)] hover:text-[var(--accent)] transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      My Profile
+                    </Link>
+                  )}
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-200 hover:bg-[var(--card-hover)] hover:text-[var(--accent)] transition-colors text-left"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    Log out
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -138,76 +283,113 @@ export default function NavBar() {
         {user && (
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden text-gray-300 hover:text-white"
+            aria-label="Toggle menu"
+            aria-expanded={mobileMenuOpen}
+            className="md:hidden w-10 h-10 flex items-center justify-center rounded-lg text-gray-300 hover:text-[var(--accent)] hover:bg-[var(--card-hover)] transition-colors"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={mobileMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} />
             </svg>
           </button>
         )}
-
-        {!user && (
-          <div className="space-x-4 flex items-center">
-            <Link href="/login" className="hover:text-[var(--accent)] transition">Login</Link>
-            <Link href="/signup" className="hover:text-[var(--accent)] transition">Signup</Link>
-          </div>
-        )}
       </div>
 
-      {/* Mobile menu */}
+      {/* Mobile drawer */}
       {user && mobileMenuOpen && (
-        <div className="md:hidden mt-3 pt-3 border-t border-gray-800 space-y-2">
-          {/* Mobile search */}
-          <div ref={searchRef} className="relative">
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onFocus={() => searchResults.length > 0 && setShowResults(true)}
-              onKeyDown={(e) => e.key === "Escape" && setShowResults(false)}
-              placeholder="Search people & families..."
-              className="bg-gray-800 border border-gray-700 text-gray-100 text-base px-3 py-2.5 rounded-lg w-full focus:outline-none focus:border-[var(--accent)]"
-            />
-            {showResults && searchResults.length > 0 && (
-              <ul className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
-                {searchResults.map((r) => (
-                  <li key={`${r.type}-${r.id}`}>
-                    <Link
-                      href={r.type === "person" ? `/profile/${r.id}` : `/family/${r.id}`}
-                      onClick={() => {
-                        setSearch("")
-                        setShowResults(false)
-                        setMobileMenuOpen(false)
-                      }}
-                      className="block px-3 py-2.5 hover:bg-gray-700 text-base"
-                    >
-                      <span className="text-gray-400 text-sm mr-2">
-                        {r.type === "person" ? "Person" : "Family"}
-                      </span>
-                      {r.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+        <div className="md:hidden border-t border-[var(--card-border)] bg-[var(--background)]">
+          <div className="container mx-auto px-4 py-4 space-y-4">
+            {/* Mobile search */}
+            <div ref={searchRef} className="relative">
+              <svg
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
+              </svg>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onFocus={() => searchResults.length > 0 && setShowResults(true)}
+                onKeyDown={(e) => e.key === "Escape" && setShowResults(false)}
+                placeholder="Search people & families..."
+                className="bg-[var(--card-bg)] border border-[var(--card-border)] text-gray-100 placeholder-gray-500 text-base pl-9 pr-3 py-2.5 rounded-lg w-full focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20"
+              />
+              {showResults && searchResults.length > 0 && (
+                <ul className="absolute top-full left-0 right-0 mt-2 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl shadow-xl z-50 max-h-64 overflow-y-auto py-1">
+                  {searchResults.map((r) => (
+                    <li key={`${r.type}-${r.id}`}>
+                      <Link
+                        href={r.type === "person" ? `/profile/${r.id}` : `/family/${r.id}`}
+                        onClick={() => {
+                          setSearch("")
+                          setShowResults(false)
+                          setMobileMenuOpen(false)
+                        }}
+                        className="flex items-center gap-2 px-3 py-2.5 hover:bg-[var(--card-hover)] text-sm transition-colors"
+                      >
+                        <span className="text-xs font-medium uppercase tracking-wider text-[var(--accent)]/80 w-14">
+                          {r.type}
+                        </span>
+                        <span className="text-gray-100 truncate">{r.label}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
 
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              onClick={() => setMobileMenuOpen(false)}
-              className="block py-2.5 text-base hover:text-[var(--accent)] transition"
-            >
-              {link.label}
-            </Link>
-          ))}
-          <button
-            onClick={handleLogout}
-            className="block w-full text-left py-2 text-gray-300 hover:text-white"
-          >
-            Logout
-          </button>
+            <div className="space-y-1">
+              {navLinks.map((link) => {
+                const active = isActive(link.href)
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center gap-3 px-3 py-3 rounded-lg text-base font-medium transition-colors ${
+                      active
+                        ? "text-[var(--accent)] bg-[var(--accent)]/10"
+                        : "text-gray-200 hover:text-[var(--accent)] hover:bg-[var(--card-hover)]"
+                    }`}
+                  >
+                    {link.icon}
+                    {link.label}
+                  </Link>
+                )
+              })}
+            </div>
+
+            <div className="pt-3 border-t border-[var(--card-border)] space-y-2">
+              <div className="px-3">
+                <p className="text-xs text-gray-500 uppercase tracking-wider">Signed in as</p>
+                <p className="text-sm text-gray-200 truncate mt-0.5">{user.email}</p>
+              </div>
+              {myPersonId && (
+                <Link
+                  href={`/profile/${myPersonId}`}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-3 px-3 py-3 rounded-lg text-base text-gray-200 hover:text-[var(--accent)] hover:bg-[var(--card-hover)] transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  My Profile
+                </Link>
+              )}
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-base text-gray-200 hover:text-[var(--accent)] hover:bg-[var(--card-hover)] transition-colors text-left"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                Log out
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </nav>
