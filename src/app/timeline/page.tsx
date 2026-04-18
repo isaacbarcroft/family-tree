@@ -9,17 +9,7 @@ import ProtectedRoute from "@/components/ProtectedRoute"
 import { formatDate } from "@/utils/dates"
 import Link from "next/link"
 import { SkeletonLine, SkeletonCard } from "@/components/SkeletonLoader"
-
-interface TimelineItem {
-  id: string
-  title: string
-  date: string
-  type: "event" | "memory"
-  description?: string
-  imageUrl?: string
-  peopleIds: string[]
-  eventType?: string
-}
+import { getTimelineItemColor, type TimelineItem } from "@/utils/timeline"
 
 export default function TimelinePage() {
   const [items, setItems] = useState<TimelineItem[]>([])
@@ -147,9 +137,7 @@ export default function TimelinePage() {
                 <div key={`${item.type}-${item.id}`} className="relative pl-10">
                   {/* Dot */}
                   <div
-                    className={`absolute left-2.5 top-2 w-3 h-3 rounded-full border-2 border-gray-900 ${
-                      item.type === "memory" ? "bg-purple-500" : "bg-green-500"
-                    }`}
+                    className={`absolute left-2.5 top-2 w-3 h-3 rounded-full border-2 border-gray-900 ${getTimelineItemColor(item)}`}
                   />
 
                   <div className="border border-[var(--card-border)] bg-[var(--card-bg)] rounded-lg p-4">
@@ -166,11 +154,7 @@ export default function TimelinePage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span
-                            className={`text-sm px-2 py-0.5 rounded ${
-                              item.type === "memory"
-                                ? "bg-purple-600 text-white"
-                                : "bg-green-600 text-white"
-                            }`}
+                            className={`text-sm px-2 py-0.5 rounded text-white ${getTimelineItemColor(item)}`}
                           >
                             {item.type === "memory" ? "Memory" : item.eventType || "Event"}
                           </span>
