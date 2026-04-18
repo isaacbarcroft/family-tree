@@ -11,14 +11,8 @@ import type { Person } from "@/models/Person"
 import { formatDate } from "@/utils/dates"
 import Link from "next/link"
 import { SkeletonLine, SkeletonCard } from "@/components/SkeletonLoader"
-import { EVENT_TYPES } from "@/constants/enums"
+import { EVENT_TYPES, EVENT_TYPE_TAG_COLOR } from "@/constants/enums"
 import type { EventType } from "@/constants/enums"
-
-const typeColors: Record<string, string> = {
-  life: "bg-green-600",
-  memory: "bg-purple-600",
-  historical: "bg-amber-600",
-}
 
 export default function EventsPage() {
   const PAGE_SIZE = 25
@@ -210,7 +204,7 @@ export default function EventsPage() {
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-semibold text-white text-lg">{e.title}</h3>
                         <span
-                          className={`text-sm px-2.5 py-0.5 rounded-full text-white ${typeColors[e.type] || "bg-gray-600"}`}
+                          className={`text-sm px-2.5 py-0.5 rounded-full text-white ${EVENT_TYPE_TAG_COLOR[e.type]}`}
                         >
                           {e.type}
                         </span>

@@ -12,12 +12,7 @@ import { formatDate, getAge, getNextBirthday } from "@/utils/dates"
 import { supabase } from "@/lib/supabase"
 import { SkeletonCard, SkeletonLine } from "@/components/SkeletonLoader"
 import WelcomeModal from "@/components/WelcomeModal"
-
-const typeColors: Record<string, string> = {
-  life: "bg-green-600",
-  memory: "bg-purple-600",
-  historical: "bg-amber-600",
-}
+import { EVENT_TYPE_TAG_COLOR } from "@/constants/enums"
 
 export default function Home() {
   const { user } = useAuth()
@@ -434,7 +429,7 @@ export default function Home() {
                         href="/events"
                         className="flex items-center gap-3 hover:bg-gray-800/50 rounded-lg p-1.5 -mx-1.5 transition"
                       >
-                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${typeColors[e.type] || "bg-gray-600"}`} />
+                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${EVENT_TYPE_TAG_COLOR[e.type]}`} />
                         <div className="flex-1 min-w-0">
                           <p className="text-white text-sm truncate">{e.title}</p>
                           <p className="text-gray-400 text-xs">{formatDate(e.date)}</p>
