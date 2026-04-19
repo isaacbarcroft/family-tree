@@ -5,6 +5,7 @@ import { linkPersonToFamily } from "@/lib/db"
 import type { Family } from "@/models/Family"
 import { useAuth } from "@/components/AuthProvider"
 import { supabase } from "@/lib/supabase"
+import { getErrorMessage } from "@/utils/errorMessage"
 
 interface AddFamilyModalProps {
   onClose: () => void
@@ -68,7 +69,7 @@ const AddFamilyModal = ({
       onClose()
     } catch (err) {
       console.error(err)
-      setError("Failed to link to family.")
+      setError(getErrorMessage(err, "Failed to link to family."))
     }
   }
 
@@ -90,7 +91,7 @@ const AddFamilyModal = ({
 
       if (insertError) {
         console.error("Family insert error:", insertError)
-        setError(`Failed to create family: ${insertError.message}`)
+        setError(getErrorMessage(insertError, "Failed to create family. Please try again."))
         return
       }
 
@@ -102,7 +103,7 @@ const AddFamilyModal = ({
       onClose()
     } catch (err) {
       console.error("Family creation failed:", err)
-      setError("Failed to create family. Please try again.")
+      setError(getErrorMessage(err, "Failed to create family. Please try again."))
     } finally {
       setCreating(false)
     }
