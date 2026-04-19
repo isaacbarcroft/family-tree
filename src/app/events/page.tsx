@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useAuth } from "@/components/AuthProvider"
-import { listEvents, updateEvent, deleteEvent, type PaginatedResult } from "@/lib/db"
+import { listEvents, updateEvent, deleteEvent } from "@/lib/db"
 import type { Event } from "@/models/Event"
 import ProtectedRoute from "@/components/ProtectedRoute"
 import AddEventModal from "@/components/AddEventModal"

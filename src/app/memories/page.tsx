@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useAuth } from "@/components/AuthProvider"
-import { listMemories, updateMemory, deleteMemory, type PaginatedResult } from "@/lib/db"
+import { listMemories, updateMemory, deleteMemory } from "@/lib/db"
 import type { Memory } from "@/models/Memory"
 import ProtectedRoute from "@/components/ProtectedRoute"
 import AddMemoryModal from "@/components/AddMemoryModal"
