@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import ProtectedRoute from "@/components/ProtectedRoute"
-import { addPerson, listPeople, deletePerson, type PaginatedResult } from "@/lib/db"
+import { addPerson, listPeople, deletePerson } from "@/lib/db"
 import type { Person } from "@/models/Person"
 import { useAuth } from "@/components/AuthProvider"
 import { ProfileAvatar } from "@/components/ProfileAvatar"

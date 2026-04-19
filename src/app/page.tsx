@@ -9,7 +9,6 @@ import type { Event } from "@/models/Event"
 import Link from "next/link"
 import { ProfileAvatar } from "@/components/ProfileAvatar"
 import { formatDate, getAge, getNextBirthday } from "@/utils/dates"
-import { supabase } from "@/lib/supabase"
 import { SkeletonCard, SkeletonLine } from "@/components/SkeletonLoader"
 import WelcomeModal from "@/components/WelcomeModal"
 import { EVENT_TYPE_TAG_COLOR } from "@/constants/enums"
@@ -19,7 +18,6 @@ export default function Home() {
   const [people, setPeople] = useState<Person[]>([])
   const [memories, setMemories] = useState<Memory[]>([])
   const [events, setEvents] = useState<Event[]>([])
-  const [familyCount, setFamilyCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [myPerson, setMyPerson] = useState<Person | null>(null)
 
@@ -38,9 +36,6 @@ export default function Home() {
         // Find current user's person record
         const me = p.find((person) => person.userId === user.id)
         if (me) setMyPerson(me)
-
-        const { data: families } = await supabase.from("families").select("id")
-        setFamilyCount(Array.isArray(families) ? families.length : 0)
       } catch (err) {
         console.error(err)
       } finally {

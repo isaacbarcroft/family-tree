@@ -18,8 +18,7 @@ interface FamilyListProps {
 function getRelLabel(
   personId: string,
   currentPersonId: string | undefined,
-  relationships: Relationship[] | undefined,
-  listType: string
+  relationships: Relationship[] | undefined
 ): string | null {
   if (!relationships?.length || !currentPersonId) return null
 
@@ -69,7 +68,7 @@ export default function FamilyList({ title, ids = [], onRemove, relationships, c
       <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
       <ul className="space-y-2">
         {people.map((p) => {
-          const label = getRelLabel(p.id, currentPersonId, relationships, title)
+          const label = getRelLabel(p.id, currentPersonId, relationships)
           return (
             <li
               key={p.id}

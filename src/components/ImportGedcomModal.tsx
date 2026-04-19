@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { parseGedcom, type ParsedPerson, type GedcomParseResult } from "@/utils/gedcom"
+import { parseGedcom, type GedcomParseResult } from "@/utils/gedcom"
 import { addPerson, linkParentChild, linkSpouses } from "@/lib/db"
 import { useAuth } from "@/components/AuthProvider"
 import type { Person } from "@/models/Person"
