@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase"
 import type { Person } from "@/models/Person"
 import { EVENT_TYPES } from "@/constants/enums"
 import type { EventType } from "@/constants/enums"
+import { getErrorMessage } from "@/utils/errorMessage"
 
 interface AddEventModalProps {
   onClose: () => void
@@ -62,7 +63,7 @@ export default function AddEventModal({ onClose, onCreated }: AddEventModalProps
       onClose()
     } catch (err) {
       console.error(err)
-      setError("Failed to create event. Please try again.")
+      setError(getErrorMessage(err, "Failed to create event. Please try again."))
     } finally {
       setSubmitting(false)
     }

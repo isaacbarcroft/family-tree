@@ -7,6 +7,7 @@ import { useAuth } from "@/components/AuthProvider"
 import { supabase } from "@/lib/supabase"
 import type { Person } from "@/models/Person"
 import { convertHeicToJpeg, isHeicFile, isHeicFileByMagic } from "@/utils/heic"
+import { getErrorMessage } from "@/utils/errorMessage"
 
 interface AddMemoryModalProps {
   onClose: () => void
@@ -112,7 +113,7 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
       onClose()
     } catch (err) {
       console.error(err)
-      setError("Failed to create memory. Please try again.")
+      setError(getErrorMessage(err, "Failed to create memory. Please try again."))
     } finally {
       setSubmitting(false)
     }

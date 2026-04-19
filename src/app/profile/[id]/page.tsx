@@ -37,6 +37,7 @@ import AddFamilyModal from "@/components/AddFamilyModal"
 import ProfileEditForm from "@/components/ProfileEditForm"
 import { convertHeicToJpeg, isHeicFile, isHeicFileByMagic } from "@/utils/heic"
 import { formatDate } from "@/utils/dates"
+import { getErrorMessage } from "@/utils/errorMessage"
 
 const obituaryKeywords = ["obituary", "obituaries", "legacy", "memorial"]
 
@@ -157,7 +158,7 @@ function ProfileContent() {
       }
     } catch (err: unknown) {
       console.error(err)
-      setError("Error saving profile.")
+      setError(getErrorMessage(err, "Error saving profile."))
     }
     setEditing(false)
   }
