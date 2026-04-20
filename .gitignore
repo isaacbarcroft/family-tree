@@ -44,3 +44,23 @@ next-env.d.ts
 # claude
 .claude/**
 .claude/settings.local.json
+
+# TODO list
+TODOS.md
+
+# CHANGELOG
+CHANGELOG.md
+
+# AGENT DECISIONS
+.agent/decisions.md
+
+# AGENT LOGS
+.agent/logs/**
+
+# AGENT RESULTS
+.agent/results/**
+
+# AGENT TASKS
+.agent/tasks/**
+
+# AGENT NOTES
