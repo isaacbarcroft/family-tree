@@ -6,20 +6,48 @@ export const runtime = "nodejs"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ""
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 const NOMINATIM_USER_AGENT = "FamilyLegacy/0.1 (contact: isaacbarcroft@gmail.com)"
 const MIN_MS_BETWEEN_CALLS = 1100
 
-let lastNominatimCallAt = 0
+// Chain concurrent calls on a single promise so each waiter is serialized
+// behind the previous one. This keeps the 1 req/sec spacing correct even
+// when multiple requests arrive at once within the same Node instance.
+// Under horizontal scaling a shared limiter (Redis, queue, etc.) would be
+// required to stay strictly within Nominatim's policy.
+let ratePromise: Promise<number> = Promise.resolve(0)
 
-async function waitForRateLimit() {
-  const now = Date.now()
-  const elapsed = now - lastNominatimCallAt
-  if (elapsed < MIN_MS_BETWEEN_CALLS) {
-    await new Promise((r) => setTimeout(r, MIN_MS_BETWEEN_CALLS - elapsed))
+function waitForRateLimit(): Promise<void> {
+  const next = ratePromise.then(async (last) => {
+    const wait = Math.max(0, MIN_MS_BETWEEN_CALLS - (Date.now() - last))
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait))
+    return Date.now()
+  })
+  ratePromise = next
+  return next.then(() => undefined)
+}
+
+async function verifyUser(req: Request): Promise<boolean> {
+  const auth = req.headers.get("authorization") ?? ""
+  const match = auth.match(/^Bearer\s+(.+)$/i)
+  if (!match) return false
+  try {
+    const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: { apikey: supabaseAnonKey, Authorization: `Bearer ${match[1]}` },
+    })
+    return res.ok
+  } catch {
+    return false
   }
-  lastNominatimCallAt = Date.now()
+}
+
+// PostgREST `in.(...)` filter: wrap each value in double quotes and escape
+// internal backslashes and quotes. placeKey comes from free-form user input,
+// so an unescaped `"` would break the filter syntax.
+function pgInValue(v: string): string {
+  return `"${v.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`
 }
 
 async function supabaseRest<T = unknown>(
@@ -109,8 +137,12 @@ async function geocodeOne(raw: string): Promise<{
 }
 
 export async function POST(req: Request) {
-  if (!supabaseUrl || !supabaseServiceKey) {
+  if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
     return NextResponse.json({ error: "Missing Supabase env vars" }, { status: 500 })
+  }
+
+  if (!(await verifyUser(req))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
   let body: { places?: unknown }
@@ -138,8 +170,10 @@ export async function POST(req: Request) {
   }
 
   // Load existing rows in one call so we can skip anything already ok/failed
+  const lookupParams = new URLSearchParams()
+  lookupParams.set("placeKey", `in.(${[...keyed.keys()].map(pgInValue).join(",")})`)
   const existing = await supabaseRest<GeocodedPlace[]>("geocoded_places", "GET", {
-    params: `placeKey=in.(${[...keyed.keys()].map((k) => `"${encodeURIComponent(k)}"`).join(",")})`,
+    params: lookupParams.toString(),
   })
   const existingByKey = new Map<string, GeocodedPlace>()
   for (const row of existing ?? []) existingByKey.set(row.placeKey, row)

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import Link from "next/link"
 import {
   deleteGeocodedPlace,
@@ -58,6 +58,12 @@ export default function UngeocodedSidebar({ rows, people, residences, onChange }
   const [draft, setDraft] = useState("")
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  const peopleById = useMemo(() => {
+    const map = new Map<string, Person>()
+    for (const p of people) map.set(p.id, p)
+    return map
+  }, [people])
 
   const startEdit = (row: GeocodedPlace) => {
     setEditingKey(row.placeKey)
@@ -142,8 +148,6 @@ export default function UngeocodedSidebar({ rows, people, residences, onChange }
       <ul className="space-y-3">
         {rows.map((row) => {
           const hit = hitsForKey(people, residences, row.placeKey)
-          const peopleById = new Map<string, Person>()
-          for (const p of people) peopleById.set(p.id, p)
           const allPeople: Person[] = []
           const seen = new Set<string>()
           const addPerson = (p: Person) => {

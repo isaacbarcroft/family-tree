@@ -54,12 +54,14 @@ export default function ResidencesEditor({ personId }: Props) {
     async (id: string, patch: Partial<Residence>) => {
       const existing = residences.find((r) => r.id === id)
       if (!existing) return
+      const prev = residences
       const next: Residence = { ...existing, ...patch, updatedAt: new Date().toISOString() }
       setResidences((rows) => rows.map((r) => (r.id === id ? next : r)))
       try {
         await updateResidence(id, { ...patch, updatedAt: next.updatedAt })
       } catch (err) {
         console.error("Failed to update residence", err)
+        setResidences(prev)
         setError("Failed to save changes.")
       }
     },

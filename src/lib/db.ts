@@ -1,4 +1,4 @@
-import { supabase } from "./supabase"
+import { supabase, getAccessToken } from "./supabase"
 import type { Person } from "@/models/Person"
 import type { Event } from "@/models/Event"
 import type { Memory } from "@/models/Memory"
@@ -509,11 +509,34 @@ export async function deleteGeocodedPlace(placeKey: string) {
 
 export async function requestGeocode(places: string[]): Promise<void> {
   if (places.length === 0) return
-  await fetch("/api/geocode", {
+  const token = await getAccessToken()
+  const res = await fetch("/api/geocode", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({ places }),
   })
+  if (res.ok) return
+
+  let message = `Geocoding request failed with status ${res.status}`
+  const contentType = res.headers.get("content-type") ?? ""
+  try {
+    if (contentType.includes("application/json")) {
+      const body = (await res.json()) as { error?: unknown; message?: unknown } | null
+      if (body && typeof body === "object") {
+        if (typeof body.error === "string") message = body.error
+        else if (typeof body.message === "string") message = body.message
+      }
+    } else {
+      const text = (await res.text()).trim()
+      if (text) message = text
+    }
+  } catch {
+    // fall through to status-based message
+  }
+  throw new Error(message)
 }
 
 // ---- Residences ----

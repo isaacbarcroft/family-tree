@@ -7,10 +7,12 @@ async function loadRoute() {
   return await import("@/app/api/geocode/route")
 }
 
-function makeRequest(body: unknown): Request {
+function makeRequest(body: unknown, opts: { auth?: boolean } = {}): Request {
+  const headers: Record<string, string> = { "Content-Type": "application/json" }
+  if (opts.auth !== false) headers.Authorization = "Bearer test-token"
   return new Request("http://localhost/api/geocode", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(body),
   })
 }
@@ -30,17 +32,25 @@ interface MockConfig {
     | { kind: "throw" }
     | { kind: "invalid-json" }
   >
+  authOk?: boolean
 }
 
 interface MockHandles {
   nominatimUrls: string[]
   nominatimTimes: number[]
   upserts: Array<Record<string, unknown>>
+  lookupUrls: string[]
 }
 
 function setupFetchMock(cfg: MockConfig): MockHandles {
-  const handles: MockHandles = { nominatimUrls: [], nominatimTimes: [], upserts: [] }
+  const handles: MockHandles = {
+    nominatimUrls: [],
+    nominatimTimes: [],
+    upserts: [],
+    lookupUrls: [],
+  }
   let nomIdx = 0
+  const authOk = cfg.authOk ?? true
 
   vi.spyOn(globalThis, "fetch").mockImplementation((async (
     input: RequestInfo | URL,
@@ -53,6 +63,12 @@ function setupFetchMock(cfg: MockConfig): MockHandles {
         ? input.toString()
         : (input as Request).url
     const method = init?.method ?? "GET"
+
+    if (url.includes("/auth/v1/user")) {
+      return new Response(authOk ? JSON.stringify({ id: "user-1" }) : "", {
+        status: authOk ? 200 : 401,
+      })
+    }
 
     if (url.startsWith("https://nominatim.openstreetmap.org/")) {
       handles.nominatimUrls.push(url)
@@ -71,6 +87,7 @@ function setupFetchMock(cfg: MockConfig): MockHandles {
 
     if (url.includes("/rest/v1/geocoded_places")) {
       if (method === "GET") {
+        handles.lookupUrls.push(url)
         return new Response(JSON.stringify(cfg.existingRows), { status: 200 })
       }
       if (method === "POST") {
@@ -90,10 +107,12 @@ describe("POST /api/geocode", () => {
   beforeEach(() => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://x.supabase.co"
     process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key"
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon-key"
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
+    vi.useRealTimers()
     process.env = { ...ORIGINAL_ENV }
   })
 
@@ -104,13 +123,29 @@ describe("POST /api/geocode", () => {
     expect(res.status).toBe(500)
   })
 
+  it("returns 401 when Authorization header is missing", async () => {
+    setupFetchMock({ existingRows: [], nominatim: [] })
+    const { POST } = await loadRoute()
+    const res = await POST(makeRequest({ places: ["X"] }, { auth: false }))
+    expect(res.status).toBe(401)
+  })
+
+  it("returns 401 when the access token is rejected", async () => {
+    setupFetchMock({ existingRows: [], nominatim: [], authOk: false })
+    const { POST } = await loadRoute()
+    const res = await POST(makeRequest({ places: ["X"] }))
+    expect(res.status).toBe(401)
+  })
+
   it("returns 400 when body lacks places array", async () => {
+    setupFetchMock({ existingRows: [], nominatim: [] })
     const { POST } = await loadRoute()
     const res = await POST(makeRequest({ foo: "bar" }))
     expect(res.status).toBe(400)
   })
 
   it("returns empty results when places is empty", async () => {
+    setupFetchMock({ existingRows: [], nominatim: [] })
     const { POST } = await loadRoute()
     const res = await POST(makeRequest({ places: [] }))
     expect(res.status).toBe(200)
@@ -237,22 +272,41 @@ describe("POST /api/geocode", () => {
     expect(body.results).toHaveLength(1)
   })
 
-  it(
-    "spaces Nominatim calls at least 1100ms apart",
-    async () => {
-      const handles = setupFetchMock({
-        existingRows: [],
-        nominatim: [
-          { kind: "ok", body: [{ lat: "1", lon: "1" }] },
-          { kind: "ok", body: [{ lat: "2", lon: "2" }] },
-        ],
-      })
-      const { POST } = await loadRoute()
-      await POST(makeRequest({ places: ["First", "Second"] }))
-      expect(handles.nominatimTimes).toHaveLength(2)
-      const gap = handles.nominatimTimes[1] - handles.nominatimTimes[0]
-      expect(gap).toBeGreaterThanOrEqual(1100)
-    },
-    10000
-  )
+  it("escapes double quotes and backslashes in the placeKey lookup filter", async () => {
+    const handles = setupFetchMock({
+      existingRows: [],
+      nominatim: [{ kind: "ok", body: [{ lat: "1", lon: "2" }] }],
+    })
+    const { POST } = await loadRoute()
+    // Quote character survives normalizePlace, so verify it is escaped rather
+    // than injected raw into the PostgREST filter.
+    await POST(makeRequest({ places: [`weird "quoted" place`] }))
+    expect(handles.lookupUrls).toHaveLength(1)
+    // URLSearchParams emits spaces as `+`; replace before decoding.
+    const decoded = decodeURIComponent(handles.lookupUrls[0].replace(/\+/g, " "))
+    expect(decoded).toContain(`"weird \\"quoted\\" place"`)
+  })
+
+  it("spaces Nominatim calls at least 1100ms apart", async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date("2026-01-01T00:00:00Z"))
+
+    const handles = setupFetchMock({
+      existingRows: [],
+      nominatim: [
+        { kind: "ok", body: [{ lat: "1", lon: "1" }] },
+        { kind: "ok", body: [{ lat: "2", lon: "2" }] },
+      ],
+    })
+    const { POST } = await loadRoute()
+    const promise = POST(makeRequest({ places: ["First", "Second"] }))
+    // Drain pending timers (including the 1100ms rate-limit wait) under fake time.
+    await vi.runAllTimersAsync()
+    const res = await promise
+
+    expect(res.status).toBe(200)
+    expect(handles.nominatimTimes).toHaveLength(2)
+    const gap = handles.nominatimTimes[1] - handles.nominatimTimes[0]
+    expect(gap).toBeGreaterThanOrEqual(1100)
+  })
 })

@@ -42,5 +42,8 @@ yarn-error.log*
 next-env.d.ts
 
 # claude
-.claude/**
+# Commit shared routines (.claude/commands/, .claude/agents/) but exclude personal settings
 .claude/settings.local.json
+
+# TODO list
+TODOS.md

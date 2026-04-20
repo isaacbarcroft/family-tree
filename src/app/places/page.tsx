@@ -61,37 +61,43 @@ export default function PlacesPage() {
   const [loading, setLoading] = useState(true)
   const [geocoding, setGeocoding] = useState(false)
 
-  const loadSnapshot = useCallback(async () => {
+  const loadSnapshot = useCallback(async (isActive: () => boolean = () => true) => {
     const [allPeople, allResidences, rows] = await Promise.all([
       listPeople(),
       listResidences(),
       listGeocodedPlaces(),
     ])
-    setPeople(allPeople)
-    setResidences(allResidences)
-    setPlaceRows(rows)
+    if (isActive()) {
+      setPeople(allPeople)
+      setResidences(allResidences)
+      setPlaceRows(rows)
+    }
     return { allPeople, allResidences, rows }
   }, [])
 
-  const refresh = useCallback(async () => {
-    const first = await loadSnapshot()
-    const unknown = findUnknownPlaces(first.allPeople, first.allResidences, first.rows)
-    if (unknown.length === 0) return
+  const refresh = useCallback(
+    async (isActive: () => boolean = () => true) => {
+      const first = await loadSnapshot(isActive)
+      const unknown = findUnknownPlaces(first.allPeople, first.allResidences, first.rows)
+      if (unknown.length === 0) return
 
-    setGeocoding(true)
-    try {
-      await requestGeocode(unknown)
-      await loadSnapshot()
-    } finally {
-      setGeocoding(false)
-    }
-  }, [loadSnapshot])
+      if (isActive()) setGeocoding(true)
+      try {
+        await requestGeocode(unknown)
+        await loadSnapshot(isActive)
+      } finally {
+        if (isActive()) setGeocoding(false)
+      }
+    },
+    [loadSnapshot]
+  )
 
   useEffect(() => {
     let cancelled = false
+    const isActive = () => !cancelled
     const run = async () => {
       try {
-        await refresh()
+        await refresh(isActive)
       } catch (err) {
         console.error("Failed to load places", err)
       } finally {
