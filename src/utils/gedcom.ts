@@ -71,7 +71,7 @@ function buildFamilyUnits(people: Person[]): FamilyUnit[] {
   return units
 }
 
-export function exportToGedcom(people: Person[], families: Family[]): string {
+export function exportToGedcom(people: Person[], _families: Family[]): string {
   const lines: string[] = []
   const personIdMap = new Map<string, string>()
 

@@ -201,6 +201,11 @@ class QueryBuilder {
     return this
   }
 
+  or(filters: string) {
+    this.params.append("or", `(${filters})`)
+    return this
+  }
+
   order(column: string, options?: { ascending?: boolean }) {
     const direction = options?.ascending === false ? "desc" : "asc"
     this.params.set("order", `${column}.${direction}`)

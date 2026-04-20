@@ -469,20 +469,13 @@ export async function addRelationship(rel: Omit<Relationship, "id">) {
 }
 
 export async function listRelationshipsForPerson(personId: string) {
-  // PostgREST doesn't support OR directly — fetch both directions
-  const { data: asA, error: errA } = await supabase
+  const { data, error } = await supabase
     .from("relationships")
     .select("*")
-    .eq("personAId", personId)
-  if (errA) throw errA
+    .or(`personAId.eq.${personId},personBId.eq.${personId}`)
+  if (error) throw error
 
-  const { data: asB, error: errB } = await supabase
-    .from("relationships")
-    .select("*")
-    .eq("personBId", personId)
-  if (errB) throw errB
-
-  return [...((asA ?? []) as Relationship[]), ...((asB ?? []) as Relationship[])]
+  return (data ?? []) as Relationship[]
 }
 
 export async function updateRelationship(id: string, updates: Partial<Relationship>) {
