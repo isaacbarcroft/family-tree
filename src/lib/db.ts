@@ -3,6 +3,8 @@ import type { Person } from "@/models/Person"
 import type { Event } from "@/models/Event"
 import type { Memory } from "@/models/Memory"
 import type { Relationship } from "@/models/Relationship"
+import type { GeocodedPlace } from "@/models/GeocodedPlace"
+import type { Residence } from "@/models/Residence"
 
 function buildSearchName(firstName?: string, middleName?: string, lastName?: string) {
   return [firstName, middleName, lastName].filter(Boolean).join(" ").toLowerCase().trim()
@@ -490,5 +492,63 @@ export async function updateRelationship(id: string, updates: Partial<Relationsh
 
 export async function deleteRelationship(id: string) {
   const { error } = await supabase.from("relationships").delete().eq("id", id)
+  if (error) throw error
+}
+
+// ---- Geocoded Places ----
+export async function listGeocodedPlaces(): Promise<GeocodedPlace[]> {
+  const { data, error } = await supabase.from("geocoded_places").select("*")
+  if (error) throw error
+  return (data ?? []) as GeocodedPlace[]
+}
+
+export async function deleteGeocodedPlace(placeKey: string) {
+  const { error } = await supabase.from("geocoded_places").delete().eq("placeKey", placeKey)
+  if (error) throw error
+}
+
+export async function requestGeocode(places: string[]): Promise<void> {
+  if (places.length === 0) return
+  await fetch("/api/geocode", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ places }),
+  })
+}
+
+// ---- Residences ----
+export async function listResidences(): Promise<Residence[]> {
+  const { data, error } = await supabase.from("residences").select("*")
+  if (error) throw error
+  return (data ?? []) as Residence[]
+}
+
+export async function listResidencesForPerson(personId: string): Promise<Residence[]> {
+  const { data, error } = await supabase
+    .from("residences")
+    .select("*")
+    .eq("personId", personId)
+    .order("dateFrom", { ascending: true })
+  if (error) throw error
+  return (data ?? []) as Residence[]
+}
+
+export async function addResidence(residence: Omit<Residence, "id">): Promise<Residence> {
+  const { data, error } = await supabase
+    .from("residences")
+    .insert(residence)
+    .select("*")
+    .single()
+  if (error) throw error
+  return data as Residence
+}
+
+export async function updateResidence(id: string, updates: Partial<Residence>): Promise<void> {
+  const { error } = await supabase.from("residences").update(updates).eq("id", id)
+  if (error) throw error
+}
+
+export async function deleteResidence(id: string): Promise<void> {
+  const { error } = await supabase.from("residences").delete().eq("id", id)
   if (error) throw error
 }

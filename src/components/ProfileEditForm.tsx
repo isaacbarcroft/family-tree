@@ -3,6 +3,7 @@
 import type { Person } from "@/models/Person"
 import FamilyList from "@/components/FamilyList"
 import FamilyListCompact from "@/components/FamilyListCompact"
+import ResidencesEditor from "@/components/ResidencesEditor"
 
 interface ProfileEditFormProps {
   form: Partial<Person>
@@ -102,17 +103,30 @@ export default function ProfileEditForm({
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold mb-3 text-white">Life Dates</h2>
+        <h2 className="text-lg font-semibold mb-3 text-white">Life Dates & Places</h2>
         <div className="space-y-4">
-          <div className="max-w-xs">
-            <label className="block text-base mb-1 text-gray-300">Birth Date</label>
-            <input
-              type="date"
-              name="birthDate"
-              value={(form.birthDate as string) || ""}
-              onChange={onChange}
-              className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
-            />
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-base mb-1 text-gray-300">Birth Date</label>
+              <input
+                type="date"
+                name="birthDate"
+                value={(form.birthDate as string) || ""}
+                onChange={onChange}
+                className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
+              />
+            </div>
+            <div>
+              <label className="block text-base mb-1 text-gray-300">Birthplace</label>
+              <input
+                type="text"
+                name="birthPlace"
+                value={(form.birthPlace as string) || ""}
+                onChange={onChange}
+                placeholder="e.g. Nashville, Tennessee, USA"
+                className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
+              />
+            </div>
           </div>
           <label className="inline-flex items-center gap-2 cursor-pointer text-gray-300">
             <input
@@ -121,7 +135,7 @@ export default function ProfileEditForm({
               onChange={(e) => {
                 onShowDeceasedChange(e.target.checked)
                 if (!e.target.checked) {
-                  onFormUpdate((prev) => ({ ...prev, deathDate: "" }))
+                  onFormUpdate((prev) => ({ ...prev, deathDate: "", deathPlace: "" }))
                 }
               }}
               className="w-4 h-4 rounded border-gray-600 bg-gray-800 accent-[var(--accent)] focus:ring-[var(--accent)]"
@@ -129,18 +143,39 @@ export default function ProfileEditForm({
             <span className="text-base">In heaven</span>
           </label>
           {showDeceased && (
-            <div className="max-w-xs">
-              <label className="block text-base mb-1 text-gray-300">Date of Passing</label>
-              <input
-                type="date"
-                name="deathDate"
-                value={(form.deathDate as string) || ""}
-                onChange={onChange}
-                className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
-              />
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-base mb-1 text-gray-300">Date of Passing</label>
+                <input
+                  type="date"
+                  name="deathDate"
+                  value={(form.deathDate as string) || ""}
+                  onChange={onChange}
+                  className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-base mb-1 text-gray-300">Place of Passing</label>
+                <input
+                  type="text"
+                  name="deathPlace"
+                  value={(form.deathPlace as string) || ""}
+                  onChange={onChange}
+                  placeholder="e.g. Memphis, Tennessee, USA"
+                  className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
+                />
+              </div>
             </div>
           )}
         </div>
+      </section>
+
+      <section>
+        <h2 className="text-lg font-semibold mb-1 text-white">Places Lived</h2>
+        <p className="text-sm text-gray-400 mb-3">
+          Where did they live along the way? Each entry shows up as a pin on the Places map.
+        </p>
+        <ResidencesEditor personId={person.id} />
       </section>
 
       <section>
