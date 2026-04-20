@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useRef, useState } from "react"
 import { addMemory } from "@/lib/db"
 import { uploadMemoryPhoto } from "@/lib/storage"
 import { useAuth } from "@/components/AuthProvider"
@@ -22,6 +22,7 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
   const [date, setDate] = useState("")
   const [files, setFiles] = useState<File[]>([])
   const [previews, setPreviews] = useState<string[]>([])
+  const previewsRef = useRef<string[]>([])
   const [search, setSearch] = useState("")
   const [searchResults, setSearchResults] = useState<Person[]>([])
   const [taggedPeople, setTaggedPeople] = useState<Person[]>([])
@@ -82,8 +83,24 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
 
   const removeFile = (index: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== index))
-    setPreviews((prev) => prev.filter((_, i) => i !== index))
+    setPreviews((prev) => {
+      const removed = prev[index]
+      if (removed) URL.revokeObjectURL(removed)
+      return prev.filter((_, i) => i !== index)
+    })
   }
+
+  // Keep a ref of outstanding preview blob URLs so unmount cleanup can revoke
+  // them without re-subscribing every time the list changes.
+  useEffect(() => {
+    previewsRef.current = previews
+  }, [previews])
+
+  useEffect(() => {
+    return () => {
+      previewsRef.current.forEach((url) => URL.revokeObjectURL(url))
+    }
+  }, [])
 
   const handleSubmit = async () => {
     if (!title.trim() || !user) return
