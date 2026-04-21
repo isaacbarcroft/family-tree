@@ -129,6 +129,11 @@ async function getFreshAuthHeaders(contentTypeJson = false) {
   }
 }
 
+export async function getAccessToken(): Promise<string | null> {
+  const session = await getFreshSession()
+  return session?.access_token ?? null
+}
+
 function parseIn(values: string[]) {
   return `(${values.map((v) => `"${v}"`).join(",")})`
 }
