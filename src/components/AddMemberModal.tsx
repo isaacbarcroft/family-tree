@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useId, useRef } from "react"
 import { linkParentChild, linkSpouses, addPerson, addRelationship } from "@/lib/db"
 import type { Person } from "@/models/Person"
 import type { RelationshipSubtype, MarriageStatus } from "@/models/Relationship"
@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/AuthProvider"
 import { supabase } from "@/lib/supabase"
 import { RELATIONSHIP_SUBTYPES, MARRIAGE_STATUSES } from "@/constants/enums"
+import Modal from "@/components/Modal"
 
 interface AddMemberModalProps {
   onClose: () => void
@@ -30,6 +31,7 @@ const AddMemberModal = ({ onClose, currentPersonId, onLinked }: AddMemberModalPr
   const router = useRouter()
   const { user } = useAuth()
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const titleId = useId()
 
   useEffect(() => {
     if (!search.trim()) {
@@ -123,150 +125,150 @@ const AddMemberModal = ({ onClose, currentPersonId, onLinked }: AddMemberModalPr
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 w-full max-w-md text-gray-100 shadow-lg">
-        <h3 className="text-lg font-semibold mb-4 text-white">
-          Add Family Member
-        </h3>
+    <Modal onClose={onClose} labelledBy={titleId}>
+      <h3 id={titleId} className="text-lg font-semibold mb-4 text-white">
+        Add Family Member
+      </h3>
 
+      <div className="mb-4">
+        <label className="block text-base text-gray-300 mb-1">
+          Relationship Type
+        </label>
+        <select
+          value={relationship}
+          onChange={(e) =>
+            setRelationship(e.target.value as "parent" | "child" | "spouse")
+          }
+          className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
+        >
+          <option value="parent">Parent</option>
+          <option value="child">Child</option>
+          <option value="spouse">Spouse / Partner</option>
+        </select>
+      </div>
+
+      {(relationship === "parent" || relationship === "child") && (
         <div className="mb-4">
           <label className="block text-base text-gray-300 mb-1">
-            Relationship Type
+            Relationship
           </label>
           <select
-            value={relationship}
-            onChange={(e) =>
-              setRelationship(e.target.value as "parent" | "child" | "spouse")
-            }
+            value={subtype}
+            onChange={(e) => setSubtype(e.target.value as RelationshipSubtype)}
             className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
           >
-            <option value="parent">Parent</option>
-            <option value="child">Child</option>
-            <option value="spouse">Spouse / Partner</option>
+            {RELATIONSHIP_SUBTYPES.map((s) => (
+              <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+            ))}
           </select>
         </div>
+      )}
 
-        {(relationship === "parent" || relationship === "child") && (
-          <div className="mb-4">
-            <label className="block text-base text-gray-300 mb-1">
-              Relationship
-            </label>
+      {relationship === "spouse" && (
+        <div className="mb-4 space-y-3">
+          <div>
+            <label className="block text-base text-gray-300 mb-1">Status</label>
             <select
-              value={subtype}
-              onChange={(e) => setSubtype(e.target.value as RelationshipSubtype)}
+              value={marriageStatus}
+              onChange={(e) => setMarriageStatus(e.target.value as MarriageStatus)}
               className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
             >
-              {RELATIONSHIP_SUBTYPES.map((s) => (
+              {MARRIAGE_STATUSES.map((s) => (
                 <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
               ))}
             </select>
           </div>
-        )}
-
-        {relationship === "spouse" && (
-          <div className="mb-4 space-y-3">
-            <div>
-              <label className="block text-base text-gray-300 mb-1">Status</label>
-              <select
-                value={marriageStatus}
-                onChange={(e) => setMarriageStatus(e.target.value as MarriageStatus)}
-                className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
-              >
-                {MARRIAGE_STATUSES.map((s) => (
-                  <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-base text-gray-300 mb-1">Date (optional)</label>
-              <input
-                type="date"
-                value={marriageDate}
-                onChange={(e) => setMarriageDate(e.target.value)}
-                className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
-              />
-            </div>
+          <div>
+            <label className="block text-base text-gray-300 mb-1">Date (optional)</label>
+            <input
+              type="date"
+              value={marriageDate}
+              onChange={(e) => setMarriageDate(e.target.value)}
+              className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
+            />
           </div>
-        )}
-
-        <div className="mb-4">
-          <label className="block text-base text-gray-300 mb-1">
-            Search by Name
-          </label>
-          <input
-            type="text"
-            placeholder="Enter a name..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
-          />
         </div>
+      )}
 
-        {search.trim() && (
-          <div className="min-h-[60px] mb-4">
-            {loading ? (
-              <div className="flex items-center gap-2 text-gray-400 text-base py-2">
-                <svg
-                  className="animate-spin h-4 w-4"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-                Searching...
-              </div>
-            ) : results.length > 0 ? (
-              <ul className="space-y-2 max-h-40 overflow-y-auto">
-                {results.map((r) => (
-                  <li
-                    key={r.id}
+      <div className="mb-4">
+        <label className="block text-base text-gray-300 mb-1">
+          Search by Name
+        </label>
+        <input
+          type="text"
+          placeholder="Enter a name..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
+        />
+      </div>
+
+      {search.trim() && (
+        <div className="min-h-[60px] mb-4">
+          {loading ? (
+            <div className="flex items-center gap-2 text-gray-400 text-base py-2">
+              <svg
+                className="animate-spin h-4 w-4"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
+              </svg>
+              Searching...
+            </div>
+          ) : results.length > 0 ? (
+            <ul className="space-y-2 max-h-40 overflow-y-auto">
+              {results.map((r) => (
+                <li key={r.id}>
+                  <button
+                    type="button"
                     onClick={() => handleLink(r.id)}
-                    className="p-2 bg-gray-800 hover:bg-gray-700 rounded cursor-pointer transition"
+                    className="w-full text-left p-2 bg-gray-800 hover:bg-gray-700 rounded transition"
                   >
                     {r.firstName} {r.lastName || ""}
-                  </li>
-                ))}
-              </ul>
-            ) : searched ? (
-              <>
-                <p className="text-gray-300 text-base mb-3">
-                  No existing people found for &ldquo;{search}&rdquo;.
-                </p>
-                <button
-                  onClick={handleCreate}
-                  disabled={creating}
-                  className="bg-green-600 hover:bg-green-500 text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px]"
-                >
-                  {creating ? "Creating..." : `Create “${search}” and Link`}
-                </button>
-              </>
-            ) : null}
-          </div>
-        )}
-
-        <div className="flex justify-end">
-          <button
-            onClick={onClose}
-            className="bg-gray-700 hover:bg-gray-600 text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px]"
-          >
-            Close
-          </button>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : searched ? (
+            <>
+              <p className="text-gray-300 text-base mb-3">
+                No existing people found for &ldquo;{search}&rdquo;.
+              </p>
+              <button
+                onClick={handleCreate}
+                disabled={creating}
+                className="bg-green-600 hover:bg-green-500 text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px]"
+              >
+                {creating ? "Creating..." : `Create “${search}” and Link`}
+              </button>
+            </>
+          ) : null}
         </div>
+      )}
+
+      <div className="flex justify-end">
+        <button
+          onClick={onClose}
+          className="bg-gray-700 hover:bg-gray-600 text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px]"
+        >
+          Close
+        </button>
       </div>
-    </div>
+    </Modal>
   )
 }
 
