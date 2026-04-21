@@ -285,24 +285,65 @@ export async function unlinkSpouses(personAId: string, personBId: string) {
 }
 
 export async function deletePerson(id: string) {
-  // Clean up bi-directional references before deleting
+  // Clean up bi-directional references before deleting the row itself.
+  // Fetch affected people/families in one query each, compute the
+  // updated arrays client-side, then batch-upsert — avoids the N+1
+  // SELECT+UPDATE pattern that grew linearly with the number of
+  // relationships.
   const person = await getPersonById(id)
+
   if (person) {
-    // Remove from parents' childIds
-    for (const parentId of person.parentIds ?? []) {
-      try { await removeFromArray("people", parentId, "childIds", id) } catch { /* parent may already be deleted */ }
+    const relatedPersonIds = Array.from(
+      new Set([
+        ...(person.parentIds ?? []),
+        ...(person.childIds ?? []),
+        ...(person.spouseIds ?? []),
+      ])
+    )
+    const familyIds = person.familyIds ?? []
+
+    if (relatedPersonIds.length > 0) {
+      const { data, error } = await supabase
+        .from("people")
+        .select("*")
+        .in("id", relatedPersonIds)
+      if (error) throw error
+
+      const peopleUpdates = ((data ?? []) as Person[]).map((p) => ({
+        id: p.id,
+        parentIds: (p.parentIds ?? []).filter((pid) => pid !== id),
+        childIds: (p.childIds ?? []).filter((cid) => cid !== id),
+        spouseIds: (p.spouseIds ?? []).filter((sid) => sid !== id),
+      }))
+
+      if (peopleUpdates.length > 0) {
+        const { error: updateError } = await supabase
+          .from("people")
+          .upsert(peopleUpdates, { onConflict: "id" })
+        if (updateError) throw updateError
+      }
     }
-    // Remove from children's parentIds
-    for (const childId of person.childIds ?? []) {
-      try { await removeFromArray("people", childId, "parentIds", id) } catch { /* child may already be deleted */ }
-    }
-    // Remove from spouses' spouseIds
-    for (const spouseId of person.spouseIds ?? []) {
-      try { await removeFromArray("people", spouseId, "spouseIds", id) } catch { /* spouse may already be deleted */ }
-    }
-    // Remove from family members arrays
-    for (const familyId of person.familyIds ?? []) {
-      try { await removeFromArray("families", familyId, "members", id) } catch { /* family may already be deleted */ }
+
+    if (familyIds.length > 0) {
+      const { data, error } = await supabase
+        .from("families")
+        .select("*")
+        .in("id", familyIds)
+      if (error) throw error
+
+      const familyUpdates = (
+        (data ?? []) as import("@/models/Family").Family[]
+      ).map((f) => ({
+        id: f.id,
+        members: (f.members ?? []).filter((mid) => mid !== id),
+      }))
+
+      if (familyUpdates.length > 0) {
+        const { error: updateError } = await supabase
+          .from("families")
+          .upsert(familyUpdates, { onConflict: "id" })
+        if (updateError) throw updateError
+      }
     }
   }
 
