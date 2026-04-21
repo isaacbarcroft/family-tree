@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useId } from "react"
+import Modal from "@/components/Modal"
 
 const WELCOME_SEEN_KEY = "family_legacy_welcome_seen"
 
@@ -50,6 +51,7 @@ const steps = [
 export default function WelcomeModal() {
   const [visible, setVisible] = useState(false)
   const [step, setStep] = useState(0)
+  const titleId = useId()
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -82,56 +84,67 @@ export default function WelcomeModal() {
   const isLast = step === steps.length - 1
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-      <div className="w-full max-w-md bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl card-shadow overflow-hidden">
-        {/* Progress dots */}
-        <div className="flex justify-center gap-2 pt-6 pb-2">
-          {steps.map((_, i) => (
-            <div
-              key={i}
-              className={`h-1.5 rounded-full transition-all duration-300 ${
-                i === step ? "w-6 bg-[var(--accent)]" : "w-1.5 bg-gray-600"
-              }`}
-            />
-          ))}
-        </div>
-
-        {/* Content */}
-        <div className="px-8 py-6 text-center">
-          <div className="flex justify-center mb-5">
-            <div className="w-16 h-16 rounded-full bg-[var(--accent)]/10 flex items-center justify-center">
-              {current.icon}
-            </div>
-          </div>
-          <h2 className="text-xl font-bold text-white mb-3">{current.title}</h2>
-          <p className="text-gray-300 text-base leading-relaxed">{current.description}</p>
-        </div>
-
-        {/* Actions */}
-        <div className="px-8 pb-6 flex items-center justify-between gap-3">
-          {step > 0 ? (
-            <button
-              onClick={prev}
-              className="px-4 py-2 text-sm text-gray-400 hover:text-white transition"
-            >
-              Back
-            </button>
-          ) : (
-            <button
-              onClick={dismiss}
-              className="px-4 py-2 text-sm text-gray-400 hover:text-white transition"
-            >
-              Skip
-            </button>
-          )}
-          <button
-            onClick={next}
-            className="px-6 py-2.5 bg-[var(--accent)] text-white rounded-lg hover:bg-[var(--accent-hover)] font-medium text-sm transition min-w-[100px]"
-          >
-            {isLast ? "Get Started" : "Next"}
-          </button>
-        </div>
+    <Modal
+      onClose={dismiss}
+      labelledBy={titleId}
+      backdropClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
+      panelClassName="w-full max-w-md bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl card-shadow overflow-hidden outline-none"
+    >
+      {/* Progress dots */}
+      <div
+        className="flex justify-center gap-2 pt-6 pb-2"
+        role="progressbar"
+        aria-valuemin={1}
+        aria-valuemax={steps.length}
+        aria-valuenow={step + 1}
+        aria-label={`Step ${step + 1} of ${steps.length}`}
+      >
+        {steps.map((_, i) => (
+          <div
+            key={i}
+            aria-hidden="true"
+            className={`h-1.5 rounded-full transition-all duration-300 ${
+              i === step ? "w-6 bg-[var(--accent)]" : "w-1.5 bg-gray-600"
+            }`}
+          />
+        ))}
       </div>
-    </div>
+
+      {/* Content */}
+      <div className="px-8 py-6 text-center">
+        <div className="flex justify-center mb-5">
+          <div className="w-16 h-16 rounded-full bg-[var(--accent)]/10 flex items-center justify-center" aria-hidden="true">
+            {current.icon}
+          </div>
+        </div>
+        <h2 id={titleId} className="text-xl font-bold text-white mb-3">{current.title}</h2>
+        <p className="text-gray-300 text-base leading-relaxed">{current.description}</p>
+      </div>
+
+      {/* Actions */}
+      <div className="px-8 pb-6 flex items-center justify-between gap-3">
+        {step > 0 ? (
+          <button
+            onClick={prev}
+            className="px-4 py-2 text-sm text-gray-400 hover:text-white transition"
+          >
+            Back
+          </button>
+        ) : (
+          <button
+            onClick={dismiss}
+            className="px-4 py-2 text-sm text-gray-400 hover:text-white transition"
+          >
+            Skip
+          </button>
+        )}
+        <button
+          onClick={next}
+          className="px-6 py-2.5 bg-[var(--accent)] text-white rounded-lg hover:bg-[var(--accent-hover)] font-medium text-sm transition min-w-[100px]"
+        >
+          {isLast ? "Get Started" : "Next"}
+        </button>
+      </div>
+    </Modal>
   )
 }

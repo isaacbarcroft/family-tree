@@ -79,7 +79,7 @@ describe("AddMemoryModal blob URL lifecycle", () => {
     expect(revoked).toHaveLength(0)
 
     // Remove the preview via the "x" button inside the preview grid.
-    const removeButton = screen.getAllByRole("button", { name: "x" })[0]
+    const removeButton = screen.getByRole("button", { name: /remove photo 1/i })
     await act(async () => {
       fireEvent.click(removeButton)
     })
