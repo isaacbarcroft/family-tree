@@ -6,7 +6,7 @@ function ensureProtocol(url: string): string {
   return `https://${url}`
 }
 
-import { Suspense, useEffect, useState } from "react"
+import { Suspense, useEffect, useRef, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import ProtectedRoute from "@/components/ProtectedRoute"
 import {
@@ -75,6 +75,7 @@ function ProfileContent() {
   const [form, setForm] = useState<Partial<Person>>({})
   const [photoUploading, setPhotoUploading] = useState(false)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const photoPreviewBlobRef = useRef<string | null>(null)
   const [photoError, setPhotoError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showFamilyModal, setShowFamilyModal] = useState(false)
@@ -163,6 +164,13 @@ function ProfileContent() {
     setEditing(false)
   }
 
+  const revokePreviewBlob = () => {
+    if (photoPreviewBlobRef.current) {
+      URL.revokeObjectURL(photoPreviewBlobRef.current)
+      photoPreviewBlobRef.current = null
+    }
+  }
+
   const handlePhotoUpload = async (file: File) => {
     if (!file || !user) return
     setPhotoError(null)
@@ -177,9 +185,13 @@ function ProfileContent() {
         uploadFile = await convertHeicToJpeg(file)
       }
 
-      setPhotoPreview(URL.createObjectURL(uploadFile))
+      revokePreviewBlob()
+      const blobUrl = URL.createObjectURL(uploadFile)
+      photoPreviewBlobRef.current = blobUrl
+      setPhotoPreview(blobUrl)
       const url = await uploadProfilePhoto(user.id, personId, uploadFile)
       setPhotoPreview(url)
+      revokePreviewBlob()
       await updatePerson(personId, { profilePhotoUrl: url })
       setPerson((prev) => ({ ...prev!, profilePhotoUrl: url }))
     } catch (err: unknown) {
@@ -191,6 +203,17 @@ function ProfileContent() {
       setPhotoUploading(false)
     }
   }
+
+  // Revoke any outstanding preview blob URL when the profile unmounts so the
+  // blob doesn't linger for the rest of the session.
+  useEffect(() => {
+    return () => {
+      if (photoPreviewBlobRef.current) {
+        URL.revokeObjectURL(photoPreviewBlobRef.current)
+        photoPreviewBlobRef.current = null
+      }
+    }
+  }, [])
 
   const refreshPerson = async () => {
     const p = await getPersonById(personId)
