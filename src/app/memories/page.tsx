@@ -11,6 +11,7 @@ import type { Person } from "@/models/Person"
 import { formatDate } from "@/utils/dates"
 import Link from "next/link"
 import { SkeletonLine, SkeletonCard } from "@/components/SkeletonLoader"
+import { MemoryImage } from "@/components/MemoryImage"
 
 export default function MemoriesPage() {
   const PAGE_SIZE = 24
@@ -165,17 +166,16 @@ export default function MemoriesPage() {
                   }}
                 >
                   {/* Thumbnail */}
-                  {m.imageUrls && m.imageUrls.length > 0 ? (
-                    <img
-                      src={m.imageUrls[0]}
-                      alt={m.title}
-                      className={`w-full object-cover ${isExpanded ? "h-64" : "h-40"}`}
-                    />
-                  ) : (
-                    <div className={`w-full bg-gray-700 flex items-center justify-center text-gray-400 text-base ${isExpanded ? "h-64" : "h-40"}`}>
-                      No photo
-                    </div>
-                  )}
+                  <MemoryImage
+                    src={m.imageUrls?.[0]}
+                    alt={m.title}
+                    className={`w-full object-cover ${isExpanded ? "h-64" : "h-40"}`}
+                    fallback={
+                      <div className={`w-full bg-gray-700 flex items-center justify-center text-gray-400 text-base ${isExpanded ? "h-64" : "h-40"}`}>
+                        No photo
+                      </div>
+                    }
+                  />
 
                   <div className="p-4">
                     {isEditing ? (
@@ -269,7 +269,7 @@ export default function MemoriesPage() {
                             {m.imageUrls && m.imageUrls.length > 1 && (
                               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
                                 {m.imageUrls.map((url, i) => (
-                                  <img
+                                  <MemoryImage
                                     key={i}
                                     src={url}
                                     alt={`${m.title} ${i + 1}`}

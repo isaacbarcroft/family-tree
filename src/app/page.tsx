@@ -8,6 +8,7 @@ import type { Memory } from "@/models/Memory"
 import type { Event } from "@/models/Event"
 import Link from "next/link"
 import { ProfileAvatar } from "@/components/ProfileAvatar"
+import { MemoryImage } from "@/components/MemoryImage"
 import { formatDate, getAge, getNextBirthday } from "@/utils/dates"
 import { SkeletonCard, SkeletonLine } from "@/components/SkeletonLoader"
 import WelcomeModal from "@/components/WelcomeModal"
@@ -342,13 +343,16 @@ export default function Home() {
                   href="/memories"
                   className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl overflow-hidden hover:bg-[var(--card-hover)] transition card-shadow"
                 >
-                  {m.imageUrls && m.imageUrls.length > 0 ? (
-                    <img src={m.imageUrls[0]} alt={m.title} className="w-full h-32 object-cover" />
-                  ) : (
-                    <div className="w-full h-32 bg-gray-700 flex items-center justify-center text-gray-400 text-sm">
-                      No photo
-                    </div>
-                  )}
+                  <MemoryImage
+                    src={m.imageUrls?.[0]}
+                    alt={m.title}
+                    className="w-full h-32 object-cover"
+                    fallback={
+                      <div className="w-full h-32 bg-gray-700 flex items-center justify-center text-gray-400 text-sm">
+                        No photo
+                      </div>
+                    }
+                  />
                   <div className="p-3">
                     <p className="text-white text-sm font-medium truncate">{m.title}</p>
                     <p className="text-gray-400 text-xs mt-1">{formatDate(m.date)}</p>
