@@ -9,6 +9,7 @@ import ProtectedRoute from "@/components/ProtectedRoute"
 import { formatDate } from "@/utils/dates"
 import Link from "next/link"
 import { SkeletonLine, SkeletonCard } from "@/components/SkeletonLoader"
+import { MemoryImage } from "@/components/MemoryImage"
 import { getTimelineItemColor, type TimelineItem } from "@/utils/timeline"
 
 export default function TimelinePage() {
@@ -144,7 +145,7 @@ export default function TimelinePage() {
                     <div className="flex items-start gap-3">
                       {/* Memory thumbnail */}
                       {item.imageUrl && (
-                        <img
+                        <MemoryImage
                           src={item.imageUrl}
                           alt=""
                           className="w-16 h-16 object-cover rounded flex-shrink-0"

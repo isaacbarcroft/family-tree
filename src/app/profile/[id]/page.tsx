@@ -27,6 +27,7 @@ import type { Relationship } from "@/models/Relationship"
 import AddMemoryModal from "@/components/AddMemoryModal"
 import { useAuth } from "@/components/AuthProvider"
 import { ProfileAvatar } from "@/components/ProfileAvatar"
+import { MemoryImage } from "@/components/MemoryImage"
 import { uploadProfilePhoto } from "@/lib/storage"
 import { v4 as uuidv4 } from "uuid"
 import Link from "next/link"
@@ -598,17 +599,16 @@ function ProfileContent() {
                       key={m.id}
                       className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden"
                     >
-                      {m.imageUrls && m.imageUrls.length > 0 ? (
-                        <img
-                          src={m.imageUrls[0]}
-                          alt={m.title}
-                          className="w-full h-24 object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-24 bg-gray-700/50 flex items-center justify-center text-gray-400 text-sm">
-                          No photo
-                        </div>
-                      )}
+                      <MemoryImage
+                        src={m.imageUrls?.[0]}
+                        alt={m.title}
+                        className="w-full h-24 object-cover"
+                        fallback={
+                          <div className="w-full h-24 bg-gray-700/50 flex items-center justify-center text-gray-400 text-sm">
+                            No photo
+                          </div>
+                        }
+                      />
                       <div className="p-2">
                         <p className="text-white text-base font-medium truncate">
                           {m.title}
