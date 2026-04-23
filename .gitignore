@@ -18,7 +18,7 @@
 /out/
 
 # production
-/build
+/build.jw
 
 # misc
 .DS_Store
@@ -44,9 +44,6 @@ next-env.d.ts
 # claude
 .claude/**
 .claude/settings.local.json
-
-# TODO list
-TODOS.md
 
 # CHANGELOG
 CHANGELOG.md
