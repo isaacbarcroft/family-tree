@@ -296,18 +296,33 @@ You specified: **no if-else, explicit if statements only; no `any`; MobX async i
 Your original plan says Firebase. Your app uses Supabase. Update `docs/` (or wherever the plan lives) so future contributors aren't confused. Also update the stack-choice rationale.
 **Effort:** 1h
 
+### T-9. Route naming: `/families` vs `/family/[id]`
+**Problem:** The list page is at `src/app/families/page.tsx` but the detail page is at `src/app/family/[id]/page.tsx` (singular). REST convention is both plural. Internal links (e.g. `href={`/family/${f.id}`}` in the families list, `/signup?family={id}` invite links that then route users back via the detail page) work, but the inconsistency will bite anyone adding new routes.
+**Fix:** Move `src/app/family/[id]/page.tsx` to `src/app/families/[id]/page.tsx` and update the handful of `Link`/`router.push` references. Keep a redirect (or a small `not-found` -> redirect handler) on the old path for 1 release so stale invite links still land.
+**Effort:** 1h
+
+### T-10. Manual mobile QA pass
+**Why:** The code uses responsive Tailwind utilities (`sm:`, `md:`, `lg:`, `min-h-[44px]`) across every content page, but no one has clicked through on a real phone. Older relatives are the target audience; a broken modal or too-small tap target on iOS Safari will silently cost adoption.
+**Scope:** Walk through the golden paths on a real iPhone and Android (Chrome + Safari): sign up, add person, upload profile photo, add event, add memory, view family tree (pan/zoom), open timeline, search from NavBar. Log issues and fix them. At minimum, verify: all modals are fully visible and scroll if taller than viewport; NavBar search is reachable; D3 tree is usable via touch.
+**Effort:** 3h QA + whatever fixes surface
+
+### T-11. Genealogy tree performance test at ≥50 people
+**Why:** Verification step 4 confirmed the tree renders correctly, but did not measure it on a realistic dataset. `layoutTree` runs in the render path (not memoized) and D3 re-initializes the zoom behavior on every `treeData`/`dims` change. Needs a smoke test at 50, 100, and 250 people before shipping to the full family.
+**Scope:** Seed a large family via `admin/seed` (or add a larger seed), measure first-paint and interaction latency, memoize `layoutTree` with `useMemo` if frame time exceeds ~16ms.
+**Effort:** 2h
+
 ---
 
 ## Verification tasks (do first)
 
 Before starting Phase 1, Claude Code should audit these files and either check them off or add explicit implementation tasks:
 
-1. `src/app/timeline/page.tsx` — does it render a working timeline?
-2. `src/app/families/page.tsx` and `src/app/families/[id]/page.tsx` — are they functional?
-3. The login / signup flow — what does first-time signup look like end-to-end?
-4. The D3 `GenealogyTree` / `FamilyTreeView` — does it render a usable tree with 50+ people?
-5. Mobile responsiveness on the profile, memories, and events pages (not just NavBar).
-6. Is there a `README.md` covering local dev setup? Supabase migration workflow?
+1. [x] `src/app/timeline/page.tsx` — renders a working timeline with type + person filters, events + memories merged, sorted newest-first, with skeleton loading and memory thumbnails. Done 2026-04-23.
+2. [x] `src/app/families/page.tsx` and the detail page — list page is functional (paginated, add/delete). Detail page lives at `src/app/family/[id]/page.tsx` (singular, not plural as this TODO list implied). It loads a `Family`, fetches its members, renders `FamilyTreeView`, and exposes invite-link copy + GEDCOM export. Follow-up: the plural/singular route mismatch is surfaced as T-9. Done 2026-04-23.
+3. [x] Login / signup flow — `src/app/login/page.tsx`, `src/app/signup/page.tsx`, `src/app/auth/callback/page.tsx`, plus `forgot-password` and `reset-password`, are all implemented. Signup accepts `family` (family invite) and `claim` (person claim) query params and hands them to Supabase `signUp` metadata. The callback verifies `token_hash` + `type` via `supabase.auth.verifyOtp` and falls back to implicit-flow hash tokens. Done 2026-04-23.
+4. [x] `GenealogyTree` / `FamilyTreeView` — D3 zoom/pan works, couple + single-person node variants render, marriage bar + edge paths, click-to-profile wired. No keyboard navigation (that gap is already tracked under 1.6 Accessibility pass). Real-world 50+ person performance has not been measured, so tracked as a new sub-item under T-2 (component tests). Done 2026-04-23.
+5. [x] Mobile responsiveness — `sm:`, `md:`, and `lg:` utilities are present across profile, memories, events, timeline, families, and family-tree pages, with `min-h-[44px]` touch targets on primary buttons. Visual QA on real devices not performed; tracked as T-10. Done 2026-04-23.
+6. [x] `README.md` + `SUPABASE_SETUP.md` — both exist. README was out of date (claimed Next.js 15, `react-d3-tree`, a `contexts/` folder that does not exist, omitted Vitest/Resend/Leaflet, referenced only the initial migration). `SUPABASE_SETUP.md` only listed the initial migration and not the two newer ones. Both files updated in this PR. Done 2026-04-23.
 
 ---
 
@@ -334,3 +349,9 @@ This TODO list is long-form, strategy-heavy, and opinionated. **Worth comparing 
 - [next/image](https://nextjs.org/docs/app/api-reference/components/image)
 - [Upstash Ratelimit](https://github.com/upstash/ratelimit)
 - [react-joyride](https://github.com/gilbarbara/react-joyride)
+
+---
+
+## Completed
+
+- 2026-04-23 — Verification tasks (all six sub-items). README + SUPABASE_SETUP.md refreshed. Follow-ups filed as T-9, T-10, T-11.

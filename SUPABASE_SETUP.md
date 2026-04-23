@@ -2,16 +2,20 @@
 
 ## 1) Apply schema and policies
 
-Run the SQL file in Supabase SQL Editor:
+Run the SQL files in Supabase SQL Editor, in filename order:
 
 - `supabase/migrations/20260309_initial_schema_and_rls.sql`
+- `supabase/migrations/20260419_places.sql`
+- `supabase/migrations/20260419_residences.sql`
 
-This creates:
+The initial migration creates:
 
 - tables: `people`, `families`, `events`, `memories`
 - indexes and `searchName` trigger
 - row level security policies for authenticated users
 - storage bucket `media` and storage policies
+
+The later migrations add `places` (with geocoding) and `residences` (person-place relationships over time) support.
 
 ## 2) Add env vars
 
