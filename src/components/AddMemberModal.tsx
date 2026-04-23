@@ -9,6 +9,7 @@ import { useAuth } from "@/components/AuthProvider"
 import { supabase } from "@/lib/supabase"
 import { RELATIONSHIP_SUBTYPES, MARRIAGE_STATUSES } from "@/constants/enums"
 import Modal from "@/components/Modal"
+import { getErrorMessage } from "@/utils/errorMessage"
 
 interface AddMemberModalProps {
   onClose: () => void
@@ -27,7 +28,9 @@ const AddMemberModal = ({ onClose, currentPersonId, onLinked }: AddMemberModalPr
   const [results, setResults] = useState<Person[]>([])
   const [loading, setLoading] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [linkingId, setLinkingId] = useState<string | null>(null)
   const [searched, setSearched] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const { user } = useAuth()
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -66,14 +69,33 @@ const AddMemberModal = ({ onClose, currentPersonId, onLinked }: AddMemberModalPr
     }
   }, [search])
 
-  const handleLink = async (targetId: string) => {
-    if (relationship === "parent")
+  const linkArrays = async (targetId: string) => {
+    if (relationship === "parent") {
       await linkParentChild(targetId, currentPersonId)
-    if (relationship === "child")
+      return
+    }
+    if (relationship === "child") {
       await linkParentChild(currentPersonId, targetId)
-    if (relationship === "spouse") await linkSpouses(currentPersonId, targetId)
+      return
+    }
+    await linkSpouses(currentPersonId, targetId)
+  }
 
-    // Create a Relationship metadata record
+  const handleLink = async (targetId: string) => {
+    setError(null)
+    setLinkingId(targetId)
+    try {
+      await linkArrays(targetId)
+    } catch (err) {
+      console.error("Failed to link family member:", err)
+      setError(getErrorMessage(err, "Failed to link family member. Please try again."))
+      setLinkingId(null)
+      return
+    }
+
+    // Create a Relationship metadata record. Non-blocking — the array-based
+    // link above is the primary relationship storage, so a metadata failure
+    // should not roll back the successful link or hide the success UI.
     try {
       const relType = relationship === "spouse" ? "spouse" as const : "parent-child" as const
       const personAId = relationship === "parent" ? targetId : currentPersonId
@@ -92,10 +114,10 @@ const AddMemberModal = ({ onClose, currentPersonId, onLinked }: AddMemberModalPr
         createdAt: new Date().toISOString(),
       })
     } catch (err) {
-      // Non-blocking — the array-based link is the primary relationship storage
       console.error("Failed to create relationship metadata:", err)
     }
 
+    setLinkingId(null)
     onLinked?.()
     onClose()
   }
@@ -104,24 +126,44 @@ const AddMemberModal = ({ onClose, currentPersonId, onLinked }: AddMemberModalPr
     if (!search.trim()) return
 
     setCreating(true)
+    setError(null)
     const [firstName, ...rest] = search.trim().split(" ")
     const lastName = rest.join(" ")
 
+    let created: Person
     try {
-      const created = await addPerson({
+      created = await addPerson({
         firstName,
         lastName,
         roleType: "family member",
         createdBy: user?.id || "system",
         createdAt: new Date().toISOString(),
       })
-
-      await handleLink(created.id)
-      router.push(`/profile/${created.id}?edit=true`)
-    } finally {
+    } catch (err) {
+      console.error("Failed to create person:", err)
+      setError(getErrorMessage(err, "Failed to create person. Please try again."))
       setCreating(false)
-      onClose()
+      return
     }
+
+    try {
+      await linkArrays(created.id)
+    } catch (err) {
+      console.error("Failed to link newly created person:", err)
+      setError(
+        getErrorMessage(
+          err,
+          `Created ${firstName} but failed to link them. Open their profile to link manually.`,
+        ),
+      )
+      setCreating(false)
+      return
+    }
+
+    setCreating(false)
+    onLinked?.()
+    router.push(`/profile/${created.id}?edit=true`)
+    onClose()
   }
 
   return (
@@ -129,6 +171,15 @@ const AddMemberModal = ({ onClose, currentPersonId, onLinked }: AddMemberModalPr
       <h3 id={titleId} className="text-lg font-semibold mb-4 text-white">
         Add Family Member
       </h3>
+
+      {error && (
+        <p
+          role="alert"
+          className="text-red-400 text-sm mb-3 bg-red-900/20 border border-red-800 rounded-lg p-3"
+        >
+          {error}
+        </p>
+      )}
 
       <div className="mb-4">
         <label className="block text-base text-gray-300 mb-1">
@@ -198,7 +249,10 @@ const AddMemberModal = ({ onClose, currentPersonId, onLinked }: AddMemberModalPr
           type="text"
           placeholder="Enter a name..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value)
+            setError(null)
+          }}
           className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
         />
       </div>
@@ -235,10 +289,14 @@ const AddMemberModal = ({ onClose, currentPersonId, onLinked }: AddMemberModalPr
                 <li key={r.id}>
                   <button
                     type="button"
-                    onClick={() => handleLink(r.id)}
-                    className="w-full text-left p-2 bg-gray-800 hover:bg-gray-700 rounded transition"
+                    onClick={() => {
+                      void handleLink(r.id)
+                    }}
+                    disabled={linkingId !== null}
+                    className="w-full text-left p-2 bg-gray-800 hover:bg-gray-700 rounded transition disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {r.firstName} {r.lastName || ""}
+                    {linkingId === r.id ? " — Linking..." : ""}
                   </button>
                 </li>
               ))}
@@ -249,9 +307,11 @@ const AddMemberModal = ({ onClose, currentPersonId, onLinked }: AddMemberModalPr
                 No existing people found for &ldquo;{search}&rdquo;.
               </p>
               <button
-                onClick={handleCreate}
+                onClick={() => {
+                  void handleCreate()
+                }}
                 disabled={creating}
-                className="bg-green-600 hover:bg-green-500 text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px]"
+                className="bg-green-600 hover:bg-green-500 text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {creating ? "Creating..." : `Create “${search}” and Link`}
               </button>
