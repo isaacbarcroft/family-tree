@@ -16,14 +16,16 @@ A modern family tree app for documenting your family's story — people, relatio
 
 ## Tech Stack
 
-- **Framework:** Next.js 15 (App Router, Turbopack)
-- **Language:** TypeScript
+- **Framework:** Next.js 16 (App Router, Turbopack) + React 19
+- **Language:** TypeScript 5
 - **Styling:** Tailwind CSS 4
 - **Database:** Supabase (PostgreSQL + Row Level Security)
 - **Auth:** Supabase Auth (email/password)
 - **Storage:** Supabase Storage (profile photos, memory images)
-- **Visualization:** react-d3-tree
-- **Package Manager:** Yarn
+- **Visualization:** D3 (d3-selection + d3-zoom) for the family tree, Leaflet + react-leaflet for the places map
+- **Email:** Resend (transactional)
+- **Testing:** Vitest + Testing Library
+- **Package Manager:** Yarn 1.22
 
 ## Getting Started
 
@@ -59,15 +61,27 @@ You can find these in your Supabase Dashboard under **Settings > API**.
 
 ### 3. Set up the database
 
-Run the initial migration against your Supabase project:
+Run the migrations against your Supabase project (in order):
 
 ```bash
 supabase db push
 ```
 
-Or manually execute the SQL in `supabase/migrations/20260309_initial_schema_and_rls.sql` via the Supabase SQL Editor.
+Or manually execute each SQL file in `supabase/migrations/` via the Supabase SQL Editor, in filename order:
 
-### 4. Run the dev server
+1. `20260309_initial_schema_and_rls.sql` (tables, RLS, storage bucket)
+2. `20260419_places.sql` (places + geocoding support)
+3. `20260419_residences.sql` (person-place residences)
+
+See `SUPABASE_SETUP.md` for environment and auth provider configuration.
+
+### 4. Run the tests
+
+```bash
+yarn test
+```
+
+### 5. Run the dev server
 
 ```bash
 yarn dev
@@ -82,22 +96,29 @@ src/
 ├── app/                  # Next.js App Router pages
 │   ├── page.tsx          # Homepage (landing + dashboard)
 │   ├── family-tree/      # People list & management
-│   ├── families/         # Family groups
+│   ├── families/         # Family groups (list)
 │   ├── family/[id]/      # Individual family view
 │   ├── profile/[id]/     # Person profile & relationships
 │   ├── events/           # Events list with inline edit
 │   ├── memories/         # Memories with photo uploads
+│   ├── places/           # Places map (Leaflet)
 │   ├── timeline/         # Chronological timeline
-│   ├── login/            # Authentication
-│   ├── signup/
+│   ├── login/, signup/   # Authentication
+│   ├── forgot-password/, reset-password/
+│   ├── auth/callback/    # Supabase email verification callback
 │   ├── admin/seed/       # Seed data management
-│   └── api/              # API routes (seed, image conversion)
-├── components/           # Shared components (NavBar, ProfileAvatar, etc.)
+│   └── api/              # API routes (seed, geocode, convert-image, webhooks)
+├── components/           # Shared components (NavBar, GenealogyTree, PlacesMap, modals, etc.)
 ├── lib/
 │   ├── supabase.ts       # Custom Supabase REST client
-│   └── db.ts             # Data access layer (CRUD operations)
-├── models/               # TypeScript interfaces (Person, Family, Event, Memory)
-└── contexts/             # Auth context provider
+│   ├── db.ts             # Data access layer (CRUD operations)
+│   ├── storage.ts        # Supabase Storage helpers (uploads)
+│   ├── userPersonLink.tsx
+│   └── emails/           # Resend transactional email senders
+├── models/               # TypeScript interfaces (Person, Family, Event, Memory, ...)
+├── utils/                # Pure helpers (dates, gedcom, heic, colors, treeBuilder, ...)
+├── constants/            # Shared constants
+└── __tests__/            # Vitest tests
 ```
 
 ## Seed Data
