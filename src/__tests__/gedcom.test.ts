@@ -211,4 +211,49 @@ describe("parseGedcom", () => {
     expect(result.people).toHaveLength(0)
     expect(result.families).toHaveLength(0)
   })
+
+  it("parses NAME without surname slashes as first name only", () => {
+    const gedcom = `0 HEAD
+0 @I1@ INDI
+1 NAME Prince
+0 TRLR`
+
+    const result = parseGedcom(gedcom)
+    expect(result.people).toHaveLength(1)
+    expect(result.people[0].firstName).toBe("Prince")
+    expect(result.people[0].lastName).toBe("")
+    expect(result.people[0].middleName).toBeUndefined()
+  })
+
+  it("skips unrecognized level-1 tags without corrupting subsequent fields", () => {
+    const gedcom = `0 HEAD
+0 @I1@ INDI
+1 NAME Alice /Smith/
+1 SEX F
+1 EMAIL alice@example.com
+1 OCCU Doctor
+1 NOTE Loves gardening
+0 TRLR`
+
+    const result = parseGedcom(gedcom)
+    expect(result.people).toHaveLength(1)
+    expect(result.people[0].firstName).toBe("Alice")
+    expect(result.people[0].lastName).toBe("Smith")
+    expect(result.people[0].email).toBe("alice@example.com")
+    expect(result.people[0].bio).toBe("Loves gardening")
+  })
+
+  it("parses only GIVN/SURN when NAME is absent", () => {
+    const gedcom = `0 HEAD
+0 @I1@ INDI
+1 NAME
+2 GIVN Alice Marie
+2 SURN Smith
+0 TRLR`
+
+    const result = parseGedcom(gedcom)
+    expect(result.people[0].firstName).toBe("Alice")
+    expect(result.people[0].middleName).toBe("Marie")
+    expect(result.people[0].lastName).toBe("Smith")
+  })
 })
