@@ -13,6 +13,7 @@ A modern family tree app for documenting your family's story — people, relatio
 - **Upcoming Birthdays** — Dashboard highlights who's celebrating soon
 - **Search** — Find people quickly from the navbar (desktop and mobile)
 - **Ownership Controls** — Users can only edit/delete content they created
+- **Allowlisted Access** — Only invited relatives in `app_users` can read or modify data; the first signup becomes the admin who manages the allowlist
 
 ## Tech Stack
 
@@ -72,6 +73,7 @@ Or manually execute each SQL file in `supabase/migrations/` via the Supabase SQL
 1. `20260309_initial_schema_and_rls.sql` (tables, RLS, storage bucket)
 2. `20260419_places.sql` (places + geocoding support)
 3. `20260419_residences.sql` (person-place residences)
+4. `20260424_app_users_rls_lockdown.sql` (app_users allowlist + tightened RLS)
 
 See `SUPABASE_SETUP.md` for environment and auth provider configuration.
 

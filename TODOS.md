@@ -41,16 +41,10 @@ You've built a lot more than the original plan called for. Current stack is **Ne
 
 ## Critical Bugs (P0 — fix before anyone else logs in)
 
-### P0-1. Row-Level Security is blanket-open
-**File:** `supabase/migrations/20260309_initial_schema_and_rls.sql`, `supabase/migrations/20260419_places.sql`
-**Problem:** All policies are `using (true)` for authenticated users. Any signup = full read/write/delete on every table.
-**Why it matters:** This is a family-only app. If you invite a cousin and someone else creates an account (or a cousin's account is compromised), they see everything and can delete anything.
-**Fix:**
-- Add an `invite_code` / `family_group_id` concept, OR a simple allowlist table `app_users (user_id, role)` where `role in ('admin','member')`.
-- Rewrite RLS policies to gate on membership in that allowlist: `using (auth.uid() in (select user_id from app_users))`.
-- Restrict destructive mutations (`delete`, `update`) to `createdBy = auth.uid()` or `role = 'admin'`.
-- Add RLS policy tests (pgTAP or just Vitest + a service-role-created user).
-**Effort:** 3–4h
+### ~~P0-1. Row-Level Security is blanket-open~~ ✅ Done 2026-04-24
+~~**File:** `supabase/migrations/20260309_initial_schema_and_rls.sql`, `supabase/migrations/20260419_places.sql`~~
+~~**Problem:** All policies are `using (true)` for authenticated users. Any signup = full read/write/delete on every table.~~
+**Outcome:** Added `supabase/migrations/20260424_app_users_rls_lockdown.sql` introducing the `public.app_users (user_id, role)` allowlist, `is_app_user()` / `is_app_admin()` helpers (`SECURITY DEFINER`), and an `on_auth_user_created_app_users` trigger that auto-seeds the first signup as `admin` and all later signups as `member`. Every `using (true)` policy on `people`, `families`, `events`, `memories`, `residences`, and `geocoded_places` has been replaced with membership-gated equivalents. UPDATE/DELETE now require `is_app_admin()` or `"createdBy" = auth.uid()::text`, with two narrow carveouts on `people` UPDATE (self-profile edits and claiming an unclaimed record) so the existing signup claim flow keeps working. Storage `media` bucket mutations require allowlist membership; DELETE requires admin. `src/__tests__/rlsMigration.test.ts` statically verifies policy structure (33 new assertions, all green). Rollback SQL is included as a comment block in the migration header. `SUPABASE_SETUP.md` + `README.md` updated. **Full pgTAP / live-DB RLS tests remain a follow-up (see T-12).**
 
 ### P0-2. No "is this person actually in my family" boundary
 **Problem:** Related to above. Even with RLS fixed per-user, if you invite extended family, there's no mechanism for "Aunt Karen shouldn't see my wife's side of the tree." Everyone sees the whole graph.
@@ -306,6 +300,11 @@ Your original plan says Firebase. Your app uses Supabase. Update `docs/` (or whe
 **Scope:** Walk through the golden paths on a real iPhone and Android (Chrome + Safari): sign up, add person, upload profile photo, add event, add memory, view family tree (pan/zoom), open timeline, search from NavBar. Log issues and fix them. At minimum, verify: all modals are fully visible and scroll if taller than viewport; NavBar search is reachable; D3 tree is usable via touch.
 **Effort:** 3h QA + whatever fixes surface
 
+### T-12. Live-DB RLS integration test harness
+**Why:** The P0-1 lockdown ships with a static policy-lint test (`rlsMigration.test.ts`) that guarantees the SQL structure of the policies, but does not execute them. CLAUDE.md asks that every RLS change include a policy test that creates three auth states (anonymous, authenticated-but-not-in-allowlist, authenticated-and-in-allowlist) and asserts access. That requires either a Supabase branch or a local Postgres with pgTAP, neither of which is currently wired up.
+**Scope:** Stand up a lightweight integration harness (either `supabase start` in CI or pgTAP on the local DB) that seeds three test users, runs each against the REST API with and without `app_users` membership, and asserts the expected 200/403/empty responses. Cover people, families, events, memories, residences, and geocoded_places; cover the `people` claim carveout explicitly.
+**Effort:** 4–6h
+
 ### T-11. Genealogy tree performance test at ≥50 people
 **Why:** Verification step 4 confirmed the tree renders correctly, but did not measure it on a realistic dataset. `layoutTree` runs in the render path (not memoized) and D3 re-initializes the zoom behavior on every `treeData`/`dims` change. Needs a smoke test at 50, 100, and 250 people before shipping to the full family.
 **Scope:** Seed a large family via `admin/seed` (or add a larger seed), measure first-paint and interaction latency, memoize `layoutTree` with `useMemo` if frame time exceeds ~16ms.
@@ -356,3 +355,4 @@ This TODO list is long-form, strategy-heavy, and opinionated. **Worth comparing 
 
 - 2026-04-23 — Verification tasks (all six sub-items). README + SUPABASE_SETUP.md refreshed. Follow-ups filed as T-9, T-10, T-11.
 - 2026-04-23 — **T-7 no-else refactor.** 20 `else` / `else if` occurrences eliminated across 9 files; added 3 regression tests for the GEDCOM parser control-flow changes. Codebase now fully conforms to the CLAUDE.md "no `else` blocks" rule.
+- 2026-04-24 — **P0-1 RLS lockdown.** `public.app_users` allowlist + auto-bootstrap trigger + tightened policies on people, families, events, memories, residences, geocoded_places, and the `media` storage bucket. 33 new policy-lint assertions (`src/__tests__/rlsMigration.test.ts`). Rollback SQL inline in the migration header. Live-DB integration test tracked as T-12.
