@@ -16,13 +16,14 @@ import type { GeocodedPlace } from "@/models/GeocodedPlace"
 import type { Person } from "@/models/Person"
 import type { Residence } from "@/models/Residence"
 import type { PlacePin } from "@/components/PlacesMap"
+import { PLACES_MAP_HEIGHT } from "@/config/constants"
 
 const PlacesMap = dynamic(() => import("@/components/PlacesMap"), {
   ssr: false,
   loading: () => (
     <div
       className="w-full rounded-xl bg-gray-900/40 border border-[var(--card-border)] animate-pulse"
-      style={{ height: "70vh" }}
+      style={{ height: PLACES_MAP_HEIGHT }}
     />
   ),
 })
@@ -198,7 +199,7 @@ export default function PlacesPage() {
             <SkeletonLine className="w-full" />
             <div
               className="w-full rounded-xl bg-gray-900/40 border border-[var(--card-border)] animate-pulse"
-              style={{ height: "70vh" }}
+              style={{ height: PLACES_MAP_HEIGHT }}
             />
             <SkeletonCard />
           </div>
