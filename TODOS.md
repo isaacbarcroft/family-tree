@@ -41,7 +41,7 @@ You've built a lot more than the original plan called for. Current stack is **Ne
 
 ## Critical Bugs (P0 — fix before anyone else logs in)
 
-### P0-1. Row-Level Security is blanket-open
+### ~~P0-1. Row-Level Security is blanket-open~~
 **File:** `supabase/migrations/20260309_initial_schema_and_rls.sql`, `supabase/migrations/20260419_places.sql`
 **Problem:** All policies are `using (true)` for authenticated users. Any signup = full read/write/delete on every table.
 **Why it matters:** This is a family-only app. If you invite a cousin and someone else creates an account (or a cousin's account is compromised), they see everything and can delete anything.
@@ -51,6 +51,10 @@ You've built a lot more than the original plan called for. Current stack is **Ne
 - Restrict destructive mutations (`delete`, `update`) to `createdBy = auth.uid()` or `role = 'admin'`.
 - Add RLS policy tests (pgTAP or just Vitest + a service-role-created user).
 **Effort:** 3–4h
+**Done 2026-04-24.** New migration `20260424_rls_lockdown.sql` introduces `public.app_users` (`userId`, `role`, `invitedBy`, `createdAt`), `is_app_user()` / `is_app_admin()` SECURITY DEFINER helpers, and rewrites every policy on `people` / `families` / `events` / `memories` / `residences` / `geocoded_places` plus the `media` bucket writes. UPDATE / DELETE on owner-bearing tables additionally require `createdBy = auth.uid()::text` or `is_app_admin()`. Existing `auth.users` are backfilled as admins so nobody is locked out. New signups are NOT auto-allowlisted (intentional). Tests: `supabase/tests/rls_policies.test.sql` covers anon / outsider / member / admin scenarios; `src/__tests__/rlsLockdownMigration.test.ts` locks in the migration structure. Rollback SQL is embedded as a comment block in the migration.
+**Follow-ups:**
+- Admin UI to view / add / remove / promote `app_users` entries (currently SQL-only).
+- Invite-code flow that auto-adds a new signup to `app_users` when a valid code is presented.
 
 ### P0-2. No "is this person actually in my family" boundary
 **Problem:** Related to above. Even with RLS fixed per-user, if you invite extended family, there's no mechanism for "Aunt Karen shouldn't see my wife's side of the tree." Everyone sees the whole graph.
@@ -355,3 +359,4 @@ This TODO list is long-form, strategy-heavy, and opinionated. **Worth comparing 
 ## Completed
 
 - 2026-04-23 — Verification tasks (all six sub-items). README + SUPABASE_SETUP.md refreshed. Follow-ups filed as T-9, T-10, T-11.
+- 2026-04-24 — P0-1 RLS lockdown. Migration `20260424_rls_lockdown.sql` + `app_users` allowlist + `is_app_user()` / `is_app_admin()` helpers + scoped policies. SQL scenario test at `supabase/tests/rls_policies.test.sql`; structural Vitest guard at `src/__tests__/rlsLockdownMigration.test.ts`.
