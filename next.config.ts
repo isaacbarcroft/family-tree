@@ -28,6 +28,18 @@ const nextConfig: NextConfig = {
         : []),
     ],
   },
+  async redirects() {
+    // Legacy singular path from before route naming was standardized to the
+    // plural `/families/:id`. Keep a temporary 307 so older invite links and
+    // bookmarks still land. Safe to remove after one release.
+    return [
+      {
+        source: "/family/:id",
+        destination: "/families/:id",
+        permanent: false,
+      },
+    ]
+  },
 };
 
 export default nextConfig;

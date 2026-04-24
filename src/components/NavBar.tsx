@@ -227,7 +227,7 @@ export default function NavBar() {
                   {searchResults.map((r) => (
                     <li key={`${r.type}-${r.id}`}>
                       <Link
-                        href={r.type === "person" ? `/profile/${r.id}` : `/family/${r.id}`}
+                        href={r.type === "person" ? `/profile/${r.id}` : `/families/${r.id}`}
                         onClick={() => {
                           setSearch("")
                           setShowResults(false)
@@ -331,7 +331,7 @@ export default function NavBar() {
                   {searchResults.map((r) => (
                     <li key={`${r.type}-${r.id}`}>
                       <Link
-                        href={r.type === "person" ? `/profile/${r.id}` : `/family/${r.id}`}
+                        href={r.type === "person" ? `/profile/${r.id}` : `/families/${r.id}`}
                         onClick={() => {
                           setSearch("")
                           setShowResults(false)

@@ -93,7 +93,7 @@ export default function FamiliesPage() {
             {families.map((f) => (
               <li key={f.id} className="relative">
                 <Link
-                  href={`/family/${f.id}`}
+                  href={`/families/${f.id}`}
                   className="block border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-5 hover:bg-gray-700 hover:border-gray-600 transition cursor-pointer flex flex-col justify-between h-full"
                 >
                   <div>

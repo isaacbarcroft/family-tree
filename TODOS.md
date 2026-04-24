@@ -296,10 +296,10 @@ Geocoding has a rate limit. Nothing else does. If someone leaves a browser tab o
 Your original plan says Firebase. Your app uses Supabase. Update `docs/` (or wherever the plan lives) so future contributors aren't confused. Also update the stack-choice rationale.
 **Effort:** 1h
 
-### T-9. Route naming: `/families` vs `/family/[id]`
-**Problem:** The list page is at `src/app/families/page.tsx` but the detail page is at `src/app/family/[id]/page.tsx` (singular). REST convention is both plural. Internal links (e.g. `href={`/family/${f.id}`}` in the families list, `/signup?family={id}` invite links that then route users back via the detail page) work, but the inconsistency will bite anyone adding new routes.
-**Fix:** Move `src/app/family/[id]/page.tsx` to `src/app/families/[id]/page.tsx` and update the handful of `Link`/`router.push` references. Keep a redirect (or a small `not-found` -> redirect handler) on the old path for 1 release so stale invite links still land.
-**Effort:** 1h
+### ~~T-9. Route naming: `/families` vs `/family/[id]`~~ ✅ Done 2026-04-24
+~~**Problem:** The list page is at `src/app/families/page.tsx` but the detail page is at `src/app/family/[id]/page.tsx` (singular). REST convention is both plural. Internal links (e.g. `href={`/family/${f.id}`}` in the families list, `/signup?family={id}` invite links that then route users back via the detail page) work, but the inconsistency will bite anyone adding new routes.~~
+~~**Fix:** Move `src/app/family/[id]/page.tsx` to `src/app/families/[id]/page.tsx` and update the handful of `Link`/`router.push` references. Keep a redirect (or a small `not-found` -> redirect handler) on the old path for 1 release so stale invite links still land.~~
+**Outcome:** Moved the detail page to `src/app/families/[id]/page.tsx` and updated all six internal `Link` call sites (`src/app/page.tsx`, `src/app/families/page.tsx`, `src/app/profile/[id]/page.tsx`, `src/components/FamilyListCompact.tsx`, `src/components/NavBar.tsx`×2). Added a `/family/:id → /families/:id` 307 redirect in `next.config.ts` so stale invite/bookmark links still land (temporary — safe to remove after one release). Added a Vitest regression test (`src/__tests__/nextConfigRedirects.test.ts`). All 151 tests + lint + `yarn build` pass; new route appears as `ƒ /families/[id]` in the build output and the old path is gone.
 
 ### T-10. Manual mobile QA pass
 **Why:** The code uses responsive Tailwind utilities (`sm:`, `md:`, `lg:`, `min-h-[44px]`) across every content page, but no one has clicked through on a real phone. Older relatives are the target audience; a broken modal or too-small tap target on iOS Safari will silently cost adoption.
@@ -356,3 +356,4 @@ This TODO list is long-form, strategy-heavy, and opinionated. **Worth comparing 
 
 - 2026-04-23 — Verification tasks (all six sub-items). README + SUPABASE_SETUP.md refreshed. Follow-ups filed as T-9, T-10, T-11.
 - 2026-04-23 — **T-7 no-else refactor.** 20 `else` / `else if` occurrences eliminated across 9 files; added 3 regression tests for the GEDCOM parser control-flow changes. Codebase now fully conforms to the CLAUDE.md "no `else` blocks" rule.
+- 2026-04-24 — **T-9 route naming alignment.** `/family/[id]` moved to `/families/[id]`; six internal `Link` call sites updated; legacy path gets a 307 redirect in `next.config.ts`; regression test added.
