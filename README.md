@@ -72,6 +72,7 @@ Or manually execute each SQL file in `supabase/migrations/` via the Supabase SQL
 1. `20260309_initial_schema_and_rls.sql` (tables, RLS, storage bucket)
 2. `20260419_places.sql` (places + geocoding support)
 3. `20260419_residences.sql` (person-place residences)
+4. `20260423_app_users_rls_lockdown.sql` (allowlist + tighter RLS; see `SUPABASE_SETUP.md` before applying to production)
 
 See `SUPABASE_SETUP.md` for environment and auth provider configuration.
 

@@ -41,16 +41,15 @@ You've built a lot more than the original plan called for. Current stack is **Ne
 
 ## Critical Bugs (P0 — fix before anyone else logs in)
 
-### P0-1. Row-Level Security is blanket-open
+### P0-1. ~~Row-Level Security is blanket-open~~ Done 2026-04-23
 **File:** `supabase/migrations/20260309_initial_schema_and_rls.sql`, `supabase/migrations/20260419_places.sql`
 **Problem:** All policies are `using (true)` for authenticated users. Any signup = full read/write/delete on every table.
-**Why it matters:** This is a family-only app. If you invite a cousin and someone else creates an account (or a cousin's account is compromised), they see everything and can delete anything.
-**Fix:**
-- Add an `invite_code` / `family_group_id` concept, OR a simple allowlist table `app_users (user_id, role)` where `role in ('admin','member')`.
-- Rewrite RLS policies to gate on membership in that allowlist: `using (auth.uid() in (select user_id from app_users))`.
-- Restrict destructive mutations (`delete`, `update`) to `createdBy = auth.uid()` or `role = 'admin'`.
-- Add RLS policy tests (pgTAP or just Vitest + a service-role-created user).
-**Effort:** 3–4h
+**Why it mattered:** This is a family-only app. If you invited a cousin and someone else created an account (or a cousin's account was compromised), they saw everything and could delete anything.
+**Fix shipped:** `supabase/migrations/20260423_app_users_rls_lockdown.sql` adds a `public.app_users` allowlist, back-fills existing `auth.users` as members, and replaces every `using (true)` policy on `people` / `families` / `events` / `memories` / `residences` / `geocoded_places` / `storage.objects` (media bucket) with allowlist-gated policies. Destructive ops require the row creator or an admin (for `geocoded_places`, which has no `createdBy`, destructive ops are admin-only). Rollback migration and static + opt-in integration tests included. See `SUPABASE_SETUP.md` for the post-apply admin promotion step.
+**Follow-ups:**
+- Admin UI to approve/revoke members without touching SQL (currently manual via service role or `auth.uid()` admin inserts).
+- Tighten the Supabase auth provider (disable open signups or require invite links) so unapproved accounts can't even be created.
+
 
 ### P0-2. No "is this person actually in my family" boundary
 **Problem:** Related to above. Even with RLS fixed per-user, if you invite extended family, there's no mechanism for "Aunt Karen shouldn't see my wife's side of the tree." Everyone sees the whole graph.
@@ -355,4 +354,5 @@ This TODO list is long-form, strategy-heavy, and opinionated. **Worth comparing 
 ## Completed
 
 - 2026-04-23 — Verification tasks (all six sub-items). README + SUPABASE_SETUP.md refreshed. Follow-ups filed as T-9, T-10, T-11.
+- 2026-04-23 — **P0-1 RLS lockdown.** Added `public.app_users` allowlist + `is_approved_user` / `is_admin_user` SECURITY DEFINER helpers, replaced every blanket `using (true)` policy on data tables and the media bucket, gated destructive ops on creator-or-admin. Back-fill seeds existing `auth.users` to avoid lockout; admin promotion is a manual follow-up (see `SUPABASE_SETUP.md`). Rollback migration included. Static migration-structure test + opt-in Vitest integration test (`RUN_RLS_INTEGRATION=1`).
 - 2026-04-23 — **T-7 no-else refactor.** 20 `else` / `else if` occurrences eliminated across 9 files; added 3 regression tests for the GEDCOM parser control-flow changes. Codebase now fully conforms to the CLAUDE.md "no `else` blocks" rule.
