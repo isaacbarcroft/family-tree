@@ -125,23 +125,24 @@ async function autoLinkToFamilyByLastName(person: Person) {
   if (families.length > 0) {
     // Family exists — link this person to it
     await linkPersonToFamily(person.id, families[0].id)
-  } else if (person.createdBy) {
-    // No family exists — create one and link
-    const { data: newFamily, error: createError } = await supabase
-      .from("families")
-      .insert({
-        name: lastName,
-        "createdBy": person.createdBy,
-        members: [person.id],
-      })
-      .select("*")
-      .single()
-
-    if (!createError && newFamily) {
-      const created = newFamily as { id: string }
-      await appendUnique("people", person.id, "familyIds", created.id)
-    }
+    return
   }
+  if (!person.createdBy) return
+
+  // No family exists — create one and link
+  const { data: newFamily, error: createError } = await supabase
+    .from("families")
+    .insert({
+      name: lastName,
+      "createdBy": person.createdBy,
+      members: [person.id],
+    })
+    .select("*")
+    .single()
+
+  if (createError || !newFamily) return
+  const created = newFamily as { id: string }
+  await appendUnique("people", person.id, "familyIds", created.id)
 }
 
 export interface PaginationOptions {
@@ -555,15 +556,16 @@ export async function requestGeocode(places: string[]): Promise<void> {
   if (res.ok) return
 
   let message = `Geocoding request failed with status ${res.status}`
-  const contentType = res.headers.get("content-type") ?? ""
+  const isJsonResponse = (res.headers.get("content-type") ?? "").includes("application/json")
   try {
-    if (contentType.includes("application/json")) {
+    if (isJsonResponse) {
       const body = (await res.json()) as { error?: unknown; message?: unknown } | null
       if (body && typeof body === "object") {
         if (typeof body.error === "string") message = body.error
-        else if (typeof body.message === "string") message = body.message
+        if (typeof body.error !== "string" && typeof body.message === "string") message = body.message
       }
-    } else {
+    }
+    if (!isJsonResponse) {
       const text = (await res.text()).trim()
       if (text) message = text
     }

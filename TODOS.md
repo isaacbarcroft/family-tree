@@ -287,9 +287,9 @@ Currently deletes are permanent. For a legacy app that's dangerous. Add a `delet
 Geocoding has a rate limit. Nothing else does. If someone leaves a browser tab open and your Resend webhook gets hit, you can burn credits fast. Add [`@upstash/ratelimit`](https://github.com/upstash/ratelimit) or similar on all write API routes.
 **Effort:** 3h
 
-### T-7. Align with your code preferences
-You specified: **no if-else, explicit if statements only; no `any`; MobX async in `runInAction`**. The current code is hook-based (no MobX), has zero `any`, and the if/else convention wasn't audited. Ask Claude Code to grep for `else` and `} else {` and refactor to early-returns.
-**Effort:** 2h
+### ~~T-7. Align with your code preferences~~ ✅ Done 2026-04-23
+~~You specified: **no if-else, explicit if statements only; no `any`; MobX async in `runInAction`**. The current code is hook-based (no MobX), has zero `any`, and the if/else convention wasn't audited. Ask Claude Code to grep for `else` and `} else {` and refactor to early-returns.~~
+**Outcome:** Eliminated all 20 `else` / `else if` occurrences across `src/app/profile/[id]/page.tsx`, `src/app/login/page.tsx`, `src/app/family/[id]/page.tsx`, `src/app/admin/seed/page.tsx`, `src/components/WelcomeModal.tsx`, `src/components/AddMemberModal.tsx`, `src/components/AddFamilyModal.tsx`, `src/lib/db.ts`, and `src/utils/gedcom.ts`. `grep -rEn "\belse\b" src/` now returns zero hits. Added 3 GEDCOM parser regression tests covering the restructured control flow (NAME without slashes, unrecognized level-1 tags, GIVN/SURN without NAME value). All 150 tests + lint + `yarn build` pass.
 
 ### T-8. Update the project plan doc
 Your original plan says Firebase. Your app uses Supabase. Update `docs/` (or wherever the plan lives) so future contributors aren't confused. Also update the stack-choice rationale.
@@ -355,3 +355,4 @@ This TODO list is long-form, strategy-heavy, and opinionated. **Worth comparing 
 
 - 2026-04-23 — Verification tasks (all six sub-items). README + SUPABASE_SETUP.md refreshed. Follow-ups filed as T-9, T-10, T-11.
 - 2026-04-23 — **P0-1 RLS lockdown.** Added `public.app_users` allowlist + `is_approved_user` / `is_admin_user` SECURITY DEFINER helpers, replaced every blanket `using (true)` policy on data tables and the media bucket, gated destructive ops on creator-or-admin. Back-fill seeds existing `auth.users` to avoid lockout; admin promotion is a manual follow-up (see `SUPABASE_SETUP.md`). Rollback migration included. Static migration-structure test + opt-in Vitest integration test (`RUN_RLS_INTEGRATION=1`).
+- 2026-04-23 — **T-7 no-else refactor.** 20 `else` / `else if` occurrences eliminated across 9 files; added 3 regression tests for the GEDCOM parser control-flow changes. Codebase now fully conforms to the CLAUDE.md "no `else` blocks" rule.

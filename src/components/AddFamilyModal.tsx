@@ -51,9 +51,11 @@ const AddFamilyModal = ({
       if (queryError) {
         console.error(queryError)
         setResults([])
-      } else {
-        setResults((data ?? []) as Family[])
+        setLoading(false)
+        setSearched(true)
+        return
       }
+      setResults((data ?? []) as Family[])
       setLoading(false)
       setSearched(true)
     }, 300)

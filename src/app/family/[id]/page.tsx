@@ -44,16 +44,16 @@ export default function FamilyPage() {
         const fetchedFamily = data as Family
         setFamily(fetchedFamily)
 
-        if (fetchedFamily.members?.length) {
-          const { data: peopleData, error: peopleError } = await supabase
-            .from("people")
-            .select("*")
-            .in("id", fetchedFamily.members)
-          if (peopleError) throw peopleError
-          setMembers((peopleData ?? []) as Person[])
-        } else {
+        if (!fetchedFamily.members?.length) {
           setMembers([])
+          return
         }
+        const { data: peopleData, error: peopleError } = await supabase
+          .from("people")
+          .select("*")
+          .in("id", fetchedFamily.members)
+        if (peopleError) throw peopleError
+        setMembers((peopleData ?? []) as Person[])
       } catch (err: unknown) {
         console.error(err)
         setError("Unable to load family data.")

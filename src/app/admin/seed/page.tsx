@@ -21,17 +21,16 @@ export default function SeedPage() {
         return
       }
 
+      setStatus("success")
       if (method === "POST") {
-        setStatus("success")
         setResult(
           `Created: ${data.created.people} people, ${data.created.families} families, ${data.created.events} events, ${data.created.memories} memories`
         )
-      } else {
-        setStatus("success")
-        setResult(
-          `Removed: ${data.deleted.people} people, ${data.deleted.families} families, ${data.deleted.events} events, ${data.deleted.memories} memories`
-        )
+        return
       }
+      setResult(
+        `Removed: ${data.deleted.people} people, ${data.deleted.families} families, ${data.deleted.events} events, ${data.deleted.memories} memories`
+      )
     } catch (err) {
       setStatus("error")
       setResult(String(err))

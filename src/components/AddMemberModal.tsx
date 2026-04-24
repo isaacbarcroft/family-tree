@@ -57,9 +57,11 @@ const AddMemberModal = ({ onClose, currentPersonId, onLinked }: AddMemberModalPr
       if (error) {
         console.error(error)
         setResults([])
-      } else {
-        setResults((data ?? []) as Person[])
+        setLoading(false)
+        setSearched(true)
+        return
       }
+      setResults((data ?? []) as Person[])
       setLoading(false)
       setSearched(true)
     }, 300)
