@@ -147,7 +147,7 @@ export default function Home() {
 
   // Getting Started checklist (for new users)
   const isNewUser = people.length <= 5
-  const familyTreeHref = myPerson?.familyIds?.[0] ? `/family/${myPerson.familyIds[0]}` : "/families"
+  const familyTreeHref = myPerson?.familyIds?.[0] ? `/families/${myPerson.familyIds[0]}` : "/families"
   const gettingStarted = myPerson
     ? [
         { label: "Add your basic info", done: !!(myPerson.birthDate && myPerson.firstName && myPerson.lastName), href: `/profile/${myPerson.id}?edit=true` },

@@ -39,7 +39,7 @@ const FamilyListCompact = ({ ids = [] }: FamilyListCompactProps) => {
       {families.map((f) => (
         <li key={f.id}>
           <Link
-            href={`/family/${f.id}`}
+            href={`/families/${f.id}`}
             className="text-[var(--accent)] hover:text-[var(--accent-hover)] font-medium hover:underline"
           >
             {f.name}
