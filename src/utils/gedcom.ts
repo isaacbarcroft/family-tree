@@ -283,25 +283,35 @@ export function parseGedcom(content: string): GedcomParseResult {
         if (sub.level === 1 && sub.tag === "NAME") {
           // Parse "FirstName MiddleName /LastName/"
           const nameMatch = sub.value.match(/^(.*?)\s*\/(.*?)\//)
-          if (nameMatch) {
-            const givenParts = nameMatch[1].trim().split(/\s+/)
-            person.firstName = givenParts[0] || ""
-            if (givenParts.length > 1) {
-              person.middleName = givenParts.slice(1).join(" ")
-            }
-            person.lastName = nameMatch[2] || ""
-          } else {
+          if (!nameMatch) {
             person.firstName = sub.value.trim()
+            i++
+            continue
           }
-        } else if (sub.level === 2 && sub.tag === "GIVN") {
+          const givenParts = nameMatch[1].trim().split(/\s+/)
+          person.firstName = givenParts[0] || ""
+          if (givenParts.length > 1) {
+            person.middleName = givenParts.slice(1).join(" ")
+          }
+          person.lastName = nameMatch[2] || ""
+          i++
+          continue
+        }
+        if (sub.level === 2 && sub.tag === "GIVN") {
           const parts = sub.value.trim().split(/\s+/)
           person.firstName = parts[0] || ""
           if (parts.length > 1) {
             person.middleName = parts.slice(1).join(" ")
           }
-        } else if (sub.level === 2 && sub.tag === "SURN") {
+          i++
+          continue
+        }
+        if (sub.level === 2 && sub.tag === "SURN") {
           person.lastName = sub.value.trim()
-        } else if (sub.level === 1 && sub.tag === "BIRT") {
+          i++
+          continue
+        }
+        if (sub.level === 1 && sub.tag === "BIRT") {
           i++
           while (i < lines.length && lines[i].level > 1) {
             if (lines[i].tag === "DATE") person.birthDate = parseGedcomDate(lines[i].value)
@@ -309,7 +319,8 @@ export function parseGedcom(content: string): GedcomParseResult {
             i++
           }
           continue
-        } else if (sub.level === 1 && sub.tag === "DEAT") {
+        }
+        if (sub.level === 1 && sub.tag === "DEAT") {
           i++
           while (i < lines.length && lines[i].level > 1) {
             if (lines[i].tag === "DATE") person.deathDate = parseGedcomDate(lines[i].value)
@@ -317,16 +328,28 @@ export function parseGedcom(content: string): GedcomParseResult {
             i++
           }
           continue
-        } else if (sub.level === 1 && sub.tag === "EMAIL") {
+        }
+        if (sub.level === 1 && sub.tag === "EMAIL") {
           person.email = sub.value
-        } else if (sub.level === 1 && sub.tag === "NOTE") {
+          i++
+          continue
+        }
+        if (sub.level === 1 && sub.tag === "NOTE") {
           person.bio = sub.value
-        } else if (sub.level === 1 && sub.tag === "FAMS") {
+          i++
+          continue
+        }
+        if (sub.level === 1 && sub.tag === "FAMS") {
           const ref = sub.value.match(/@([^@]+)@/)
           if (ref) person.familySpouseIds.push(ref[1])
-        } else if (sub.level === 1 && sub.tag === "FAMC") {
+          i++
+          continue
+        }
+        if (sub.level === 1 && sub.tag === "FAMC") {
           const ref = sub.value.match(/@([^@]+)@/)
           if (ref) person.familyChildIds.push(ref[1])
+          i++
+          continue
         }
         i++
       }
@@ -347,12 +370,20 @@ export function parseGedcom(content: string): GedcomParseResult {
         if (sub.level === 1 && sub.tag === "HUSB") {
           const ref = sub.value.match(/@([^@]+)@/)
           if (ref) fam.husbandRef = ref[1]
-        } else if (sub.level === 1 && sub.tag === "WIFE") {
+          i++
+          continue
+        }
+        if (sub.level === 1 && sub.tag === "WIFE") {
           const ref = sub.value.match(/@([^@]+)@/)
           if (ref) fam.wifeRef = ref[1]
-        } else if (sub.level === 1 && sub.tag === "CHIL") {
+          i++
+          continue
+        }
+        if (sub.level === 1 && sub.tag === "CHIL") {
           const ref = sub.value.match(/@([^@]+)@/)
           if (ref) fam.childRefs.push(ref[1])
+          i++
+          continue
         }
         i++
       }

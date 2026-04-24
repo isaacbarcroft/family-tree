@@ -130,6 +130,11 @@ function ProfileContent() {
     const now = new Date().toISOString()
 
     try {
+      if (person) {
+        const updates = { ...form, updatedAt: now }
+        await updatePerson(person.id, updates)
+        setPerson((prev) => ({ ...prev!, ...updates }))
+      }
       if (!person) {
         const newId = personId || uuidv4()
         const newPerson: Person = {
@@ -153,10 +158,6 @@ function ProfileContent() {
         setPerson(newPerson)
         setForm(newPerson)
         router.push(`/profile/${newId}`)
-      } else {
-        const updates = { ...form, updatedAt: now }
-        await updatePerson(person.id, updates)
-        setPerson((prev) => ({ ...prev!, ...updates }))
       }
     } catch (err: unknown) {
       console.error(err)

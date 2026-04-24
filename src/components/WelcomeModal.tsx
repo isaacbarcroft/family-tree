@@ -69,9 +69,9 @@ export default function WelcomeModal() {
   const next = () => {
     if (step < steps.length - 1) {
       setStep(step + 1)
-    } else {
-      dismiss()
+      return
     }
+    dismiss()
   }
 
   const prev = () => {

@@ -46,9 +46,9 @@ export default function LoginPage() {
       const message = signInError.message.toLowerCase()
       if (message.includes("email") && message.includes("confirm")) {
         setError("Please confirm your email before signing in.")
-      } else {
-        setError("Invalid email or password")
+        return
       }
+      setError("Invalid email or password")
       return
     }
 
