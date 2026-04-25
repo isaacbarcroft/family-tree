@@ -275,9 +275,9 @@ Next.js Image component isn't being used based on the review. Switch profile pho
 **Effort:** 4h
 **Reference:** [next/image docs](https://nextjs.org/docs/app/api-reference/components/image)
 
-### T-4. Error boundaries around top-level pages
-You have an `ErrorBoundary` component — make sure it wraps every `app/*/page.tsx`. A Firestore… ahem, Supabase… error on the Places page shouldn't white-screen the whole app.
-**Effort:** 2h
+### ~~T-4. Error boundaries around top-level pages~~ ✅ Done 2026-04-25
+~~You have an `ErrorBoundary` component — make sure it wraps every `app/*/page.tsx`. A Firestore… ahem, Supabase… error on the Places page shouldn't white-screen the whole app.~~
+**Outcome:** Replaced the layout-level class `ErrorBoundary` with idiomatic Next.js App Router boundaries: `src/app/error.tsx` (per-route segment) and `src/app/global-error.tsx` (root-layout fallback, includes its own `<html><body>`). Both are client components, log the caught error, expose a working `reset()` (Next.js re-renders the segment, fixing the previous bug where "Try Again" only flipped local state and re-threw on the next render), and the route-level boundary adds a "Go Home" link. Error message is shown only in development; in production only the Next-supplied `error.digest` is surfaced as a support reference. The unused `src/components/ErrorBoundary.tsx` was deleted. 8 new Vitest cases (`src/__tests__/errorBoundaries.test.tsx`) cover the alert role, reset behavior, and dev/prod message gating. All 179 tests + lint + `yarn build` pass.
 
 ### T-5. Delete/soft-delete policy
 Currently deletes are permanent. For a legacy app that's dangerous. Add a `deletedAt` column to Person, Event, Memory, Family. "Delete" marks it. Restore from an admin page. Hard-purge after 30 days via cron.
@@ -357,3 +357,4 @@ This TODO list is long-form, strategy-heavy, and opinionated. **Worth comparing 
 - 2026-04-23 — **P0-1 RLS lockdown.** Added `public.app_users` allowlist + `is_approved_user` / `is_admin_user` SECURITY DEFINER helpers, replaced every blanket `using (true)` policy on data tables and the media bucket, gated destructive ops on creator-or-admin. Back-fill seeds existing `auth.users` to avoid lockout; admin promotion is a manual follow-up (see `SUPABASE_SETUP.md`). Rollback migration included. Static migration-structure test + opt-in Vitest integration test (`RUN_RLS_INTEGRATION=1`).
 - 2026-04-23 — **T-7 no-else refactor.** 20 `else` / `else if` occurrences eliminated across 9 files; added 3 regression tests for the GEDCOM parser control-flow changes. Codebase now fully conforms to the CLAUDE.md "no `else` blocks" rule.
 - 2026-04-24 — **T-9 route naming alignment.** `/family/[id]` moved to `/families/[id]`; six internal `Link` call sites updated; legacy path gets a 307 redirect in `next.config.ts`; regression test added.
+- 2026-04-25 — **T-4 error boundaries.** Replaced layout-level class `ErrorBoundary` with idiomatic `src/app/error.tsx` (per-route) + `src/app/global-error.tsx` (root). `reset()` now actually re-renders the segment instead of just flipping local state. Dev shows full message; prod shows only `error.digest` as a support reference. Old component deleted; 8 new Vitest cases added.
