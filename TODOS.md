@@ -51,10 +51,11 @@ You've built a lot more than the original plan called for. Current stack is **Ne
 - Tighten the Supabase auth provider (disable open signups or require invite links) so unapproved accounts can't even be created.
 
 
-### P0-2. No "is this person actually in my family" boundary
+### P0-2. ~~No "is this person actually in my family" boundary~~ Done 2026-04-25
 **Problem:** Related to above. Even with RLS fixed per-user, if you invite extended family, there's no mechanism for "Aunt Karen shouldn't see my wife's side of the tree." Everyone sees the whole graph.
 **Recommendation:** For MVP, punt on this. But **document the assumption** in the README: "This app assumes a single-family trust boundary — every authenticated user sees all data." Revisit when you want to share with in-laws.
-**Effort:** 0h now, ~16h when you need it
+**Outcome:** Documented the single-family trust boundary in `README.md` under a new "Trust model and access" section. The section calls out that approved members can read every record, that ownership-only restricts mutations (not reads), and that branch-level isolation requires the ~16h follow-up scope below.
+**Follow-up (when needed):** ~16h to add per-branch / per-family visibility (likely a `visible_to` join table + RLS predicate keyed on a Person -> Branch mapping derived from the parent graph).
 
 ### P0-3. Verify stub vs. implemented pages
 **Files to audit:** `src/app/timeline/page.tsx`, `src/app/families/page.tsx`, `src/app/families/[id]/page.tsx`, `src/app/login/*`, `src/app/signup/*` (or whatever your auth pages are)
@@ -357,3 +358,4 @@ This TODO list is long-form, strategy-heavy, and opinionated. **Worth comparing 
 - 2026-04-23 — **P0-1 RLS lockdown.** Added `public.app_users` allowlist + `is_approved_user` / `is_admin_user` SECURITY DEFINER helpers, replaced every blanket `using (true)` policy on data tables and the media bucket, gated destructive ops on creator-or-admin. Back-fill seeds existing `auth.users` to avoid lockout; admin promotion is a manual follow-up (see `SUPABASE_SETUP.md`). Rollback migration included. Static migration-structure test + opt-in Vitest integration test (`RUN_RLS_INTEGRATION=1`).
 - 2026-04-23 — **T-7 no-else refactor.** 20 `else` / `else if` occurrences eliminated across 9 files; added 3 regression tests for the GEDCOM parser control-flow changes. Codebase now fully conforms to the CLAUDE.md "no `else` blocks" rule.
 - 2026-04-24 — **T-9 route naming alignment.** `/family/[id]` moved to `/families/[id]`; six internal `Link` call sites updated; legacy path gets a 307 redirect in `next.config.ts`; regression test added.
+- 2026-04-25 — **P0-2 trust boundary documentation.** Added a "Trust model and access" section to `README.md` that states the single-family assumption, explains the `app_users` allowlist gate, and notes that ownership rules cover mutations but not reads. Branch-level isolation remains a future ~16h scope.
