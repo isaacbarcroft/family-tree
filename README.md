@@ -2,6 +2,17 @@
 
 A modern family tree app for documenting your family's story — people, relationships, events, and memories — all in one place. Built for non-technical users who want a simple, warm experience.
 
+## Trust model
+
+**This app assumes a single-family trust boundary.** Every authenticated user is treated as a trusted relative and can read every record in the database (people, families, events, memories, places, residences). There is no per-branch, per-household, or per-person scoping of reads.
+
+Implications:
+
+- Do not share signup access with anyone outside the immediate trust circle. An approved account sees the entire family graph.
+- Account creation is gated by the `public.app_users` allowlist (see `supabase/migrations/20260423_app_users_rls_lockdown.sql`). New `auth.users` are not approved until promoted via SQL or the service role; until then they cannot read or write data.
+- Write and delete are scoped to the row creator (or an admin in `app_users`), so a member cannot silently rewrite another member's history. Reads are open to every approved member.
+- If you ever need to share with extended family ("Aunt Karen shouldn't see my wife's side of the tree"), this assumption breaks and you will need per-subtree RLS. That work is intentionally out of scope for the current single-family deployment and tracked in `TODOS.md`.
+
 ## Features
 
 - **People & Relationships** — Add family members with profiles, photos, and link parent/child/spouse relationships

@@ -51,16 +51,16 @@ You've built a lot more than the original plan called for. Current stack is **Ne
 - Tighten the Supabase auth provider (disable open signups or require invite links) so unapproved accounts can't even be created.
 
 
-### P0-2. No "is this person actually in my family" boundary
+### P0-2. ~~No "is this person actually in my family" boundary~~ Done 2026-04-26
 **Problem:** Related to above. Even with RLS fixed per-user, if you invite extended family, there's no mechanism for "Aunt Karen shouldn't see my wife's side of the tree." Everyone sees the whole graph.
 **Recommendation:** For MVP, punt on this. But **document the assumption** in the README: "This app assumes a single-family trust boundary — every authenticated user sees all data." Revisit when you want to share with in-laws.
-**Effort:** 0h now, ~16h when you need it
+**Outcome:** Added a prominent "Trust model" section to the top of `README.md` that states the single-family trust boundary, calls out that approved accounts see the full graph, explains the `public.app_users` allowlist gate, notes that writes/deletes are creator-or-admin scoped, and flags the per-subtree RLS work as deliberately out of scope. The ~16h per-subtree RLS revisit remains tracked here for when extended-family sharing is wanted.
 
-### P0-3. Verify stub vs. implemented pages
+### P0-3. ~~Verify stub vs. implemented pages~~ Done 2026-04-26
 **Files to audit:** `src/app/timeline/page.tsx`, `src/app/families/page.tsx`, `src/app/families/[id]/page.tsx`, `src/app/login/*`, `src/app/signup/*` (or whatever your auth pages are)
 **Reason:** The review agent didn't fully read these. Could be working, could be placeholders.
 **Action:** Claude Code should open each, confirm functionality, and mark as "done" or add an explicit "implement" task to this list.
-**Effort:** 30min audit
+**Outcome:** Already covered by Verification tasks #1 (timeline), #2 (families list + detail at `src/app/families/[id]/page.tsx` after T-9 move), and #3 (login/signup/auth callback/forgot-password/reset-password) — all checked off 2026-04-23. No additional implementation work was needed; this entry is now formally retired.
 
 ---
 
@@ -357,3 +357,5 @@ This TODO list is long-form, strategy-heavy, and opinionated. **Worth comparing 
 - 2026-04-23 — **P0-1 RLS lockdown.** Added `public.app_users` allowlist + `is_approved_user` / `is_admin_user` SECURITY DEFINER helpers, replaced every blanket `using (true)` policy on data tables and the media bucket, gated destructive ops on creator-or-admin. Back-fill seeds existing `auth.users` to avoid lockout; admin promotion is a manual follow-up (see `SUPABASE_SETUP.md`). Rollback migration included. Static migration-structure test + opt-in Vitest integration test (`RUN_RLS_INTEGRATION=1`).
 - 2026-04-23 — **T-7 no-else refactor.** 20 `else` / `else if` occurrences eliminated across 9 files; added 3 regression tests for the GEDCOM parser control-flow changes. Codebase now fully conforms to the CLAUDE.md "no `else` blocks" rule.
 - 2026-04-24 — **T-9 route naming alignment.** `/family/[id]` moved to `/families/[id]`; six internal `Link` call sites updated; legacy path gets a 307 redirect in `next.config.ts`; regression test added.
+- 2026-04-26 — **P0-2 single-family trust boundary documented.** Added a "Trust model" section to the top of `README.md` calling out that every approved user sees the full graph, explaining the `app_users` allowlist gate, and flagging per-subtree RLS as deliberately out of scope. No code change.
+- 2026-04-26 — **P0-3 verification audit retired.** The timeline, families list/detail, and login/signup pages were already audited and checked off under Verification tasks #1-#3 on 2026-04-23. P0-3 entry updated in place to record the cross-reference; no additional implementation work was required.
