@@ -256,11 +256,11 @@ Monthly or quarterly, Claude composes a recap: new memories added, recent birthd
 
 ## Technical debt & quality (ongoing)
 
-### T-1. Extract hard-coded constants to config
-**Files:** `src/app/family-tree/page.tsx`, `src/app/memories/page.tsx`, `src/app/events/page.tsx`, `src/app/places/page.tsx`, `src/app/api/geocode/route.ts`
-**What:** `PAGE_SIZE`, `MIN_MS_BETWEEN_CALLS`, home-page "recent count" limits, map viewport height.
-**Fix:** Move to `src/config/constants.ts`.
-**Effort:** 1h
+### ~~T-1. Extract hard-coded constants to config~~ ✅ Done 2026-04-24
+~~**Files:** `src/app/family-tree/page.tsx`, `src/app/memories/page.tsx`, `src/app/events/page.tsx`, `src/app/places/page.tsx`, `src/app/api/geocode/route.ts`~~
+~~**What:** `PAGE_SIZE`, `MIN_MS_BETWEEN_CALLS`, home-page "recent count" limits, map viewport height.~~
+~~**Fix:** Move to `src/config/constants.ts`.~~
+**Outcome:** Introduced `src/config/constants.ts` exporting `PAGE_SIZE` (per-list), `HOME_RECENT`, `NOMINATIM_MIN_MS_BETWEEN_CALLS`, and `PLACES_MAP_HEIGHT`. Updated the four list pages (`families`, `memories`, `events`, `family-tree`), the signed-in home page, `places/page.tsx`, `components/PlacesMap.tsx`, and `api/geocode/route.ts` to consume the shared module. Added `src/__tests__/configConstants.test.ts` (5 invariants including the grid-column divisibility rule and the ≥1 req/sec Nominatim policy floor). All 176 tests + build pass; lint warning count unchanged.
 
 ### T-2. Component test coverage
 Current tests cover utilities (dates, colors, enums, gedcom, geocode, normalize, heic, treeBuilder, sortByIds, webhookNewUser). Missing: component rendering, modal flows, page-level integration. Add at least:
@@ -276,9 +276,9 @@ Next.js Image component isn't being used based on the review. Switch profile pho
 **Effort:** 4h
 **Reference:** [next/image docs](https://nextjs.org/docs/app/api-reference/components/image)
 
-### T-4. Error boundaries around top-level pages
-You have an `ErrorBoundary` component — make sure it wraps every `app/*/page.tsx`. A Firestore… ahem, Supabase… error on the Places page shouldn't white-screen the whole app.
-**Effort:** 2h
+### ~~T-4. Error boundaries around top-level pages~~ ✅ Done 2026-04-25
+~~You have an `ErrorBoundary` component — make sure it wraps every `app/*/page.tsx`. A Firestore… ahem, Supabase… error on the Places page shouldn't white-screen the whole app.~~
+**Outcome:** Replaced the layout-level class `ErrorBoundary` with idiomatic Next.js App Router boundaries: `src/app/error.tsx` (per-route segment) and `src/app/global-error.tsx` (root-layout fallback, includes its own `<html><body>`). Both are client components, log the caught error, expose a working `reset()` (Next.js re-renders the segment, fixing the previous bug where "Try Again" only flipped local state and re-threw on the next render), and the route-level boundary adds a "Go Home" link. Error message is shown only in development; in production only the Next-supplied `error.digest` is surfaced as a support reference. The unused `src/components/ErrorBoundary.tsx` was deleted. 8 new Vitest cases (`src/__tests__/errorBoundaries.test.tsx`) cover the alert role, reset behavior, and dev/prod message gating. All 179 tests + lint + `yarn build` pass.
 
 ### T-5. Delete/soft-delete policy
 Currently deletes are permanent. For a legacy app that's dangerous. Add a `deletedAt` column to Person, Event, Memory, Family. "Delete" marks it. Restore from an admin page. Hard-purge after 30 days via cron.
@@ -359,3 +359,5 @@ This TODO list is long-form, strategy-heavy, and opinionated. **Worth comparing 
 - 2026-04-23 — **T-7 no-else refactor.** 20 `else` / `else if` occurrences eliminated across 9 files; added 3 regression tests for the GEDCOM parser control-flow changes. Codebase now fully conforms to the CLAUDE.md "no `else` blocks" rule.
 - 2026-04-24 — **T-9 route naming alignment.** `/family/[id]` moved to `/families/[id]`; six internal `Link` call sites updated; legacy path gets a 307 redirect in `next.config.ts`; regression test added.
 - 2026-04-25 — **P0-2 trust boundary documentation.** Added a "Trust model and access" section to `README.md` that states the single-family assumption, explains the `app_users` allowlist gate, and notes that ownership rules cover mutations but not reads. Branch-level isolation remains a future ~16h scope.
+- 2026-04-25 — **T-4 error boundaries.** Replaced layout-level class `ErrorBoundary` with idiomatic `src/app/error.tsx` (per-route) + `src/app/global-error.tsx` (root). `reset()` now actually re-renders the segment instead of just flipping local state. Dev shows full message; prod shows only `error.digest` as a support reference. Old component deleted; 8 new Vitest cases added.
+- 2026-04-24 — **T-1 extract hard-coded constants.** New `src/config/constants.ts` centralizes `PAGE_SIZE` per list, `HOME_RECENT.*` counts, `NOMINATIM_MIN_MS_BETWEEN_CALLS`, and `PLACES_MAP_HEIGHT`. Eight files updated to consume it; `configConstants.test.ts` adds 5 invariants. All 176 tests + build pass.
