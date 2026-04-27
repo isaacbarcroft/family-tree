@@ -1,53 +1,76 @@
-"use client"
+"use client";
+
+import { Icon, Wordmark } from "@/components/ui";
 
 export default function AuthHero() {
   return (
-    <div className="flex flex-col justify-center">
-      <div className="mb-6">
-        <h1 className="text-4xl font-bold warm-gradient mb-2">Family Legacy</h1>
-        <p className="text-lg text-gray-300 leading-relaxed">
-          Your family&apos;s story, beautifully preserved.
+    <div className="flex flex-col justify-center" style={{ color: "var(--ink)" }}>
+      <Wordmark size={26} />
+
+      <h1
+        className="display mt-8"
+        style={{
+          fontSize: "clamp(36px, 5vw, 52px)",
+          margin: 0,
+          fontWeight: 400,
+          lineHeight: 1,
+          letterSpacing: "-0.025em",
+        }}
+      >
+        Your family&rsquo;s story,{" "}
+        <span className="display-italic" style={{ color: "var(--sage-deep)" }}>
+          beautifully kept
+        </span>
+        .
+      </h1>
+
+      <p
+        className="mt-6"
+        style={{
+          fontSize: 17,
+          lineHeight: 1.6,
+          color: "var(--ink-2)",
+          maxWidth: 480,
+        }}
+      >
+        Build your family tree, save the memories, and celebrate the milestones that connect
+        generations — all on one page.
+      </p>
+
+      <ul className="m-0 mt-8 list-none space-y-4 p-0">
+        <BulletRow icon="people" title="Map your family tree" body="Add parents, children, and spouses to see your family grow." />
+        <BulletRow icon="memory" title="Save memories & photos" body="Preserve stories, photos, and the moments that matter most." />
+        <BulletRow icon="cake" title="Never miss a milestone" body="Track birthdays, anniversaries, and family events." />
+      </ul>
+    </div>
+  );
+}
+
+function BulletRow({
+  icon,
+  title,
+  body,
+}: {
+  icon: "people" | "memory" | "cake";
+  title: string;
+  body: string;
+}) {
+  return (
+    <li className="flex items-start gap-3">
+      <div
+        className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full"
+        style={{ background: "var(--sage-tint)", color: "var(--sage-deep)" }}
+      >
+        <Icon name={icon} size={16} />
+      </div>
+      <div>
+        <p style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", margin: 0 }}>
+          {title}
+        </p>
+        <p style={{ fontSize: 14, color: "var(--ink-3)", margin: "2px 0 0", lineHeight: 1.5 }}>
+          {body}
         </p>
       </div>
-      <p className="text-gray-400 text-base leading-relaxed mb-6">
-        Build your family tree, save cherished memories, and celebrate the
-        milestones that connect generations — all in one place.
-      </p>
-      <div className="space-y-4">
-        <div className="flex items-start gap-3">
-          <div className="w-8 h-8 rounded-full bg-[var(--accent)]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <svg className="w-4 h-4 text-[var(--accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-white font-medium text-sm">Map your family tree</p>
-            <p className="text-gray-400 text-sm">Add parents, children, and spouses to see your family grow.</p>
-          </div>
-        </div>
-        <div className="flex items-start gap-3">
-          <div className="w-8 h-8 rounded-full bg-[var(--accent)]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <svg className="w-4 h-4 text-[var(--accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-white font-medium text-sm">Save memories &amp; photos</p>
-            <p className="text-gray-400 text-sm">Preserve stories, photos, and the moments that matter most.</p>
-          </div>
-        </div>
-        <div className="flex items-start gap-3">
-          <div className="w-8 h-8 rounded-full bg-[var(--accent)]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <svg className="w-4 h-4 text-[var(--accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-white font-medium text-sm">Never miss a milestone</p>
-            <p className="text-gray-400 text-sm">Track birthdays, anniversaries, and family events.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+    </li>
+  );
 }

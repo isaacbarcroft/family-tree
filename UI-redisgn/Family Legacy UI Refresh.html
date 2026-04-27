@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Family Legacy — UI Refresh</title>
+  <link rel="stylesheet" href="lib/tokens.css" />
+  <style>
+    html, body { margin: 0; padding: 0; background: #efe8d8; min-height: 100vh; font-family: "Inter", sans-serif; }
+    #root { min-height: 100vh; }
+    .screen-frame { background: var(--paper); border-radius: 20px; overflow: hidden; border: 1px solid var(--hairline); box-shadow: var(--shadow-lg); }
+  </style>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" src="lib/design-canvas.jsx"></script>
+  <script type="text/babel" src="lib/data.jsx"></script>
+  <script type="text/babel" src="lib/primitives.jsx"></script>
+  <script type="text/babel" src="screens/home.jsx"></script>
+  <script type="text/babel" src="screens/core.jsx"></script>
+  <script type="text/babel" src="screens/secondary.jsx"></script>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const TWEAKS = /*EDITMODE-BEGIN*/{
+      "theme": "light",
+      "palette": "sage",
+      "density": "comfort",
+      "heroLayout": "editorial"
+    }/*EDITMODE-END*/;
+
+    function Screen({ label, width = 1280, height = "auto", tweaks, children, navActive = "home", showNav = true, bg = "var(--paper)" }) {
+      return (
+        <div
+          data-screen-label={label}
+          className={`app theme-${tweaks.theme} palette-${tweaks.palette} density-${tweaks.density} screen-frame`}
+          style={{ width, minHeight: height === "auto" ? 0 : height, background: bg, display: "flex", flexDirection: "column" }}
+        >
+          {showNav && <NavBar active={navActive} isDark={tweaks.theme === "dark"} />}
+          <div style={{ flex: 1 }}>{children}</div>
+        </div>
+      );
+    }
+
+    function TweakPanel({ tweaks, setTweaks, visible }) {
+      if (!visible) return null;
+      const set = (k, v) => {
+        const next = { ...tweaks, [k]: v };
+        setTweaks(next);
+        window.parent?.postMessage({ type: "__edit_mode_set_keys", edits: { [k]: v } }, "*");
+      };
+      const row = (label, key, options) => (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#93a298", marginBottom: 8 }}>{label}</div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {options.map((o) => (
+              <button
+                key={o.v}
+                onClick={() => set(key, o.v)}
+                style={{
+                  padding: "6px 12px", fontSize: 12, borderRadius: 999,
+                  border: "1px solid " + (tweaks[key] === o.v ? "#4a6555" : "#d9cfb8"),
+                  background: tweaks[key] === o.v ? "#4a6555" : "#f6f1e7",
+                  color: tweaks[key] === o.v ? "#f6f1e7" : "#1f2a24",
+                  cursor: "pointer", fontFamily: "Inter, sans-serif",
+                }}
+              >{o.l}</button>
+            ))}
+          </div>
+        </div>
+      );
+      return (
+        <div style={{ position: "fixed", bottom: 20, right: 20, zIndex: 100, width: 280, background: "#f6f1e7", border: "1px solid #d9cfb8", borderRadius: 16, padding: 20, boxShadow: "0 20px 50px rgba(0,0,0,0.15)", fontFamily: "Inter, sans-serif" }}>
+          <div style={{ fontFamily: "Fraunces, serif", fontSize: 18, fontWeight: 500, marginBottom: 16, color: "#1f2a24" }}>Tweaks</div>
+          {row("Theme", "theme", [{ v: "light", l: "Light" }, { v: "dark", l: "Dark" }])}
+          {row("Palette", "palette", [{ v: "sage", l: "Sage" }, { v: "dust", l: "Dust Rose" }, { v: "library", l: "Library" }, { v: "heirloom", l: "Heirloom" }])}
+          {row("Density", "density", [{ v: "cozy", l: "Cozy" }, { v: "comfort", l: "Comfort" }, { v: "spacious", l: "Spacious" }])}
+          {row("Hero layout", "heroLayout", [{ v: "editorial", l: "Editorial" }, { v: "gallery", l: "Gallery" }, { v: "cards", l: "Cards" }])}
+        </div>
+      );
+    }
+
+    function App() {
+      const [tweaks, setTweaks] = useState(TWEAKS);
+      const [tweaksVisible, setTweaksVisible] = useState(false);
+
+      useEffect(() => {
+        const handler = (e) => {
+          if (e.data?.type === "__activate_edit_mode") setTweaksVisible(true);
+          if (e.data?.type === "__deactivate_edit_mode") setTweaksVisible(false);
+        };
+        window.addEventListener("message", handler);
+        window.parent?.postMessage({ type: "__edit_mode_available" }, "*");
+        return () => window.removeEventListener("message", handler);
+      }, []);
+
+      return (
+        <>
+          <DesignCanvas title="Family Legacy — UI Refresh" subtitle="Sage + cream · serif-friendly editorial · clean for non-technical users">
+            <DCSection id="home" title="Home">
+              <DCArtboard id="home-main" label={`Dashboard — ${tweaks.heroLayout}`} width={1280} height={tweaks.heroLayout === "editorial" ? 1500 : tweaks.heroLayout === "gallery" ? 1100 : 1100}>
+                <Screen label="01 Home" tweaks={tweaks} width={1280} navActive="home">
+                  <Home variant={tweaks.heroLayout} />
+                </Screen>
+              </DCArtboard>
+            </DCSection>
+
+            <DCSection id="tree" title="Family Tree">
+              <DCArtboard id="tree-main" label="Tree view" width={1280} height={900}>
+                <Screen label="02 Tree" tweaks={tweaks} width={1280} navActive="tree">
+                  <TreeView />
+                </Screen>
+              </DCArtboard>
+              <DCArtboard id="people-main" label="People — grid" width={1280} height={1100}>
+                <Screen label="03 People" tweaks={tweaks} width={1280} navActive="people">
+                  <PeopleList />
+                </Screen>
+              </DCArtboard>
+            </DCSection>
+
+            <DCSection id="profile" title="Profile">
+              <DCArtboard id="profile-main" label="Profile — Eleanor (digital memoir)" width={1280} height={7200}>
+                <Screen label="04 Profile" tweaks={tweaks} width={1280} navActive="people">
+                  <Profile />
+                </Screen>
+              </DCArtboard>
+            </DCSection>
+
+            <DCSection id="memories" title="Memories & Events">
+              <DCArtboard id="memories-main" label="Memories" width={1280} height={1300}>
+                <Screen label="05 Memories" tweaks={tweaks} width={1280} navActive="memories">
+                  <MemoriesView />
+                </Screen>
+              </DCArtboard>
+              <DCArtboard id="events-main" label="Events" width={1100} height={900}>
+                <Screen label="06 Events" tweaks={tweaks} width={1100} navActive="events">
+                  <EventsView />
+                </Screen>
+              </DCArtboard>
+            </DCSection>
+
+            <DCSection id="journey" title="Timeline & Places">
+              <DCArtboard id="timeline-main" label="Timeline" width={1000} height={1400}>
+                <Screen label="07 Timeline" tweaks={tweaks} width={1000} navActive="timeline">
+                  <TimelineView />
+                </Screen>
+              </DCArtboard>
+              <DCArtboard id="places-main" label="Places" width={1280} height={800}>
+                <Screen label="08 Places" tweaks={tweaks} width={1280} navActive="places">
+                  <PlacesView />
+                </Screen>
+              </DCArtboard>
+            </DCSection>
+
+            <DCSection id="families" title="Families">
+              <DCArtboard id="families-main" label="Families" width={1100} height={700}>
+                <Screen label="09 Families" tweaks={tweaks} width={1100} navActive="home">
+                  <FamiliesView />
+                </Screen>
+              </DCArtboard>
+            </DCSection>
+
+            <DCSection id="entry" title="Auth & Empty">
+              <DCArtboard id="auth-main" label="Sign in" width={1200} height={720}>
+                <div className={`app theme-${tweaks.theme} palette-${tweaks.palette} density-${tweaks.density} screen-frame`} data-screen-label="10 Auth" style={{ width: 1200, minHeight: 720 }}>
+                  <AuthView />
+                </div>
+              </DCArtboard>
+              <DCArtboard id="empty-main" label="New user — getting started" width={900} height={800}>
+                <Screen label="11 Empty" tweaks={tweaks} width={900} navActive="home">
+                  <EmptyStateView />
+                </Screen>
+              </DCArtboard>
+            </DCSection>
+          </DesignCanvas>
+          <TweakPanel tweaks={tweaks} setTweaks={setTweaks} visible={tweaksVisible} />
+        </>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

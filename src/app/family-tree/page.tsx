@@ -1,117 +1,159 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import Link from "next/link"
-import ProtectedRoute from "@/components/ProtectedRoute"
-import { addPerson, listPeople, deletePerson } from "@/lib/db"
-import type { Person } from "@/models/Person"
-import { useAuth } from "@/components/AuthProvider"
-import { ProfileAvatar } from "@/components/ProfileAvatar"
-import { formatDate } from "@/utils/dates"
-import ConfirmDialog from "@/components/ConfirmDialog"
-import EmptyState from "@/components/EmptyState"
-import { SkeletonPage } from "@/components/SkeletonLoader"
-import ImportGedcomModal from "@/components/ImportGedcomModal"
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import ProtectedRoute from "@/components/ProtectedRoute";
+import { addPerson, deletePerson, listPeople } from "@/lib/db";
+import type { Person } from "@/models/Person";
+import { useAuth } from "@/components/AuthProvider";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import EmptyState from "@/components/EmptyState";
+import { SkeletonPage } from "@/components/SkeletonLoader";
+import ImportGedcomModal from "@/components/ImportGedcomModal";
+import { Avatar, Button, Icon, PhotoFrame } from "@/components/ui";
+
+type View = "grid" | "list";
+
+function lifespan(p: Person): string {
+  const birth = p.birthDate?.match(/^(\d{4})/)?.[1];
+  const death = p.deathDate?.match(/^(\d{4})/)?.[1];
+  if (birth && death) return `${birth}–${death}`;
+  if (birth) return `b. ${birth}`;
+  if (death) return `d. ${death}`;
+  return "";
+}
 
 export default function FamilyTreePage() {
-  const { user } = useAuth()
-  const PAGE_SIZE = 25
-  const [people, setPeople] = useState<Person[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [page, setPage] = useState(1)
-  const [total, setTotal] = useState<number | null>(null)
-  const [showForm, setShowForm] = useState(false)
+  const { user } = useAuth();
+  const PAGE_SIZE = 25;
+
+  const [people, setPeople] = useState<Person[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState<number | null>(null);
+  const [view, setView] = useState<View>("grid");
+  const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
     roleType: "family member",
-  })
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
-  const [showImportModal, setShowImportModal] = useState(false)
+  });
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   const fetchPage = async (pageNum: number, replace = false) => {
-    const result = await listPeople({ page: pageNum, pageSize: PAGE_SIZE, paginate: true })
-    setPeople((prev) => replace ? result.data : [...prev, ...result.data])
-    setTotal(result.total)
-    setPage(pageNum)
-  }
+    const result = await listPeople({ page: pageNum, pageSize: PAGE_SIZE, paginate: true });
+    setPeople((prev) => (replace ? result.data : [...prev, ...result.data]));
+    setTotal(result.total);
+    setPage(pageNum);
+  };
 
   useEffect(() => {
     const fetchData = async () => {
-      await fetchPage(1, true)
-      setLoading(false)
-    }
-    fetchData()
-  }, [])
+      await fetchPage(1, true);
+      setLoading(false);
+    };
+    fetchData();
+  }, []);
 
-  const hasMore = total !== null && people.length < total
+  const hasMore = total !== null && people.length < total;
 
   const loadMore = async () => {
-    setLoadingMore(true)
-    await fetchPage(page + 1)
-    setLoadingMore(false)
-  }
+    setLoadingMore(true);
+    await fetchPage(page + 1);
+    setLoadingMore(false);
+  };
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
-    setForm({ ...form, [e.target.name]: e.target.value })
-  }
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!user) return
-
+    e.preventDefault();
+    if (!user) return;
     const newPerson: Omit<Person, "id"> = {
       firstName: form.firstName,
       lastName: form.lastName,
       roleType: form.roleType as Person["roleType"],
       createdBy: user.id,
       createdAt: new Date().toISOString(),
-    }
-
-    await addPerson(newPerson)
-    await fetchPage(1, true)
-    setForm({ firstName: "", lastName: "", roleType: "family member" })
-    setShowForm(false)
-  }
+    };
+    await addPerson(newPerson);
+    await fetchPage(1, true);
+    setForm({ firstName: "", lastName: "", roleType: "family member" });
+    setShowForm(false);
+  };
 
   return (
     <ProtectedRoute>
-      <div className="max-w-3xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-white">People</h1>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowImportModal(true)}
-              className="bg-gray-700 hover:bg-gray-600 text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px] transition"
+      <div
+        className="mx-auto px-6 py-10 md:px-12 md:py-14"
+        style={{ background: "var(--paper)", color: "var(--ink)", maxWidth: 1280 }}
+      >
+        {/* Header */}
+        <div
+          className="mb-7 flex flex-col gap-4 pb-5 md:flex-row md:items-end md:justify-between"
+          style={{ borderBottom: "1px solid var(--hairline)" }}
+        >
+          <div>
+            <p className="eyebrow" style={{ marginBottom: 6 }}>
+              The family
+            </p>
+            <h1
+              className="display"
+              style={{
+                fontSize: "clamp(36px, 5vw, 48px)",
+                margin: 0,
+                fontWeight: 500,
+                letterSpacing: "-0.02em",
+              }}
             >
+              People
+            </h1>
+            {total !== null ? (
+              <p className="muted mt-1.5" style={{ fontSize: 14 }}>
+                {total} {total === 1 ? "relative" : "relatives"}
+              </p>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <ViewToggle view={view} onChange={setView} />
+            <Button variant="ghost" size="md" icon="arrow" onClick={() => setShowImportModal(true)}>
               Import GEDCOM
-            </button>
-            <button
+            </Button>
+            <Button
+              variant={showForm ? "ghost" : "primary"}
+              icon={showForm ? "close" : "plus"}
               onClick={() => setShowForm(!showForm)}
-              className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px] transition"
             >
-              {showForm ? "Cancel" : "+ Add Person"}
-            </button>
+              {showForm ? "Cancel" : "Add person"}
+            </Button>
           </div>
         </div>
 
-        {/* Add Person Form */}
-        {showForm && (
+        {showForm ? (
           <form
             onSubmit={handleSubmit}
-            className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl card-shadow p-5 mb-6 space-y-4"
+            className="mb-8 rounded-lg p-5"
+            style={{ background: "var(--paper-2)", border: "1px solid var(--hairline)" }}
           >
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <input
                 type="text"
                 name="firstName"
                 placeholder="First name"
                 value={form.firstName}
                 onChange={handleChange}
-                className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg"
+                className="rounded-md p-3"
+                style={{
+                  background: "var(--paper)",
+                  color: "var(--ink)",
+                  border: "1px solid var(--hairline)",
+                  fontSize: 15,
+                }}
                 required
               />
               <input
@@ -120,7 +162,13 @@ export default function FamilyTreePage() {
                 placeholder="Last name"
                 value={form.lastName}
                 onChange={handleChange}
-                className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg"
+                className="rounded-md p-3"
+                style={{
+                  background: "var(--paper)",
+                  color: "var(--ink)",
+                  border: "1px solid var(--hairline)",
+                  fontSize: 15,
+                }}
                 required
               />
             </div>
@@ -128,116 +176,339 @@ export default function FamilyTreePage() {
               name="roleType"
               value={form.roleType}
               onChange={handleChange}
-              className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
+              className="mt-3 w-full rounded-md p-3"
+              style={{
+                background: "var(--paper)",
+                color: "var(--ink)",
+                border: "1px solid var(--hairline)",
+                fontSize: 15,
+              }}
             >
-              <option value="family member">Family Member</option>
+              <option value="family member">Family member</option>
               <option value="friend">Friend</option>
               <option value="neighbor">Neighbor</option>
               <option value="pastor">Pastor</option>
               <option value="other">Other</option>
             </select>
-            <button
-              type="submit"
-              className="bg-green-600 text-white py-2.5 px-6 rounded-lg hover:bg-green-500 text-base font-medium min-h-[44px] transition w-full sm:w-auto"
-            >
-              Add Person
-            </button>
+            <div className="mt-4">
+              <Button type="submit" variant="primary" icon="check">
+                Add person
+              </Button>
+            </div>
           </form>
-        )}
+        ) : null}
 
-        {/* People List */}
         {loading ? (
           <SkeletonPage rows={5} />
         ) : people.length === 0 ? (
-          <EmptyState
-            message="No family members yet."
-            description="Click &ldquo;+ Add Person&rdquo; to start building your family tree."
-          />
+          <div className="rounded-lg p-12 text-center" style={{ background: "var(--paper-2)", border: "1px solid var(--hairline)" }}>
+            <p className="display-italic muted" style={{ fontSize: 22, margin: 0 }}>
+              No family members yet.
+            </p>
+            <p className="muted mt-2" style={{ fontSize: 14 }}>
+              Add the first person to start the page.
+            </p>
+            <div className="mt-5">
+              <Button variant="primary" icon="plus" onClick={() => setShowForm(true)}>
+                Add person
+              </Button>
+            </div>
+          </div>
         ) : (
           <>
-            {total !== null && (
-              <p className="text-gray-400 text-sm mb-3">
-                Showing {people.length} of {total} people
-              </p>
+            {view === "grid" ? (
+              <PeopleGrid
+                people={people}
+                user={user}
+                confirmDeleteId={confirmDeleteId}
+                setConfirmDeleteId={setConfirmDeleteId}
+                onDelete={async (id) => {
+                  await deletePerson(id);
+                  setConfirmDeleteId(null);
+                  await fetchPage(1, true);
+                }}
+              />
+            ) : (
+              <PeopleList
+                people={people}
+                user={user}
+                confirmDeleteId={confirmDeleteId}
+                setConfirmDeleteId={setConfirmDeleteId}
+                onDelete={async (id) => {
+                  await deletePerson(id);
+                  setConfirmDeleteId(null);
+                  await fetchPage(1, true);
+                }}
+              />
             )}
-            <ul className="space-y-2">
-              {people.map((p) => (
-                <li key={p.id} className="relative">
-                  <Link
-                    href={`/profile/${p.id}`}
-                    className="flex items-center justify-between bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl card-shadow p-4 pr-20 hover:bg-gray-800 hover:border-gray-700 transition cursor-pointer"
-                  >
-                    <div className="flex items-center gap-3">
-                      <ProfileAvatar
-                        src={p.profilePhotoUrl}
-                        alt={`${p.firstName} ${p.lastName}`}
-                        fallbackLetters={`${p.firstName} ${p.lastName}`}
-                        size="sm"
-                        className="w-10 h-10"
-                      />
-                      <div>
-                        <span className="font-medium text-white">
-                          {p.firstName} {p.lastName}
-                        </span>
-                        {p.roleType && (
-                          <span className="text-gray-300 text-base ml-2 capitalize">
-                            {p.roleType}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-sm text-gray-300">
-                      {p.birthDate
-                        ? formatDate(p.birthDate)
-                        : p.createdAt
-                          ? `Added ${formatDate(p.createdAt)}`
-                          : ""}
-                    </div>
-                  </Link>
-                  {user?.id === p.createdBy && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    {confirmDeleteId === p.id ? (
-                      <ConfirmDialog
-                        onConfirm={async () => {
-                          await deletePerson(p.id)
-                          setConfirmDeleteId(null)
-                          await fetchPage(1, true)
-                        }}
-                        onCancel={() => setConfirmDeleteId(null)}
-                      />
-                    ) : (
-                      <button
-                        onClick={(e) => { e.preventDefault(); setConfirmDeleteId(p.id) }}
-                        className="text-gray-500 hover:text-red-400 text-sm px-2 py-1 rounded hover:bg-gray-800 transition"
-                      >
-                        Delete
-                      </button>
-                    )}
-                  </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-            {hasMore && (
-              <div className="text-center mt-6">
-                <button
+            {hasMore ? (
+              <div className="mt-10 text-center">
+                <Button
+                  variant="ghost"
                   onClick={loadMore}
                   disabled={loadingMore}
-                  className="bg-gray-800 hover:bg-gray-700 text-white px-6 py-2.5 rounded-lg text-base font-medium min-h-[44px] transition disabled:opacity-50"
+                  icon="arrow"
                 >
-                  {loadingMore ? "Loading..." : "Load More"}
-                </button>
+                  {loadingMore ? "Loading…" : "Load more"}
+                </Button>
               </div>
-            )}
+            ) : null}
           </>
         )}
-        {showImportModal && (
+
+        {showImportModal ? (
           <ImportGedcomModal
             onClose={() => setShowImportModal(false)}
             onImported={() => fetchPage(1, true)}
           />
-        )}
+        ) : null}
       </div>
     </ProtectedRoute>
-  )
+  );
+}
+
+// =============================================================================
+// View toggle
+// =============================================================================
+function ViewToggle({ view, onChange }: { view: View; onChange: (v: View) => void }) {
+  const baseStyle = {
+    minHeight: 30,
+    padding: "6px 12px",
+    fontSize: 13,
+    color: "var(--ink)",
+  } as const;
+  return (
+    <div
+      className="flex rounded-full p-1"
+      style={{ border: "1px solid var(--hairline)" }}
+    >
+      <button
+        type="button"
+        onClick={() => onChange("grid")}
+        aria-pressed={view === "grid"}
+        className="ui-btn inline-flex cursor-pointer items-center gap-1.5 rounded-full transition-colors"
+        data-variant={view === "grid" ? "quiet" : "ghost"}
+        style={{
+          ...baseStyle,
+          background: view === "grid" ? "var(--paper-2)" : "transparent",
+          border: "none",
+        }}
+      >
+        <Icon name="grid" size={14} /> Grid
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange("list")}
+        aria-pressed={view === "list"}
+        className="ui-btn inline-flex cursor-pointer items-center gap-1.5 rounded-full transition-colors"
+        data-variant={view === "list" ? "quiet" : "ghost"}
+        style={{
+          ...baseStyle,
+          background: view === "list" ? "var(--paper-2)" : "transparent",
+          border: "none",
+        }}
+      >
+        <Icon name="list" size={14} /> List
+      </button>
+    </div>
+  );
+}
+
+// =============================================================================
+// People — grid view
+// =============================================================================
+type PeopleViewProps = {
+  people: Person[];
+  user: { id: string } | null;
+  confirmDeleteId: string | null;
+  setConfirmDeleteId: (id: string | null) => void;
+  onDelete: (id: string) => void;
+};
+
+function PeopleGrid({ people, user, confirmDeleteId, setConfirmDeleteId, onDelete }: PeopleViewProps) {
+  return (
+    <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-4">
+      {people.map((p) => (
+        <PersonCard
+          key={p.id}
+          person={p}
+          user={user}
+          confirmDeleteId={confirmDeleteId}
+          setConfirmDeleteId={setConfirmDeleteId}
+          onDelete={onDelete}
+        />
+      ))}
+    </div>
+  );
+}
+
+function PersonCard({
+  person: p,
+  user,
+  confirmDeleteId,
+  setConfirmDeleteId,
+  onDelete,
+}: {
+  person: Person;
+  user: { id: string } | null;
+  confirmDeleteId: string | null;
+  setConfirmDeleteId: (id: string | null) => void;
+  onDelete: (id: string) => void;
+}) {
+  const fullName = [p.firstName, p.lastName].filter(Boolean).join(" ");
+  const showDelete = user?.id === p.createdBy;
+  return (
+    <div className="relative">
+      <Link
+        href={`/profile/${p.id}`}
+        className="block"
+        style={{ textDecoration: "none", color: "inherit" }}
+      >
+        <PhotoFrame src={p.profilePhotoUrl} alt={fullName} ratio="3 / 4" rounded={4} frame label={p.firstName} />
+        <div className="mt-3">
+          <div
+            className="display"
+            style={{ fontSize: 18, fontWeight: 500, color: "var(--ink)" }}
+          >
+            {p.firstName}{" "}
+            <span style={{ color: "var(--ink-3)", fontWeight: 400 }}>{p.lastName}</span>
+          </div>
+          <div className="muted mt-0.5" style={{ fontSize: 12 }}>
+            {[lifespan(p), p.roleType].filter(Boolean).join(" · ")}
+          </div>
+        </div>
+      </Link>
+      {showDelete ? (
+        <div className="absolute right-2 top-2">
+          {confirmDeleteId === p.id ? (
+            <ConfirmDialog
+              onConfirm={() => onDelete(p.id)}
+              onCancel={() => setConfirmDeleteId(null)}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                setConfirmDeleteId(p.id);
+              }}
+              aria-label={`Delete ${fullName}`}
+              className="flex h-7 w-7 items-center justify-center rounded-full transition-colors"
+              style={{
+                background: "var(--paper)",
+                border: "1px solid var(--hairline-strong)",
+                color: "var(--ink-3)",
+              }}
+            >
+              <Icon name="close" size={12} />
+            </button>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// =============================================================================
+// People — list view
+// =============================================================================
+function PeopleList({ people, user, confirmDeleteId, setConfirmDeleteId, onDelete }: PeopleViewProps) {
+  return (
+    <div
+      className="overflow-hidden rounded-lg"
+      style={{ background: "var(--paper)", border: "1px solid var(--hairline)" }}
+    >
+      {people.map((p, i) => (
+        <PersonRow
+          key={p.id}
+          person={p}
+          user={user}
+          confirmDeleteId={confirmDeleteId}
+          setConfirmDeleteId={setConfirmDeleteId}
+          onDelete={onDelete}
+          isFirst={i === 0}
+        />
+      ))}
+    </div>
+  );
+}
+
+function PersonRow({
+  person: p,
+  user,
+  confirmDeleteId,
+  setConfirmDeleteId,
+  onDelete,
+  isFirst,
+}: {
+  person: Person;
+  user: { id: string } | null;
+  confirmDeleteId: string | null;
+  setConfirmDeleteId: (id: string | null) => void;
+  onDelete: (id: string) => void;
+  isFirst: boolean;
+}) {
+  const fullName = [p.firstName, p.lastName].filter(Boolean).join(" ");
+  const showDelete = user?.id === p.createdBy;
+  const ls = lifespan(p);
+  return (
+    <div
+      className="relative flex items-center gap-4 px-5 py-3.5"
+      style={{
+        borderTop: isFirst ? "none" : "1px solid var(--hairline)",
+      }}
+    >
+      <Link
+        href={`/profile/${p.id}`}
+        className="flex flex-1 items-center gap-4"
+        style={{ textDecoration: "none", color: "inherit" }}
+      >
+        <Avatar src={p.profilePhotoUrl} name={fullName} size={44} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline gap-2">
+            <div className="display" style={{ fontSize: 17, fontWeight: 500 }}>
+              {fullName}
+            </div>
+          </div>
+          <div className="muted mt-0.5" style={{ fontSize: 12 }}>
+            {p.roleType}
+            {p.city || p.state ? ` · ${[p.city, p.state].filter(Boolean).join(", ")}` : ""}
+          </div>
+        </div>
+        {ls ? (
+          <div
+            className="hidden sm:block"
+            style={{ fontSize: 13, color: "var(--ink-3)", fontFamily: "var(--font-display)" }}
+          >
+            {ls}
+          </div>
+        ) : null}
+        <Icon name="chevronRight" size={16} className="muted" />
+      </Link>
+      {showDelete ? (
+        <div className="ml-2">
+          {confirmDeleteId === p.id ? (
+            <ConfirmDialog
+              onConfirm={() => onDelete(p.id)}
+              onCancel={() => setConfirmDeleteId(null)}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmDeleteId(p.id)}
+              aria-label={`Delete ${fullName}`}
+              className="flex h-7 w-7 items-center justify-center rounded-full"
+              style={{
+                background: "transparent",
+                border: "1px solid var(--hairline-strong)",
+                color: "var(--ink-3)",
+              }}
+            >
+              <Icon name="close" size={12} />
+            </button>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
 }

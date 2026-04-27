@@ -1,166 +1,243 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { useAuth } from "@/components/AuthProvider"
-import type { Family } from "@/models/Family"
-import Link from "next/link"
-import AddFamilyModal from "@/components/AddFamilyModal"
-import { formatDate } from "@/utils/dates"
-import { deleteFamily, listFamilies } from "@/lib/db"
-import ProtectedRoute from "@/components/ProtectedRoute"
-import ConfirmDialog from "@/components/ConfirmDialog"
-import { SkeletonCard } from "@/components/SkeletonLoader"
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useAuth } from "@/components/AuthProvider";
+import type { Family } from "@/models/Family";
+import AddFamilyModal from "@/components/AddFamilyModal";
+import { deleteFamily, listFamilies } from "@/lib/db";
+import ProtectedRoute from "@/components/ProtectedRoute";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { SkeletonCard } from "@/components/SkeletonLoader";
+import { Button, Icon } from "@/components/ui";
+import { formatDate } from "@/utils/dates";
+
+const PAGE_SIZE = 24;
 
 export default function FamiliesPage() {
-  const PAGE_SIZE = 24
-  const [families, setFamilies] = useState<Family[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [page, setPage] = useState(1)
-  const [total, setTotal] = useState<number | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [showAddModal, setShowAddModal] = useState(false)
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
-  const { user } = useAuth()
+  const { user } = useAuth();
+  const [families, setFamilies] = useState<Family[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const fetchFamilies = async (pageNum = 1, replace = true) => {
     try {
-      const result = await listFamilies({ page: pageNum, pageSize: PAGE_SIZE, paginate: true })
-      setFamilies((prev) => replace ? result.data : [...prev, ...result.data])
-      setTotal(result.total)
-      setPage(pageNum)
+      const result = await listFamilies({
+        page: pageNum,
+        pageSize: PAGE_SIZE,
+        paginate: true,
+      });
+      setFamilies((prev) => (replace ? result.data : [...prev, ...result.data]));
+      setTotal(result.total);
+      setPage(pageNum);
     } catch (err: unknown) {
-      console.error(err)
-      setError("Unable to load families.")
+      console.error(err);
+      setError("Unable to load families.");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
-    fetchFamilies()
-  }, [])
+    fetchFamilies();
+  }, []);
 
-  const hasMore = total !== null && families.length < total
+  const hasMore = total !== null && families.length < total;
 
   const loadMore = async () => {
-    setLoadingMore(true)
-    await fetchFamilies(page + 1, false)
-    setLoadingMore(false)
-  }
+    setLoadingMore(true);
+    await fetchFamilies(page + 1, false);
+    setLoadingMore(false);
+  };
 
-  if (loading)
+  if (loading) {
     return (
       <ProtectedRoute>
-        <div className="max-w-5xl mx-auto p-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1,2,3].map((i) => <SkeletonCard key={i} className="h-36" />)}
+        <div className="mx-auto max-w-5xl px-6 py-12 md:px-12">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3].map((i) => (
+              <SkeletonCard key={i} className="h-36" />
+            ))}
           </div>
         </div>
       </ProtectedRoute>
-    )
+    );
+  }
 
-  if (error)
+  if (error) {
     return (
       <ProtectedRoute>
-        <div className="text-center py-16 text-red-400 text-lg">{error}</div>
+        <div
+          className="display-italic"
+          style={{ textAlign: "center", padding: "96px 24px", color: "var(--clay-deep)", fontSize: 18 }}
+        >
+          {error}
+        </div>
       </ProtectedRoute>
-    )
+    );
+  }
 
   return (
     <ProtectedRoute>
-      <div className="max-w-5xl mx-auto p-6 bg-[var(--card-bg)] text-[var(--foreground)] rounded-xl card-shadow">
-        <div className="flex flex-col sm:flex-row justify-between items-center mb-6">
-          <h1 className="text-4xl font-bold text-white mb-4 sm:mb-0">Families</h1>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px]"
-          >
-            + Add Family
-          </button>
+      <div
+        className="mx-auto px-6 pb-16 pt-10 md:px-12"
+        style={{ background: "var(--paper)", color: "var(--ink)", maxWidth: 1200 }}
+      >
+        <div
+          className="mb-8 flex flex-col gap-4 pb-5 md:flex-row md:items-end md:justify-between"
+          style={{ borderBottom: "1px solid var(--hairline)" }}
+        >
+          <div>
+            <p className="eyebrow" style={{ marginBottom: 6 }}>
+              Branches of the family
+            </p>
+            <h1
+              className="display"
+              style={{
+                fontSize: "clamp(36px, 5vw, 48px)",
+                margin: 0,
+                fontWeight: 500,
+                letterSpacing: "-0.02em",
+              }}
+            >
+              Families
+            </h1>
+            {total !== null ? (
+              <p className="muted mt-1.5" style={{ fontSize: 14 }}>
+                {total} {total === 1 ? "family" : "families"} on the page
+              </p>
+            ) : null}
+          </div>
+          <Button variant="primary" icon="plus" onClick={() => setShowAddModal(true)}>
+            Add family
+          </Button>
         </div>
 
         {families.length === 0 ? (
-          <p className="text-gray-400 text-center">No families found.</p>
+          <div
+            className="rounded-lg p-12 text-center"
+            style={{ background: "var(--paper-2)", border: "1px solid var(--hairline)" }}
+          >
+            <p className="display-italic muted" style={{ fontSize: 22, margin: 0 }}>
+              No families yet.
+            </p>
+            <p className="muted mt-2" style={{ fontSize: 14 }}>
+              Create a family to group related people together.
+            </p>
+            <div className="mt-5">
+              <Button variant="primary" icon="plus" onClick={() => setShowAddModal(true)}>
+                Add family
+              </Button>
+            </div>
+          </div>
         ) : (
           <>
-          {total !== null && (
-            <p className="text-gray-400 text-sm mb-3">
-              Showing {families.length} of {total} families
-            </p>
-          )}
-          <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {families.map((f) => (
-              <li key={f.id} className="relative">
-                <Link
-                  href={`/families/${f.id}`}
-                  className="block border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-5 hover:bg-gray-700 hover:border-gray-600 transition cursor-pointer flex flex-col justify-between h-full"
-                >
-                  <div>
-                    <h2 className="text-xl font-semibold text-white mb-1 pr-16">
-                      {f.name}
-                    </h2>
-                    {f.origin && <p className="text-gray-300 text-base mb-2">Origin:{f.origin}</p>}
-                    {f.description && (
-                      <p className="text-gray-300 text-base line-clamp-3">{f.description}</p>
-                    )}
-                  </div>
-
-                  <div className="mt-3 text-gray-300 text-sm flex justify-between items-center">
-                    <p>Created {formatDate(f.createdAt)}</p>
-                    {f.members && (
-                      <p>
-                        {f.members.length} member{f.members.length !== 1 && "s"}
-                      </p>
-                    )}
-                  </div>
-                </Link>
-                {/* Delete button - only for creator */}
-                {user?.id === f.createdBy && (
-                <div className="absolute top-3 right-3">
-                  {confirmDeleteId === f.id ? (
-                    <ConfirmDialog
-                      onConfirm={async () => {
-                        await deleteFamily(f.id)
-                        setConfirmDeleteId(null)
-                        fetchFamilies()
+            <ul className="m-0 grid list-none grid-cols-1 gap-6 p-0 sm:grid-cols-2 lg:grid-cols-3">
+              {families.map((f) => {
+                const isOwner = user?.id === f.createdBy;
+                return (
+                  <li key={f.id} className="relative">
+                    <Link
+                      href={`/families/${f.id}`}
+                      className="flex h-full flex-col justify-between rounded-md p-5 transition-colors"
+                      style={{
+                        background: "var(--paper)",
+                        border: "1px solid var(--hairline)",
+                        textDecoration: "none",
+                        color: "var(--ink)",
                       }}
-                      onCancel={() => setConfirmDeleteId(null)}
-                    />
-                  ) : (
-                    <button
-                      onClick={(e) => { e.preventDefault(); setConfirmDeleteId(f.id) }}
-                      className="text-gray-500 hover:text-red-400 text-sm px-2 py-1 rounded hover:bg-gray-900 transition"
                     >
-                      Delete
-                    </button>
-                  )}
-                </div>
-                )}
-              </li>
-            ))}
-          </ul>
-          {hasMore && (
-            <div className="text-center mt-6">
-              <button
-                onClick={loadMore}
-                disabled={loadingMore}
-                className="bg-gray-800 hover:bg-gray-700 text-white px-6 py-2.5 rounded-lg text-base font-medium min-h-[44px] transition disabled:opacity-50"
-              >
-                {loadingMore ? "Loading..." : "Load More"}
-              </button>
-            </div>
-          )}
+                      <div>
+                        <h2
+                          className="display m-0 pr-10"
+                          style={{ fontSize: 22, fontWeight: 500 }}
+                        >
+                          {f.name}
+                        </h2>
+                        {f.origin ? (
+                          <p className="display-italic muted mt-2" style={{ fontSize: 13 }}>
+                            from {f.origin}
+                          </p>
+                        ) : null}
+                        {f.description ? (
+                          <p
+                            className="mt-3 line-clamp-3"
+                            style={{ fontSize: 14, lineHeight: 1.55, color: "var(--ink-2)" }}
+                          >
+                            {f.description}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <div
+                        className="muted mt-4 flex items-center justify-between"
+                        style={{ fontSize: 12 }}
+                      >
+                        <span>Created {formatDate(f.createdAt)}</span>
+                        {f.members ? (
+                          <span style={{ fontFamily: "var(--font-display)", fontSize: 13 }}>
+                            {f.members.length} {f.members.length === 1 ? "member" : "members"}
+                          </span>
+                        ) : null}
+                      </div>
+                    </Link>
+                    {isOwner ? (
+                      <div className="absolute right-3 top-3">
+                        {confirmDeleteId === f.id ? (
+                          <ConfirmDialog
+                            onConfirm={async () => {
+                              await deleteFamily(f.id);
+                              setConfirmDeleteId(null);
+                              fetchFamilies();
+                            }}
+                            onCancel={() => setConfirmDeleteId(null)}
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setConfirmDeleteId(f.id);
+                            }}
+                            aria-label={`Delete ${f.name}`}
+                            className="flex h-7 w-7 items-center justify-center rounded-full"
+                            style={{
+                              background: "var(--paper)",
+                              border: "1px solid var(--hairline-strong)",
+                              color: "var(--ink-3)",
+                            }}
+                          >
+                            <Icon name="close" size={12} />
+                          </button>
+                        )}
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+            {hasMore ? (
+              <div className="mt-10 text-center">
+                <Button variant="ghost" icon="arrow" onClick={loadMore} disabled={loadingMore}>
+                  {loadingMore ? "Loading…" : "Load more"}
+                </Button>
+              </div>
+            ) : null}
           </>
         )}
 
-        {showAddModal && (
+        {showAddModal ? (
           <AddFamilyModal
             onClose={() => setShowAddModal(false)}
             onCreated={fetchFamilies}
           />
-        )}
+        ) : null}
       </div>
     </ProtectedRoute>
-  )
+  );
 }
