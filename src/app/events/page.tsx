@@ -13,9 +13,9 @@ import Link from "next/link"
 import { SkeletonLine, SkeletonCard } from "@/components/SkeletonLoader"
 import { EVENT_TYPES, EVENT_TYPE_TAG_COLOR } from "@/constants/enums"
 import type { EventType } from "@/constants/enums"
+import { PAGE_SIZE } from "@/config/constants"
 
 export default function EventsPage() {
-  const PAGE_SIZE = 25
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -50,7 +50,7 @@ export default function EventsPage() {
 
   const fetchEvents = async (pageNum = 1, replace = true) => {
     try {
-      const result = await listEvents({ page: pageNum, pageSize: PAGE_SIZE, paginate: true })
+      const result = await listEvents({ page: pageNum, pageSize: PAGE_SIZE.EVENTS, paginate: true })
       const data = result.data
       setEvents((prev) => replace ? data : [...prev, ...data])
       setTotal(result.total)
