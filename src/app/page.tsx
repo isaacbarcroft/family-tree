@@ -13,6 +13,7 @@ import { formatDate, getAge, getNextBirthday } from "@/utils/dates"
 import { SkeletonCard, SkeletonLine } from "@/components/SkeletonLoader"
 import WelcomeModal from "@/components/WelcomeModal"
 import { EVENT_TYPE_TAG_COLOR } from "@/constants/enums"
+import { HOME_RECENT } from "@/config/constants"
 
 export default function Home() {
   const { user } = useAuth()
@@ -129,10 +130,10 @@ export default function Home() {
     .map((p) => ({ person: p, ...getNextBirthday(p.birthDate!) }))
     .filter((b) => b.daysUntil <= 31)
     .sort((a, b) => a.daysUntil - b.daysUntil)
-    .slice(0, 5)
+    .slice(0, HOME_RECENT.UPCOMING_BIRTHDAYS)
 
-  const recentMemories = memories.slice(0, 4)
-  const recentEvents = events.slice(0, 3)
+  const recentMemories = memories.slice(0, HOME_RECENT.MEMORIES)
+  const recentEvents = events.slice(0, HOME_RECENT.EVENTS)
 
   const greeting = myPerson?.firstName
     ? myPerson.firstName
@@ -296,7 +297,7 @@ export default function Home() {
         <section>
           <h2 className="text-lg font-semibold text-white mb-3">Suggested Actions</h2>
           <div className="space-y-2">
-            {nudges.slice(0, 3).map((nudge) => (
+            {nudges.slice(0, HOME_RECENT.NUDGES).map((nudge) => (
               <Link
                 key={nudge.message}
                 href={nudge.href}
