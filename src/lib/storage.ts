@@ -25,3 +25,22 @@ export async function uploadMemoryPhoto(personId: string, file: File) {
   const path = `people/${personId}/memories/${Date.now()}-${file.name}`
   return uploadFile(path, file)
 }
+
+const AUDIO_EXTENSION_BY_MIME: Record<string, string> = {
+  "audio/webm": "webm",
+  "audio/ogg": "ogg",
+  "audio/mp4": "m4a",
+  "audio/mpeg": "mp3",
+  "audio/wav": "wav",
+}
+
+export function audioExtensionFor(mimeType: string): string {
+  const base = mimeType.split(";")[0]?.trim().toLowerCase() ?? ""
+  return AUDIO_EXTENSION_BY_MIME[base] ?? "webm"
+}
+
+export async function uploadMemoryAudio(personId: string, file: File) {
+  const ext = audioExtensionFor(file.type)
+  const path = `people/${personId}/memories/audio/${Date.now()}.${ext}`
+  return uploadFile(path, file)
+}

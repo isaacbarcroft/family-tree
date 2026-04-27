@@ -57,11 +57,9 @@ You've built a lot more than the original plan called for. Current stack is **Ne
 **Outcome:** Documented the single-family trust boundary in `README.md` under a new "Trust model and access" section. The section calls out that approved members can read every record, that ownership-only restricts mutations (not reads), and that branch-level isolation requires the ~16h follow-up scope below.
 **Follow-up (when needed):** ~16h to add per-branch / per-family visibility (likely a `visible_to` join table + RLS predicate keyed on a Person -> Branch mapping derived from the parent graph).
 
-### P0-3. Verify stub vs. implemented pages
+### ~~P0-3. Verify stub vs. implemented pages~~ Done 2026-04-27
 **Files to audit:** `src/app/timeline/page.tsx`, `src/app/families/page.tsx`, `src/app/families/[id]/page.tsx`, `src/app/login/*`, `src/app/signup/*` (or whatever your auth pages are)
-**Reason:** The review agent didn't fully read these. Could be working, could be placeholders.
-**Action:** Claude Code should open each, confirm functionality, and mark as "done" or add an explicit "implement" task to this list.
-**Effort:** 30min audit
+**Outcome:** Audit was completed under the Verification tasks section above (items 1, 2, 3). Each listed file was opened and confirmed functional; the only gap surfaced was the singular/plural route naming, which was filed as T-9 and shipped 2026-04-24. Closing this ticket as a duplicate of that audit.
 
 ---
 
@@ -69,15 +67,12 @@ You've built a lot more than the original plan called for. Current stack is **Ne
 
 Ordered by value-to-effort. These are what will make family members actually use the app.
 
-### 1.1. Voice / audio memories
+### ~~1.1. Voice / audio memories (recording + playback)~~ Done 2026-04-27
 **Why:** This is the single highest-leverage feature for a legacy app. Grandparents who won't type will record. A 3-minute voice note from Grandma about her wedding day is worth more than 50 text memories.
-**Scope:**
-- Add `audioUrl` and `durationSeconds` fields to `memories` table
-- Mic recording UI in `AddMemoryModal` (use `MediaRecorder` API — no library needed)
-- Upload to Supabase Storage under `media/audio/{userId}/{uuid}.webm`
-- Playback component (simple `<audio controls>` is fine)
-- Optional: transcription via OpenAI Whisper API in a Next.js API route. Store transcript in `memories.transcript` for searchability.
-**Effort:** 6–8h without transcription, +3h with
+**Outcome:** Migration `20260427_memory_audio.sql` adds nullable `audioUrl` text + `durationSeconds` integer (with non-negative check) columns to `public.memories`; rollback included. RLS is unchanged (the existing `memories` allowlist policies cover the new columns automatically). New `uploadMemoryAudio()` helper in `src/lib/storage.ts` writes under `people/{personId}/memories/audio/{ts}.{ext}` using the existing allowlist-gated `media` bucket; `audioExtensionFor()` maps recorder MIME types (incl. `;codecs=...`) to a canonical extension. `AddMemoryModal` now exposes a Record/Stop/Discard/Re-record flow built on the `MediaRecorder` API: it negotiates a supported codec via `MediaRecorder.isTypeSupported`, shows live elapsed time, releases the microphone stream and revokes preview blob URLs on stop/unmount, and gracefully degrades with an inline error if `getUserMedia` or `MediaRecorder` is unavailable. New `AudioPlayer` component renders an accessible `<audio controls>` with a duration label and is wired into both the expanded memories card and the profile-page memories grid; the unexpanded memory card shows a "voice" indicator. New `formatDuration()` utility shared by the modal and player. Vitest coverage: `duration.test.ts` (4 cases), `storageAudio.test.ts` (path/extension/error, 7 cases), `audioPlayer.test.tsx` (3 cases), `addMemoryModalAudio.test.tsx` (record/submit, discard, missing-MediaRecorder fallback), `memoryAudioMigration.test.ts` (column/check/RLS-untouched/no-destructive, 5 cases). Lint (0 errors), 217 tests passing, `yarn build` green.
+**Follow-ups:**
+- 1.1.a Whisper transcription. Store transcript in `memories.transcript` for searchability; expose during recording so the user can review/edit before save. Estimated +3h. Out of scope for this PR — flagged as the splittable add-on per the original ticket.
+- 1.1.b Manual device QA. The `MediaRecorder` happy path is covered by mocks; verify on real iOS Safari and Android Chrome (microphone permission UI varies by OS) before relying on this with relatives. Add to T-10 mobile QA pass.
 **Reference:** [MediaRecorder API](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder), [Whisper API](https://platform.openai.com/docs/guides/speech-to-text)
 
 ### 1.2. Reactions and comments on memories
@@ -354,6 +349,8 @@ This TODO list is long-form, strategy-heavy, and opinionated. **Worth comparing 
 
 ## Completed
 
+- 2026-04-27 — **1.1 Voice / audio memories (recording + playback).** Migration `20260427_memory_audio.sql` adds nullable `audioUrl` + `durationSeconds` to `public.memories` (rollback included; RLS unchanged). `AddMemoryModal` gains a `MediaRecorder`-based record/stop/discard/re-record flow with live elapsed time, codec negotiation (`isTypeSupported`), graceful fallback when the browser lacks `MediaRecorder`/`getUserMedia`, and full cleanup of streams + blob URLs on unmount. New `uploadMemoryAudio()` (with `audioExtensionFor()` MIME→ext mapping) writes audio to `people/{personId}/memories/audio/{ts}.{ext}` under the existing allowlist-gated `media` bucket. New shared `formatDuration()` utility and `AudioPlayer` component drop-in to the expanded memories list and profile memories grid; the collapsed memory card surfaces a "voice" indicator. Coverage: 19 new Vitest cases across 5 files; all 217 tests pass; lint clean; `yarn build` green. Whisper transcription explicitly deferred as 1.1.a; real-device microphone QA folded into T-10.
+- 2026-04-27 — **P0-3 verify stub vs. implemented pages.** Closed as duplicate; the audit was completed under the Verification tasks (items 1-3) and the only gap surfaced (route naming) was already shipped as T-9 on 2026-04-24.
 - 2026-04-23 — Verification tasks (all six sub-items). README + SUPABASE_SETUP.md refreshed. Follow-ups filed as T-9, T-10, T-11.
 - 2026-04-23 — **P0-1 RLS lockdown.** Added `public.app_users` allowlist + `is_approved_user` / `is_admin_user` SECURITY DEFINER helpers, replaced every blanket `using (true)` policy on data tables and the media bucket, gated destructive ops on creator-or-admin. Back-fill seeds existing `auth.users` to avoid lockout; admin promotion is a manual follow-up (see `SUPABASE_SETUP.md`). Rollback migration included. Static migration-structure test + opt-in Vitest integration test (`RUN_RLS_INTEGRATION=1`).
 - 2026-04-23 — **T-7 no-else refactor.** 20 `else` / `else if` occurrences eliminated across 9 files; added 3 regression tests for the GEDCOM parser control-flow changes. Codebase now fully conforms to the CLAUDE.md "no `else` blocks" rule.
