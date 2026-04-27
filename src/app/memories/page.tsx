@@ -12,6 +12,7 @@ import { formatDate } from "@/utils/dates"
 import Link from "next/link"
 import { SkeletonLine, SkeletonCard } from "@/components/SkeletonLoader"
 import { MemoryImage } from "@/components/MemoryImage"
+import AudioPlayer from "@/components/AudioPlayer"
 import { PAGE_SIZE } from "@/config/constants"
 
 export default function MemoriesPage() {
@@ -256,6 +257,7 @@ export default function MemoriesPage() {
                         <p className="text-base text-gray-300 mb-2">
                           {formatDate(m.date)}
                           {m.peopleIds.length > 0 && ` \u00B7 ${m.peopleIds.length} tagged`}
+                          {m.audioUrl && " · voice"}
                         </p>
 
                         {isExpanded && (
@@ -264,6 +266,16 @@ export default function MemoriesPage() {
                               <p className="text-gray-300 text-base mb-3 whitespace-pre-line">
                                 {m.description}
                               </p>
+                            )}
+
+                            {m.audioUrl && (
+                              <div className="mb-3">
+                                <AudioPlayer
+                                  src={m.audioUrl}
+                                  durationSeconds={m.durationSeconds}
+                                  label={`Voice memory: ${m.title}`}
+                                />
+                              </div>
                             )}
 
                             {m.imageUrls && m.imageUrls.length > 1 && (

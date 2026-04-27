@@ -28,6 +28,7 @@ import AddMemoryModal from "@/components/AddMemoryModal"
 import { useAuth } from "@/components/AuthProvider"
 import { ProfileAvatar } from "@/components/ProfileAvatar"
 import { MemoryImage } from "@/components/MemoryImage"
+import AudioPlayer from "@/components/AudioPlayer"
 import { uploadProfilePhoto } from "@/lib/storage"
 import { v4 as uuidv4 } from "uuid"
 import Link from "next/link"
@@ -616,7 +617,18 @@ function ProfileContent() {
                         </p>
                         <p className="text-gray-300 text-sm">
                           {formatDate(m.date)}
+                          {m.audioUrl && " · voice"}
                         </p>
+                        {m.audioUrl && (
+                          <div className="mt-2">
+                            <AudioPlayer
+                              src={m.audioUrl}
+                              durationSeconds={m.durationSeconds}
+                              label={`Voice memory: ${m.title}`}
+                              className="flex items-center gap-2"
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
