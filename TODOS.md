@@ -57,11 +57,17 @@ You've built a lot more than the original plan called for. Current stack is **Ne
 **Outcome:** Documented the single-family trust boundary in `README.md` under a new "Trust model and access" section. The section calls out that approved members can read every record, that ownership-only restricts mutations (not reads), and that branch-level isolation requires the ~16h follow-up scope below.
 **Follow-up (when needed):** ~16h to add per-branch / per-family visibility (likely a `visible_to` join table + RLS predicate keyed on a Person -> Branch mapping derived from the parent graph).
 
-### P0-3. Verify stub vs. implemented pages
-**Files to audit:** `src/app/timeline/page.tsx`, `src/app/families/page.tsx`, `src/app/families/[id]/page.tsx`, `src/app/login/*`, `src/app/signup/*` (or whatever your auth pages are)
-**Reason:** The review agent didn't fully read these. Could be working, could be placeholders.
-**Action:** Claude Code should open each, confirm functionality, and mark as "done" or add an explicit "implement" task to this list.
-**Effort:** 30min audit
+### ~~P0-3. Verify stub vs. implemented pages~~ Done 2026-04-27
+~~**Files to audit:** `src/app/timeline/page.tsx`, `src/app/families/page.tsx`, `src/app/families/[id]/page.tsx`, `src/app/login/*`, `src/app/signup/*` (or whatever your auth pages are)~~
+~~**Reason:** The review agent didn't fully read these. Could be working, could be placeholders.~~
+~~**Action:** Claude Code should open each, confirm functionality, and mark as "done" or add an explicit "implement" task to this list.~~
+**Outcome:** Re-audit on 2026-04-27 confirmed every file in this list is a real, working implementation, not a placeholder. Specifically:
+- `src/app/timeline/page.tsx` (204 lines): merges events + memories, sorts newest-first, exposes "all/event/memory" type filter and a person dropdown, renders skeleton loaders, memory thumbnails via `MemoryImage`, and per-item dot indicators colored by `getTimelineItemColor`.
+- `src/app/families/page.tsx` (166 lines): paginated grid keyed off `PAGE_SIZE.FAMILIES`, `AddFamilyModal` for creates, creator-gated `ConfirmDialog` for deletes, skeleton loader, and a "Showing X of Y" total counter.
+- `src/app/families/[id]/page.tsx` (164 lines, post-T-9 move from `/family/[id]`): fetches the `Family` row plus its member `Person`s, renders `FamilyTreeView`, exposes a clipboard-based invite link (`/signup?family={id}`) and `downloadGedcom` export, and shows a member grid with `ProfileAvatar`.
+- `src/app/login/page.tsx` (110 lines): `supabase.auth.signInWithPassword`, email-confirm error path, `?confirmed=1` / `?verify=1` flash messages, auto-redirect to `/` when already signed in, side-by-side `AuthHero` on `md:` and up.
+- `src/app/signup/page.tsx` (175 lines): wraps in `Suspense` for `useSearchParams`, forwards `family` and `claim` query params into the Supabase `signUp` user metadata, validates password match, and shows a "Check your email" pending-confirmation card.
+The audit work was already implicitly performed by Verification tasks 1, 2, and 3 (all marked done 2026-04-23); this entry now formally closes the P0-3 gate. No new follow-ups beyond items already tracked (1.6 accessibility, T-9 already done).
 
 ---
 
@@ -354,6 +360,7 @@ This TODO list is long-form, strategy-heavy, and opinionated. **Worth comparing 
 
 ## Completed
 
+- 2026-04-27 — **P0-3 audit close-out.** Re-audited all five pages in P0-3's "Files to audit" list (`timeline`, `families`, `families/[id]`, `login`, `signup`). Each is a complete, non-stub implementation; full per-file behavior summary recorded inline under the (now struck-through) P0-3 entry. The actual audit work had already been done by Verification tasks 1-3 on 2026-04-23; this entry formally closes the critical-bug gate so Phase 1 can be picked up cleanly. No new follow-ups beyond already-tracked items (1.6 accessibility, T-10 mobile QA). No code changes; TODOS.md only.
 - 2026-04-23 — Verification tasks (all six sub-items). README + SUPABASE_SETUP.md refreshed. Follow-ups filed as T-9, T-10, T-11.
 - 2026-04-23 — **P0-1 RLS lockdown.** Added `public.app_users` allowlist + `is_approved_user` / `is_admin_user` SECURITY DEFINER helpers, replaced every blanket `using (true)` policy on data tables and the media bucket, gated destructive ops on creator-or-admin. Back-fill seeds existing `auth.users` to avoid lockout; admin promotion is a manual follow-up (see `SUPABASE_SETUP.md`). Rollback migration included. Static migration-structure test + opt-in Vitest integration test (`RUN_RLS_INTEGRATION=1`).
 - 2026-04-23 — **T-7 no-else refactor.** 20 `else` / `else if` occurrences eliminated across 9 files; added 3 regression tests for the GEDCOM parser control-flow changes. Codebase now fully conforms to the CLAUDE.md "no `else` blocks" rule.
