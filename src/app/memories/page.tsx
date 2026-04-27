@@ -12,9 +12,9 @@ import { formatDate } from "@/utils/dates"
 import Link from "next/link"
 import { SkeletonLine, SkeletonCard } from "@/components/SkeletonLoader"
 import { MemoryImage } from "@/components/MemoryImage"
+import { MEMORIES_PAGE_SIZE } from "@/config/constants"
 
 export default function MemoriesPage() {
-  const PAGE_SIZE = 24
   const [memories, setMemories] = useState<Memory[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -50,7 +50,7 @@ export default function MemoriesPage() {
 
   const fetchMemories = async (pageNum = 1, replace = true) => {
     try {
-      const result = await listMemories({ page: pageNum, pageSize: PAGE_SIZE, paginate: true })
+      const result = await listMemories({ page: pageNum, pageSize: MEMORIES_PAGE_SIZE, paginate: true })
       const data = result.data
       setMemories((prev) => replace ? data : [...prev, ...data])
       setTotal(result.total)

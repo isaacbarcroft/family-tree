@@ -10,9 +10,9 @@ import { deleteFamily, listFamilies } from "@/lib/db"
 import ProtectedRoute from "@/components/ProtectedRoute"
 import ConfirmDialog from "@/components/ConfirmDialog"
 import { SkeletonCard } from "@/components/SkeletonLoader"
+import { FAMILIES_PAGE_SIZE } from "@/config/constants"
 
 export default function FamiliesPage() {
-  const PAGE_SIZE = 24
   const [families, setFamilies] = useState<Family[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -25,7 +25,7 @@ export default function FamiliesPage() {
 
   const fetchFamilies = async (pageNum = 1, replace = true) => {
     try {
-      const result = await listFamilies({ page: pageNum, pageSize: PAGE_SIZE, paginate: true })
+      const result = await listFamilies({ page: pageNum, pageSize: FAMILIES_PAGE_SIZE, paginate: true })
       setFamilies((prev) => replace ? result.data : [...prev, ...result.data])
       setTotal(result.total)
       setPage(pageNum)

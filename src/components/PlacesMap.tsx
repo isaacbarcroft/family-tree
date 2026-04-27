@@ -5,6 +5,7 @@ import L from "leaflet"
 import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet"
 import type { Person } from "@/models/Person"
 import PlacePopup from "./PlacePopup"
+import { PLACES_MAP_HEIGHT } from "@/config/constants"
 
 export interface LivedEntry {
   person: Person
@@ -43,7 +44,7 @@ export default function PlacesMap({ pins }: { pins: PlacePin[] }) {
       center={[20, 0]}
       zoom={2}
       scrollWheelZoom
-      style={{ height: "70vh", width: "100%", borderRadius: "0.75rem" }}
+      style={{ height: PLACES_MAP_HEIGHT, width: "100%", borderRadius: "0.75rem" }}
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'

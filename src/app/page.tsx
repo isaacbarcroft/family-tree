@@ -13,6 +13,14 @@ import { formatDate, getAge, getNextBirthday } from "@/utils/dates"
 import { SkeletonCard, SkeletonLine } from "@/components/SkeletonLoader"
 import WelcomeModal from "@/components/WelcomeModal"
 import { EVENT_TYPE_TAG_COLOR } from "@/constants/enums"
+import {
+  HOME_MAX_NUDGES,
+  HOME_RECENT_EVENTS,
+  HOME_RECENT_MEMORIES,
+  HOME_UPCOMING_BIRTHDAYS,
+  HOME_UPCOMING_BIRTHDAY_WINDOW_DAYS,
+  NEW_USER_PEOPLE_THRESHOLD,
+} from "@/config/constants"
 
 export default function Home() {
   const { user } = useAuth()
@@ -123,16 +131,15 @@ export default function Home() {
     )
   }
 
-  // Upcoming birthdays (within 31 days)
   const upcomingBirthdays = people
     .filter((p) => p.birthDate && !p.deathDate)
     .map((p) => ({ person: p, ...getNextBirthday(p.birthDate!) }))
-    .filter((b) => b.daysUntil <= 31)
+    .filter((b) => b.daysUntil <= HOME_UPCOMING_BIRTHDAY_WINDOW_DAYS)
     .sort((a, b) => a.daysUntil - b.daysUntil)
-    .slice(0, 5)
+    .slice(0, HOME_UPCOMING_BIRTHDAYS)
 
-  const recentMemories = memories.slice(0, 4)
-  const recentEvents = events.slice(0, 3)
+  const recentMemories = memories.slice(0, HOME_RECENT_MEMORIES)
+  const recentEvents = events.slice(0, HOME_RECENT_EVENTS)
 
   const greeting = myPerson?.firstName
     ? myPerson.firstName
@@ -145,8 +152,7 @@ export default function Home() {
     day: "numeric",
   })
 
-  // Getting Started checklist (for new users)
-  const isNewUser = people.length <= 5
+  const isNewUser = people.length <= NEW_USER_PEOPLE_THRESHOLD
   const familyTreeHref = myPerson?.familyIds?.[0] ? `/families/${myPerson.familyIds[0]}` : "/families"
   const gettingStarted = myPerson
     ? [
@@ -296,7 +302,7 @@ export default function Home() {
         <section>
           <h2 className="text-lg font-semibold text-white mb-3">Suggested Actions</h2>
           <div className="space-y-2">
-            {nudges.slice(0, 3).map((nudge) => (
+            {nudges.slice(0, HOME_MAX_NUDGES).map((nudge) => (
               <Link
                 key={nudge.message}
                 href={nudge.href}

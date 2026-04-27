@@ -255,11 +255,11 @@ Monthly or quarterly, Claude composes a recap: new memories added, recent birthd
 
 ## Technical debt & quality (ongoing)
 
-### T-1. Extract hard-coded constants to config
-**Files:** `src/app/family-tree/page.tsx`, `src/app/memories/page.tsx`, `src/app/events/page.tsx`, `src/app/places/page.tsx`, `src/app/api/geocode/route.ts`
-**What:** `PAGE_SIZE`, `MIN_MS_BETWEEN_CALLS`, home-page "recent count" limits, map viewport height.
-**Fix:** Move to `src/config/constants.ts`.
-**Effort:** 1h
+### ~~T-1. Extract hard-coded constants to config~~ ✅ Done 2026-04-27
+~~**Files:** `src/app/family-tree/page.tsx`, `src/app/memories/page.tsx`, `src/app/events/page.tsx`, `src/app/places/page.tsx`, `src/app/api/geocode/route.ts`~~
+~~**What:** `PAGE_SIZE`, `MIN_MS_BETWEEN_CALLS`, home-page "recent count" limits, map viewport height.~~
+~~**Fix:** Move to `src/config/constants.ts`.~~
+**Outcome:** Created `src/config/constants.ts` and consolidated every previously-inline magic number/string into named exports: per-page sizes (`PEOPLE_PAGE_SIZE`, `EVENTS_PAGE_SIZE`, `MEMORIES_PAGE_SIZE`, `FAMILIES_PAGE_SIZE`), home-page preview limits (`HOME_RECENT_MEMORIES`, `HOME_RECENT_EVENTS`, `HOME_UPCOMING_BIRTHDAYS`, `HOME_UPCOMING_BIRTHDAY_WINDOW_DAYS`, `HOME_MAX_NUDGES`, `NEW_USER_PEOPLE_THRESHOLD`), the places-map viewport (`PLACES_MAP_HEIGHT`, deduped between `PlacesMap` and the page-level skeleton), and the Nominatim spacing (`GEOCODE_MIN_MS_BETWEEN_CALLS`). Added a `config.test.ts` covering invariants (positive integers, ≥1s rate-limit, valid CSS length). All 176 tests + lint + `yarn build` pass.
 
 ### T-2. Component test coverage
 Current tests cover utilities (dates, colors, enums, gedcom, geocode, normalize, heic, treeBuilder, sortByIds, webhookNewUser). Missing: component rendering, modal flows, page-level integration. Add at least:
@@ -357,3 +357,4 @@ This TODO list is long-form, strategy-heavy, and opinionated. **Worth comparing 
 - 2026-04-23 — **P0-1 RLS lockdown.** Added `public.app_users` allowlist + `is_approved_user` / `is_admin_user` SECURITY DEFINER helpers, replaced every blanket `using (true)` policy on data tables and the media bucket, gated destructive ops on creator-or-admin. Back-fill seeds existing `auth.users` to avoid lockout; admin promotion is a manual follow-up (see `SUPABASE_SETUP.md`). Rollback migration included. Static migration-structure test + opt-in Vitest integration test (`RUN_RLS_INTEGRATION=1`).
 - 2026-04-23 — **T-7 no-else refactor.** 20 `else` / `else if` occurrences eliminated across 9 files; added 3 regression tests for the GEDCOM parser control-flow changes. Codebase now fully conforms to the CLAUDE.md "no `else` blocks" rule.
 - 2026-04-24 — **T-9 route naming alignment.** `/family/[id]` moved to `/families/[id]`; six internal `Link` call sites updated; legacy path gets a 307 redirect in `next.config.ts`; regression test added.
+- 2026-04-27 — **T-1 constants extraction.** Created `src/config/constants.ts` and replaced inline `PAGE_SIZE` / `MIN_MS_BETWEEN_CALLS` / `70vh` / home-page recency literals across `family-tree`, `events`, `memories`, `families`, `places`, `page` (home), `PlacesMap`, and `api/geocode/route.ts`. Added `config.test.ts` to lock invariants (positive integers, ≥1s Nominatim spacing, valid CSS length).
