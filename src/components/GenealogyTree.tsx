@@ -1,109 +1,26 @@
 "use client"
 
-import { useEffect, useRef, useState, useCallback } from "react"
-import { zoom as d3Zoom, zoomIdentity } from "d3-zoom"
+import { useEffect, useMemo, useRef, useState, useCallback } from "react"
+import { zoom as d3Zoom, zoomIdentity, type ZoomBehavior } from "d3-zoom"
 import { select } from "d3-selection"
 import type { TreeNode } from "@/utils/treeBuilder"
+import {
+  collectEdges,
+  computeBounds,
+  edgePath,
+  flattenNodes,
+  layoutTree,
+  NODE_H,
+  NODE_W,
+} from "@/utils/treeLayout"
 import { stringToColor } from "@/utils/colors"
 import { formatDate } from "@/utils/dates"
 import { useRouter } from "next/navigation"
 
-// Layout constants
-const NODE_W = 180
-const NODE_H = 80
-const COUPLE_W = 360
-const V_GAP = 120
-const H_GAP = 40
 const AVATAR_R = 22
 const MARRIAGE_BAR = 20
-
-interface LayoutNode {
-  x: number
-  y: number
-  w: number
-  h: number
-  data: TreeNode
-  children: LayoutNode[]
-}
-
-// Simple tree layout: compute x/y positions for each node
-function layoutTree(root: TreeNode): LayoutNode {
-  // First pass: build layout nodes with widths
-  function buildLayout(node: TreeNode, depth: number): LayoutNode {
-    const isCouple = !!node.attributes?.spouseId
-    const w = isCouple ? COUPLE_W : NODE_W
-    const children = (node.children ?? []).map((c) => buildLayout(c, depth + 1))
-
-    return {
-      x: 0,
-      y: depth * (NODE_H + V_GAP),
-      w,
-      h: NODE_H,
-      data: node,
-      children,
-    }
-  }
-
-  const layoutRoot = buildLayout(root, 0)
-
-  // Second pass: position nodes horizontally
-  function computeWidth(node: LayoutNode): number {
-    if (node.children.length === 0) return node.w
-    const childrenWidth = node.children.reduce(
-      (sum, c) => sum + computeWidth(c),
-      0
-    )
-    const gaps = (node.children.length - 1) * H_GAP
-    return Math.max(node.w, childrenWidth + gaps)
-  }
-
-  function positionNode(node: LayoutNode, left: number) {
-    const totalWidth = computeWidth(node)
-    node.x = left + totalWidth / 2
-
-    if (node.children.length > 0) {
-      const childrenWidths = node.children.map((c) => computeWidth(c))
-      const totalChildWidth =
-        childrenWidths.reduce((s, w) => s + w, 0) +
-        (node.children.length - 1) * H_GAP
-      let childLeft = node.x - totalChildWidth / 2
-
-      for (let i = 0; i < node.children.length; i++) {
-        positionNode(node.children[i], childLeft)
-        childLeft += childrenWidths[i] + H_GAP
-      }
-    }
-  }
-
-  positionNode(layoutRoot, 0)
-  return layoutRoot
-}
-
-// Flatten tree into arrays for rendering
-function flattenNodes(node: LayoutNode): LayoutNode[] {
-  return [node, ...node.children.flatMap(flattenNodes)]
-}
-
-interface Edge {
-  parentX: number
-  parentY: number
-  childX: number
-  childY: number
-}
-
-function collectEdges(node: LayoutNode): Edge[] {
-  const edges: Edge[] = []
-  for (const child of node.children) {
-    edges.push({
-      parentX: node.x,
-      parentY: node.y + node.h,
-      childX: child.x,
-      childY: child.y,
-    })
-    edges.push(...collectEdges(child))
-  }
-  return edges
-}
+const FIT_PADDING = 80
+const FIT_TOP_OFFSET = 40
 
 // Initials fallback for avatar
 function getInitials(name: string): string {
@@ -116,12 +33,6 @@ function getInitials(name: string): string {
     .toUpperCase()
 }
 
-// Edge path with rounded corners
-function edgePath(e: Edge): string {
-  const midY = e.parentY + (e.childY - e.parentY) / 2
-  return `M ${e.parentX} ${e.parentY} L ${e.parentX} ${midY} L ${e.childX} ${midY} L ${e.childX} ${e.childY}`
-}
-
 interface GenealogyTreeProps {
   treeData: TreeNode
 }
@@ -130,21 +41,42 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const gRef = useRef<SVGGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const [dims, setDims] = useState({ width: 800, height: 600 })
+  const zoomBehaviorRef = useRef<ZoomBehavior<SVGSVGElement, unknown> | null>(null)
+  const initialFitDoneRef = useRef(false)
+  const [dims, setDims] = useState({ width: 0, height: 0 })
   const router = useRouter()
 
-  // Measure container
+  const layout = useMemo(() => layoutTree(treeData), [treeData])
+  const nodes = useMemo(() => flattenNodes(layout), [layout])
+  const edges = useMemo(() => collectEdges(layout), [layout])
+  const bounds = useMemo(() => computeBounds(nodes), [nodes])
+
+  // Reset the initial-fit flag whenever the tree data changes so the new tree gets centered.
   useEffect(() => {
-    if (containerRef.current) {
-      const { width, height } = containerRef.current.getBoundingClientRect()
+    initialFitDoneRef.current = false
+  }, [treeData])
+
+  // Measure container, including on resize, so the fit math stays accurate.
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const measure = () => {
+      const { width, height } = container.getBoundingClientRect()
       setDims({ width, height })
     }
+    measure()
+
+    if (typeof ResizeObserver === "undefined") return
+    const observer = new ResizeObserver(measure)
+    observer.observe(container)
+    return () => observer.disconnect()
   }, [])
 
-  // Set up D3 zoom/pan
+  // Set up the zoom behavior once. Re-running this on every treeData change was
+  // wiping the user's pan/zoom state on any parent re-render.
   useEffect(() => {
     if (!svgRef.current || !gRef.current) return
-
     const svg = select(svgRef.current)
     const g = select(gRef.current)
 
@@ -155,25 +87,46 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
       })
 
     svg.call(zoomBehavior)
+    zoomBehaviorRef.current = zoomBehavior
 
-    // Initial transform: center tree
-    const layout = layoutTree(treeData)
-    const nodes = flattenNodes(layout)
-    const minX = Math.min(...nodes.map((n) => n.x - n.w / 2))
-    const maxX = Math.max(...nodes.map((n) => n.x + n.w / 2))
-    const maxY = Math.max(...nodes.map((n) => n.y + n.h))
-    const treeWidth = maxX - minX
-    const treeCenterX = (minX + maxX) / 2
+    return () => {
+      svg.on(".zoom", null)
+      zoomBehaviorRef.current = null
+    }
+  }, [])
 
-    const scale = Math.min(dims.width / (treeWidth + 80), dims.height / (maxY + 80), 1)
-    const tx = dims.width / 2 - treeCenterX * scale
-    const ty = 40 * scale
+  const fitToView = useCallback(() => {
+    const svgEl = svgRef.current
+    const zoomBehavior = zoomBehaviorRef.current
+    if (!svgEl || !zoomBehavior || !bounds) return
+    if (dims.width === 0 || dims.height === 0) return
 
-    svg.call(
+    const scale = Math.min(
+      dims.width / (bounds.width + FIT_PADDING),
+      dims.height / (bounds.maxY + FIT_PADDING),
+      1
+    )
+    const tx = dims.width / 2 - bounds.centerX * scale
+    const ty = FIT_TOP_OFFSET * scale
+
+    select(svgEl).call(
       zoomBehavior.transform,
       zoomIdentity.translate(tx, ty).scale(scale)
     )
-  }, [treeData, dims])
+  }, [bounds, dims])
+
+  // Apply the initial centering once per tree, and once dimensions are known.
+  useEffect(() => {
+    if (initialFitDoneRef.current) return
+    if (!bounds) return
+    if (dims.width === 0 || dims.height === 0) return
+    fitToView()
+    initialFitDoneRef.current = true
+  }, [bounds, dims, fitToView])
+
+  const handleResetView = useCallback(() => {
+    fitToView()
+  }, [fitToView])
 
   const navigateToProfile = useCallback(
     (personId: string) => {
@@ -182,16 +135,20 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
     [router]
   )
 
-  const layout = layoutTree(treeData)
-  const nodes = flattenNodes(layout)
-  const edges = collectEdges(layout)
-
   return (
     <div
       ref={containerRef}
       style={{ width: "100%", height: "85vh" }}
-      className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl overflow-hidden"
+      className="relative bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl overflow-hidden"
     >
+      <button
+        type="button"
+        onClick={handleResetView}
+        aria-label="Reset tree view"
+        className="absolute top-3 right-3 z-10 bg-gray-800/90 hover:bg-gray-700 text-white text-sm font-medium px-3 py-2 rounded-lg border border-gray-700 min-h-[36px] transition"
+      >
+        Reset view
+      </button>
       <svg ref={svgRef} width={dims.width} height={dims.height} style={{ cursor: "grab" }}>
         <g ref={gRef}>
           {/* Edges */}
