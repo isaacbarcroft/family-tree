@@ -292,10 +292,25 @@ function ProfileContent() {
   return (
     <ProtectedRoute>
       {person.deathDate && (
-        <div className="max-w-3xl mx-auto mt-2 bg-gray-800/50 border border-gray-700 rounded-lg p-3 text-center text-gray-300">
-          <span className="italic">
-            In loving memory of {person.firstName} {person.lastName}
-          </span>
+        <div className="max-w-3xl mx-auto mt-3 px-6">
+          <div className="bg-[var(--card-bg)]/80 border border-[var(--card-border)] rounded-lg px-4 py-3 text-gray-300">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="h-8 w-1 rounded-full bg-[var(--accent)] flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm uppercase text-[var(--accent)]">
+                    Remembered here
+                  </p>
+                  <p className="text-base font-semibold text-white break-words">
+                    {person.firstName} {person.lastName}
+                  </p>
+                </div>
+              </div>
+              <p className="text-sm text-gray-400 sm:text-right">
+                Passed {formatDate(person.deathDate)}
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
