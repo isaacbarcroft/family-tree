@@ -6,11 +6,12 @@ function ensureProtocol(url: string): string {
   return `https://${url}`
 }
 
-import { Suspense, useEffect, useRef, useState } from "react"
+import { Suspense, useEffect, useMemo, useRef, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import ProtectedRoute from "@/components/ProtectedRoute"
 import {
   getPersonById,
+  listPeople,
   savePerson,
   updatePerson,
   listEventsForPerson,
@@ -40,6 +41,7 @@ import ProfileEditForm from "@/components/ProfileEditForm"
 import { convertHeicToJpeg, isHeicFile, isHeicFileByMagic } from "@/utils/heic"
 import { formatDate } from "@/utils/dates"
 import { getErrorMessage } from "@/utils/errorMessage"
+import { findRelationship } from "@/utils/relationship"
 
 const obituaryKeywords = ["obituary", "obituaries", "legacy", "memorial"]
 
@@ -85,6 +87,7 @@ function ProfileContent() {
   const [showMemoryModal, setShowMemoryModal] = useState(false)
   const [showDeceased, setShowDeceased] = useState(false)
   const [relationships, setRelationships] = useState<Relationship[]>([])
+  const [allPeople, setAllPeople] = useState<Person[]>([])
 
   useEffect(() => {
     if (searchParams.get("edit") === "true") setEditing(true)
@@ -97,16 +100,18 @@ function ProfileContent() {
         setPerson(p)
         setForm(p || {})
         if (p?.deathDate) setShowDeceased(true)
-        const [related, personMemories, families, rels] = await Promise.all([
+        const [related, personMemories, families, rels, peopleList] = await Promise.all([
           listEventsForPerson(personId),
           listMemoriesForPerson(personId),
           listFamiliesForPerson(personId),
           listRelationshipsForPerson(personId).catch(() => [] as Relationship[]),
+          listPeople().catch(() => [] as Person[]),
         ])
         setEvents(related)
         setMemories(personMemories)
         setPersonFamilies(families)
         setRelationships(rels)
+        setAllPeople(peopleList)
       } catch (err: unknown) {
         console.error(err)
         setError("Unable to load this page.")
@@ -266,6 +271,19 @@ function ProfileContent() {
   const isDeceased = !!person?.deathDate
   const isOwnProfile = !!user && !!person && person.userId === user.id
 
+  // "Your relationship" chip: derive how the viewing user is related to the
+  // displayed person. Hidden when viewing your own profile, when there's no
+  // signed-in person record, or when the two have no traceable connection.
+  const relationshipToViewer = useMemo(() => {
+    if (!user || !person) return null
+    const me = allPeople.find((p) => p.userId === user.id) ?? null
+    if (!me || me.id === person.id) return null
+    const peopleById = new Map<string, Person>()
+    for (const p of allPeople) peopleById.set(p.id, p)
+    if (!peopleById.has(person.id)) peopleById.set(person.id, person)
+    return findRelationship(me.id, person.id, peopleById)
+  }, [allPeople, person, user])
+
   if (loading)
     return (
       <ProtectedRoute>
@@ -405,6 +423,18 @@ function ProfileContent() {
                         .join(", ")}
                     </span>
                   )}
+                </div>
+              )}
+
+              {relationshipToViewer && (
+                <div className="mt-3 flex justify-center sm:justify-start">
+                  <span
+                    className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gray-800 border border-gray-700 text-sm text-gray-200"
+                    aria-label={`Your relationship to ${person.firstName}: ${relationshipToViewer.label}`}
+                  >
+                    <span className="text-gray-400">Your</span>
+                    <span className="font-medium">{relationshipToViewer.label}</span>
+                  </span>
                 </div>
               )}
 
