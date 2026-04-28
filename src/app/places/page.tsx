@@ -207,7 +207,7 @@ export default function PlacesPage() {
           <div className="border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-8 text-center space-y-2">
             <p className="text-gray-300">No places yet.</p>
             <p className="text-sm text-gray-500">
-              Open a family member&apos;s profile, click Edit, and fill in a
+              Open a family member&apos;s page, click Edit, and fill in a
               birthplace, place of passing, or a &ldquo;Place lived.&rdquo; They&apos;ll appear here.
             </p>
           </div>

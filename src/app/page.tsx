@@ -152,7 +152,7 @@ export default function Home() {
   const gettingStarted = myPerson
     ? [
         { label: "Add your basic info", done: !!(myPerson.birthDate && myPerson.firstName && myPerson.lastName), href: `/profile/${myPerson.id}?edit=true` },
-        { label: "Add a profile photo", done: !!myPerson.profilePhotoUrl, href: `/profile/${myPerson.id}?edit=true` },
+        { label: "Add your photo", done: !!myPerson.profilePhotoUrl, href: `/profile/${myPerson.id}?edit=true` },
         { label: "Add your parents", done: (myPerson.parentIds?.length ?? 0) > 0, href: `/profile/${myPerson.id}?edit=true` },
         { label: "Add a family member", done: people.length > 1, href: "/family-tree" },
         { label: "Share your first memory", done: memories.length > 0, href: "/memories" },
@@ -169,7 +169,7 @@ export default function Home() {
       nudges.push({ message: "You have no birth date", href: profileHref })
     }
     if (!myPerson.profilePhotoUrl) {
-      nudges.push({ message: "You have no profile photo", href: profileHref })
+      nudges.push({ message: "You haven't added a photo yet", href: profileHref })
     }
     if ((myPerson.parentIds?.length ?? 0) === 0) {
       nudges.push({ message: "You have no parents listed", href: profileHref })
