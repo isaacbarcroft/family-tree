@@ -5,6 +5,7 @@ import type { Memory } from "@/models/Memory"
 import type { Relationship } from "@/models/Relationship"
 import type { GeocodedPlace } from "@/models/GeocodedPlace"
 import type { Residence } from "@/models/Residence"
+import type { MemoryReaction, ReactionEmoji } from "@/models/MemoryReaction"
 
 function buildSearchName(firstName?: string, middleName?: string, lastName?: string) {
   return [firstName, middleName, lastName].filter(Boolean).join(" ").toLowerCase().trim()
@@ -609,5 +610,53 @@ export async function updateResidence(id: string, updates: Partial<Residence>): 
 
 export async function deleteResidence(id: string): Promise<void> {
   const { error } = await supabase.from("residences").delete().eq("id", id)
+  if (error) throw error
+}
+
+// ---- Memory Reactions ----
+export async function listReactionsForMemory(memoryId: string): Promise<MemoryReaction[]> {
+  const { data, error } = await supabase
+    .from("memory_reactions")
+    .select("*")
+    .eq("memoryId", memoryId)
+  if (error) throw error
+  return (data ?? []) as MemoryReaction[]
+}
+
+export async function listReactionsForMemories(memoryIds: string[]): Promise<MemoryReaction[]> {
+  if (memoryIds.length === 0) return []
+  const { data, error } = await supabase
+    .from("memory_reactions")
+    .select("*")
+    .in("memoryId", memoryIds)
+  if (error) throw error
+  return (data ?? []) as MemoryReaction[]
+}
+
+export async function addReaction(
+  memoryId: string,
+  userId: string,
+  emoji: ReactionEmoji
+): Promise<MemoryReaction> {
+  const { data, error } = await supabase
+    .from("memory_reactions")
+    .insert({ memoryId, userId, emoji })
+    .select("*")
+    .single()
+  if (error) throw error
+  return data as MemoryReaction
+}
+
+export async function removeReaction(
+  memoryId: string,
+  userId: string,
+  emoji: ReactionEmoji
+): Promise<void> {
+  const { error } = await supabase
+    .from("memory_reactions")
+    .delete()
+    .eq("memoryId", memoryId)
+    .eq("userId", userId)
+    .eq("emoji", emoji)
   if (error) throw error
 }

@@ -77,13 +77,25 @@ Ordered by value-to-effort. These are what will make family members actually use
 
 ### 1.2. Reactions and comments on memories
 **Why:** Turns the app from an archive into a social space. When Grandpa posts a fishing story and five grandkids react, he'll post more.
-**Scope:**
+**Status:** Split into three slices to keep PRs reviewable. 1.2.a (reactions) shipped 2026-04-28; 1.2.b and 1.2.c remain.
+**Scope (original):**
 - New table `memory_reactions (id, memoryId, userId, emoji, createdAt)` — unique on (memoryId, userId, emoji)
 - New table `memory_comments (id, memoryId, userId, body, createdAt, parentCommentId nullable)`
 - Grid of emoji reactions under each memory card (❤️ 😂 🙏 😮)
 - Threaded comments (one level deep is plenty)
 - Email digest when someone reacts/comments on your post (reuse Resend)
 **Effort:** 6–8h
+
+#### ~~1.2.a Reactions only~~ Done 2026-04-28
+**Outcome:** Migration `20260428_memory_reactions.sql` adds `public.memory_reactions` with `(id, memoryId, userId, emoji, createdAt)`, `unique (memoryId, userId, emoji)`, and a check constraint pinning emoji to `('heart', 'laugh', 'pray', 'wow')`. Cascades on memory and user deletion. Indexes on `memoryId` and `userId`. RLS gates `select`/`insert` on `is_approved_user()` (with `userId = auth.uid()` on insert) and restricts `delete` to the owner or an admin; `update` is intentionally not exposed (reactions are immutable). Rollback included. New `MemoryReaction` model + `REACTION_GLYPHS` table. New db helpers: `listReactionsForMemory`, `listReactionsForMemories` (batched), `addReaction`, `removeReaction`. New `MemoryReactions` client component renders the four-emoji row with optimistic updates, rollback on failure, count + `aria-pressed` highlight for the current user, and disables every button when no user is signed in. Wired into the memories page (always-visible at the bottom of every card, expanded or collapsed) and the per-person memory grid on the profile page; both pages batch-load reactions alongside their initial memory fetch. Tests: `memoryReactionsMigration.test.ts` (8 cases incl. "no `update` policy", "no destructive ops", rollback), `memoryReactionsDb.test.ts` (7 cases — list/list-batched empty short-circuit, batched IN, add success/error, delete with scoped filters and error propagation), `memoryReactions.test.tsx` (4 cases — render with counts + highlight, disabled when signed-out, optimistic add, optimistic remove with rollback + alert). All 237 tests pass; lint warnings unchanged from prior baseline; `yarn build` green.
+
+#### 1.2.b Comments
+**Scope:** Add `memory_comments (id, memoryId, userId, body, createdAt, parentCommentId nullable)` with allowlist-gated RLS (creator-or-admin destructive). Threaded one level deep. UI under each memory card (collapsed by default to keep the grid tight; expand to read/post).
+**Effort:** 3–4h
+
+#### 1.2.c Email digest on reactions and comments
+**Scope:** Resend batch email when someone reacts or comments on a memory you created. Per-user `notification_prefs` jsonb opt-out (overlaps with 1.3 — share the schema there).
+**Effort:** 2–3h
 
 ### 1.3. "On this day" + birthday reminder emails
 **Why:** Resend is already wired up. This is the cheapest engagement loop you can build. Weekly email = weekly return visits.
@@ -349,6 +361,7 @@ This TODO list is long-form, strategy-heavy, and opinionated. **Worth comparing 
 
 ## Completed
 
+- 2026-04-28 — **1.2.a Reactions on memories (first slice of 1.2).** Added `memory_reactions` table with `(memoryId, userId, emoji)` uniqueness, allowlist-gated RLS (insert restricted to `userId = auth.uid()`, delete to owner-or-admin, no update policy), cascades on memory and user deletion, and lookup indexes on both foreign keys. New `MemoryReactions` client component renders ❤️ 😂 🙏 😮 with counts, `aria-pressed` for current-user state, optimistic add/remove with rollback, and disabled buttons when signed-out. Wired into the memories page (every card, both states) and the profile page memory grid; both pages batch-fetch reactions via the new `listReactionsForMemories`. Comments and email-digest follow-ups split out as 1.2.b and 1.2.c. 19 new Vitest cases across 3 files; 237 tests pass; lint baseline unchanged; `yarn build` green.
 - 2026-04-27 — **1.1 Voice / audio memories (recording + playback).** Migration `20260427_memory_audio.sql` adds nullable `audioUrl` + `durationSeconds` to `public.memories` (rollback included; RLS unchanged). `AddMemoryModal` gains a `MediaRecorder`-based record/stop/discard/re-record flow with live elapsed time, codec negotiation (`isTypeSupported`), graceful fallback when the browser lacks `MediaRecorder`/`getUserMedia`, and full cleanup of streams + blob URLs on unmount. New `uploadMemoryAudio()` (with `audioExtensionFor()` MIME→ext mapping) writes audio to `people/{personId}/memories/audio/{ts}.{ext}` under the existing allowlist-gated `media` bucket. New shared `formatDuration()` utility and `AudioPlayer` component drop-in to the expanded memories list and profile memories grid; the collapsed memory card surfaces a "voice" indicator. Coverage: 19 new Vitest cases across 5 files; all 217 tests pass; lint clean; `yarn build` green. Whisper transcription explicitly deferred as 1.1.a; real-device microphone QA folded into T-10.
 - 2026-04-27 — **P0-3 verify stub vs. implemented pages.** Closed as duplicate; the audit was completed under the Verification tasks (items 1-3) and the only gap surfaced (route naming) was already shipped as T-9 on 2026-04-24.
 - 2026-04-23 — Verification tasks (all six sub-items). README + SUPABASE_SETUP.md refreshed. Follow-ups filed as T-9, T-10, T-11.

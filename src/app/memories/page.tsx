@@ -2,8 +2,14 @@
 
 import { useEffect, useState } from "react"
 import { useAuth } from "@/components/AuthProvider"
-import { listMemories, updateMemory, deleteMemory } from "@/lib/db"
+import {
+  listMemories,
+  updateMemory,
+  deleteMemory,
+  listReactionsForMemories,
+} from "@/lib/db"
 import type { Memory } from "@/models/Memory"
+import type { MemoryReaction } from "@/models/MemoryReaction"
 import ProtectedRoute from "@/components/ProtectedRoute"
 import AddMemoryModal from "@/components/AddMemoryModal"
 import { supabase } from "@/lib/supabase"
@@ -13,6 +19,7 @@ import Link from "next/link"
 import { SkeletonLine, SkeletonCard } from "@/components/SkeletonLoader"
 import { MemoryImage } from "@/components/MemoryImage"
 import AudioPlayer from "@/components/AudioPlayer"
+import MemoryReactions from "@/components/MemoryReactions"
 import { PAGE_SIZE } from "@/config/constants"
 
 export default function MemoriesPage() {
@@ -28,6 +35,9 @@ export default function MemoriesPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<Partial<Memory>>({})
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [reactionsByMemory, setReactionsByMemory] = useState<
+    Map<string, MemoryReaction[]>
+  >(new Map())
   const { user } = useAuth()
 
   const fetchPeopleForMemories = async (memData: Memory[]) => {
@@ -49,6 +59,27 @@ export default function MemoriesPage() {
     }
   }
 
+  const fetchReactionsForMemories = async (memData: Memory[]) => {
+    const ids = memData.map((m) => m.id)
+    if (ids.length === 0) return
+    try {
+      const reactions = await listReactionsForMemories(ids)
+      setReactionsByMemory((prev) => {
+        const next = new Map(prev)
+        for (const id of ids) {
+          next.set(id, [])
+        }
+        for (const r of reactions) {
+          const current = next.get(r.memoryId) ?? []
+          next.set(r.memoryId, [...current, r])
+        }
+        return next
+      })
+    } catch (err) {
+      console.error("Failed to load reactions", err)
+    }
+  }
+
   const fetchMemories = async (pageNum = 1, replace = true) => {
     try {
       const result = await listMemories({ page: pageNum, pageSize: PAGE_SIZE.MEMORIES, paginate: true })
@@ -56,13 +87,23 @@ export default function MemoriesPage() {
       setMemories((prev) => replace ? data : [...prev, ...data])
       setTotal(result.total)
       setPage(pageNum)
+      if (replace) setReactionsByMemory(new Map())
       await fetchPeopleForMemories(data)
+      await fetchReactionsForMemories(data)
     } catch (err) {
       console.error(err)
       setError("Unable to load memories.")
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleReactionsChange = (memoryId: string, next: MemoryReaction[]) => {
+    setReactionsByMemory((prev) => {
+      const updated = new Map(prev)
+      updated.set(memoryId, next)
+      return updated
+    })
   }
 
   useEffect(() => {
@@ -310,6 +351,15 @@ export default function MemoriesPage() {
                             )}
                           </>
                         )}
+
+                        <div className="mt-3">
+                          <MemoryReactions
+                            memoryId={m.id}
+                            userId={user?.id ?? null}
+                            reactions={reactionsByMemory.get(m.id) ?? []}
+                            onChange={(next) => handleReactionsChange(m.id, next)}
+                          />
+                        </div>
                       </>
                     )}
                   </div>
