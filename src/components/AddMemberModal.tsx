@@ -155,7 +155,7 @@ const AddMemberModal = ({ onClose, currentPersonId, onLinked }: AddMemberModalPr
       setError(
         getErrorMessage(
           err,
-          `Created ${firstName} but failed to link them. Open their profile to link manually.`,
+          `Created ${firstName} but failed to link them. Open their page to link manually.`,
         ),
       )
       setCreating(false)
