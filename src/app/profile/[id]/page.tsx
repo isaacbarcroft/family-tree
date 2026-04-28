@@ -50,7 +50,7 @@ export default function ProfilePage() {
     <Suspense
       fallback={
         <div className="text-center py-16 text-gray-400">
-          Loading profile...
+          Loading...
         </div>
       }
     >
@@ -114,7 +114,7 @@ function ProfileContent() {
         setAllPeople(peopleList)
       } catch (err: unknown) {
         console.error(err)
-        setError("Unable to load profile data.")
+        setError("Unable to load this page.")
       } finally {
         setLoading(false)
       }
@@ -167,7 +167,7 @@ function ProfileContent() {
       }
     } catch (err: unknown) {
       console.error(err)
-      setError(getErrorMessage(err, "Error saving profile."))
+      setError(getErrorMessage(err, "Error saving changes."))
     }
     setEditing(false)
   }
@@ -268,6 +268,8 @@ function ProfileContent() {
       (person.spouseIds?.length ?? 0) > 0 ||
       (person.childIds?.length ?? 0) > 0)
   const hasLinks = person && (person.facebookUrl || person.websiteUrl)
+  const isDeceased = !!person?.deathDate
+  const isOwnProfile = !!user && !!person && person.userId === user.id
 
   // "Your relationship" chip: derive how the viewing user is related to the
   // displayed person. Hidden when viewing your own profile, when there's no
@@ -286,7 +288,7 @@ function ProfileContent() {
     return (
       <ProtectedRoute>
         <div className="text-center py-16 text-gray-400 text-lg">
-          Loading profile...
+          Loading...
         </div>
       </ProtectedRoute>
     )
@@ -308,10 +310,25 @@ function ProfileContent() {
   return (
     <ProtectedRoute>
       {person.deathDate && (
-        <div className="max-w-3xl mx-auto mt-2 bg-gray-800/50 border border-gray-700 rounded-lg p-3 text-center text-gray-300">
-          <span className="italic">
-            In loving memory of {person.firstName} {person.lastName}
-          </span>
+        <div className="max-w-3xl mx-auto mt-3 px-6">
+          <div className="bg-[var(--card-bg)]/80 border border-[var(--card-border)] rounded-lg px-4 py-3 text-gray-300">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="h-8 w-1 rounded-full bg-[var(--accent)] flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm uppercase text-[var(--accent)]">
+                    Remembered here
+                  </p>
+                  <p className="text-base font-semibold text-white break-words">
+                    {person.firstName} {person.lastName}
+                  </p>
+                </div>
+              </div>
+              <p className="text-sm text-gray-400 sm:text-right">
+                Passed {formatDate(person.deathDate)}
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
@@ -422,18 +439,40 @@ function ProfileContent() {
               )}
 
               {/* Action buttons */}
-              <div className="flex gap-2 justify-center sm:justify-start mt-4">
-                <button
-                  onClick={() => setEditing(!editing)}
-                  className={`px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px] transition ${
-                    editing
-                      ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                      : "bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]"
-                  }`}
-                >
-                  {editing ? "Cancel" : "Edit Profile"}
-                </button>
-                {!editing && (
+              <div className="flex flex-wrap gap-2 justify-center sm:justify-start mt-4">
+                {editing && (
+                  <button
+                    onClick={() => setEditing(false)}
+                    className="px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px] bg-gray-700 text-gray-300 hover:bg-gray-600 transition"
+                  >
+                    Cancel
+                  </button>
+                )}
+                {!editing && isDeceased && (
+                  <button
+                    onClick={() => setShowMemoryModal(true)}
+                    className="px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px] bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] transition"
+                  >
+                    Share a memory of {person.firstName}
+                  </button>
+                )}
+                {!editing && isDeceased && (
+                  <button
+                    onClick={() => setEditing(true)}
+                    className="px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px] bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700 transition"
+                  >
+                    Edit details
+                  </button>
+                )}
+                {!editing && !isDeceased && (
+                  <button
+                    onClick={() => setEditing(true)}
+                    className="px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px] bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] transition"
+                  >
+                    {isOwnProfile ? "Edit my details" : "Edit details"}
+                  </button>
+                )}
+                {!editing && !isDeceased && (
                   <button
                     onClick={() => setShowMemoryModal(true)}
                     className="px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px] bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700 transition"
@@ -441,7 +480,7 @@ function ProfileContent() {
                     Add Memory
                   </button>
                 )}
-                {!editing && !person.userId && (
+                {!editing && !isDeceased && !person.userId && (
                   <button
                     onClick={() => {
                       const url = `${window.location.origin}/signup?claim=${person.id}${person.familyIds?.[0] ? `&family=${person.familyIds[0]}` : ""}`
@@ -496,8 +535,8 @@ function ProfileContent() {
                   </div>
                 ) : (
                   <p className="text-gray-300 text-base">
-                    No family connections yet. Click &ldquo;Edit Profile&rdquo;
-                    to add parents, children, or a spouse.
+                    No family connections yet. Add parents, children, or a
+                    spouse from &ldquo;Edit details&rdquo;.
                   </p>
                 )}
               </div>
@@ -521,8 +560,7 @@ function ProfileContent() {
                   </ul>
                 ) : (
                   <p className="text-gray-300 text-base">
-                    Not part of any family group yet. Click &ldquo;Edit
-                    Profile&rdquo; to add.
+                    Not part of any family group yet.
                   </p>
                 )}
 
@@ -567,10 +605,29 @@ function ProfileContent() {
                 <p className="text-gray-300 leading-relaxed whitespace-pre-line">
                   {person.bio}
                 </p>
+              ) : isDeceased ? (
+                <div className="space-y-3">
+                  <p className="text-gray-200 text-base">
+                    What do you remember about {person.firstName}?
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setShowMemoryModal(true)}
+                      className="px-5 py-2.5 rounded-lg text-base font-medium min-h-[44px] bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] transition"
+                    >
+                      Share a memory
+                    </button>
+                    <button
+                      onClick={() => setEditing(true)}
+                      className="px-3 py-2.5 rounded-lg text-base text-gray-400 hover:text-white transition"
+                    >
+                      Or edit details
+                    </button>
+                  </div>
+                </div>
               ) : (
                 <p className="text-gray-300 text-base">
-                  No biography yet. Click &ldquo;Edit Profile&rdquo; to tell
-                  their story.
+                  No biography yet. Click &ldquo;Edit details&rdquo; to add one.
                 </p>
               )}
             </div>
@@ -621,8 +678,9 @@ function ProfileContent() {
               </div>
               {memories.length === 0 ? (
                 <p className="text-gray-300 text-base">
-                  No memories tagged yet. Share a photo or story about{" "}
-                  {person.firstName}.
+                  {isDeceased
+                    ? `No memories tagged yet. Be the first to share a memory of ${person.firstName}.`
+                    : `No memories tagged yet. Share a photo or story about ${person.firstName}.`}
                 </p>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">

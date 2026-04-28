@@ -111,7 +111,7 @@ function SignupContent() {
           {(familyId || claimPersonId) && (
             <p className="text-[var(--accent)] text-base text-center">
               {claimPersonId
-                ? "You\u2019ve been invited to claim your profile!"
+                ? "You\u2019ve been invited to claim your page!"
                 : "You\u2019ve been invited to join a family!"}
             </p>
           )}
