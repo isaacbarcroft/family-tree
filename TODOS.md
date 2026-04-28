@@ -107,14 +107,14 @@ Ordered by value-to-effort. These are what will make family members actually use
 **Effort:** 4h prompts + UI, +4h for AI follow-ups
 **Source inspiration:** [StoryWorth](https://welcome.storyworth.com/) (paid competitor; ~$99/yr, does exactly this)
 
-### 1.5. Relationship calculator
+### ~~1.5. Relationship calculator~~ Done 2026-04-28
 **Why:** "How is my daughter related to my great-uncle?" is one of the most-asked questions in any family tree app.
-**Scope:**
-- BFS on the parent-child graph from two selected people, finding their lowest common ancestor (LCA)
-- Translate path into English: "second cousin once removed", "great-great-aunt", etc.
-- Put it on the profile page and as a standalone "Relationship finder" page
-- Unit tests for tricky cases (step-siblings, half-siblings, adopted, in-laws)
-**Effort:** 6h
+**Outcome:** New `src/utils/relationship.ts` exports `findRelationship(personAId, personBId, peopleById)` that BFSes upward through `Person.parentIds`, finds the lowest common ancestor, and translates the (stepsA, stepsB) pair into a human-readable English label: "Self", "Spouse", "Parent" / "Grandparent" / "Great-grandparent" / "Nx-great-grandparent", "Child"-side mirrors, "Sibling", "Aunt / Uncle" with `Great-` prefixes, "Niece / Nephew" with `Great-` prefixes, and cousins as `{ordinal} cousin {N times} removed`. Result also returns `kind`, `stepsA`, `stepsB`, and `commonAncestorId` for callers that want the structured shape. Profile page now renders a "Your {relationship}" chip in the header card whenever the viewing user has a linked person and is not viewing their own profile; falls through silently when there's no traceable connection. 26 new Vitest cases in `src/__tests__/relationship.test.ts` cover trivial cases (self, spouse, unknown ids, unrelated), direct lines through 6 generations including the `Nx-great-` rollup, collateral relationships at every depth tested (sibling, aunt/uncle through great-great-, niece/nephew through great-), cousins (1st/2nd/3rd; once / twice / thrice / N-times removed), symmetry, malformed parent cycles, and a regression-pin that step-parents are currently treated as biological. All 243 tests + lint + `yarn build` pass.
+**Follow-ups (deferred — flagged in the PR description for review):**
+- 1.5.a In-law relationships ("Brother-in-law" / "Sister-in-law" / "Mother-in-law" etc.) by chaining a spouse hop on either side. Estimated +2h.
+- 1.5.b Half-sibling labeling ("Half-sibling" when only one parent is shared). Currently labeled as "Sibling". Estimated +1h.
+- 1.5.c Step / adoptive / foster distinctions. The denormalized `Person.parentIds` field doesn't carry the `relationships.subtype`, so the calculator can't tell them apart without joining against `relationships`. Estimated +2h.
+- 1.5.d Standalone `/relationships` page with a two-person picker (the original TODO scope mentioned this; the profile-page chip ships first because it's the higher-leverage placement).
 **Reference:** [Relationship chart logic](https://en.wikipedia.org/wiki/Cousin_chart), [LCA algorithm](https://en.wikipedia.org/wiki/Lowest_common_ancestor)
 
 ### 1.6. Accessibility pass
@@ -349,6 +349,7 @@ This TODO list is long-form, strategy-heavy, and opinionated. **Worth comparing 
 
 ## Completed
 
+- 2026-04-28 — **1.5 Relationship calculator.** New `src/utils/relationship.ts` exports `findRelationship(personAId, personBId, peopleById): RelationshipResult | null`. BFSes upward through `Person.parentIds`, finds the lowest common ancestor, and translates (stepsA, stepsB) into a human-readable English label: "Self", "Spouse", "Parent" / "Grandparent" / "Great-grandparent" / "Nx-great-grandparent", mirrored child labels, "Sibling", "Aunt / Uncle" with `Great-` prefixes, "Niece / Nephew" with `Great-` prefixes, and cousins as `{ordinal} cousin {N times} removed`. Result also returns `kind`, `stepsA`, `stepsB`, and `commonAncestorId`. Profile page renders a "Your {relationship}" chip in the header card whenever the viewing user has a linked person and isn't viewing their own profile. 26 new Vitest cases in `src/__tests__/relationship.test.ts` (243 tests total, lint clean, `yarn build` green). Deferred: in-laws (1.5.a), half-sibling labels (1.5.b), step/adoptive distinction (1.5.c), standalone `/relationships` page (1.5.d).
 - 2026-04-27 — **1.1 Voice / audio memories (recording + playback).** Migration `20260427_memory_audio.sql` adds nullable `audioUrl` + `durationSeconds` to `public.memories` (rollback included; RLS unchanged). `AddMemoryModal` gains a `MediaRecorder`-based record/stop/discard/re-record flow with live elapsed time, codec negotiation (`isTypeSupported`), graceful fallback when the browser lacks `MediaRecorder`/`getUserMedia`, and full cleanup of streams + blob URLs on unmount. New `uploadMemoryAudio()` (with `audioExtensionFor()` MIME→ext mapping) writes audio to `people/{personId}/memories/audio/{ts}.{ext}` under the existing allowlist-gated `media` bucket. New shared `formatDuration()` utility and `AudioPlayer` component drop-in to the expanded memories list and profile memories grid; the collapsed memory card surfaces a "voice" indicator. Coverage: 19 new Vitest cases across 5 files; all 217 tests pass; lint clean; `yarn build` green. Whisper transcription explicitly deferred as 1.1.a; real-device microphone QA folded into T-10.
 - 2026-04-27 — **P0-3 verify stub vs. implemented pages.** Closed as duplicate; the audit was completed under the Verification tasks (items 1-3) and the only gap surfaced (route naming) was already shipped as T-9 on 2026-04-24.
 - 2026-04-23 — Verification tasks (all six sub-items). README + SUPABASE_SETUP.md refreshed. Follow-ups filed as T-9, T-10, T-11.
