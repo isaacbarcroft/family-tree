@@ -1,37 +1,31 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { Suspense, useEffect, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/components/AuthProvider"
 import { supabase } from "@/lib/supabase"
 import Link from "next/link"
 import AuthHero from "@/components/AuthHero"
 
-export default function LoginPage() {
+function deriveInfo(params: URLSearchParams | null): string {
+  if (!params) return ""
+  if (params.get("confirmed") === "1") return "Email confirmed. You can sign in now."
+  if (params.get("verify") === "1") return "Check your inbox and confirm your email before signing in."
+  return ""
+}
+
+function LoginPageContent() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
-  const [info, setInfo] = useState("")
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user } = useAuth()
+  const info = deriveInfo(searchParams)
 
   useEffect(() => {
     if (user) router.push("/")
   }, [user, router])
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    const params = new URLSearchParams(window.location.search)
-    if (params.get("confirmed") === "1") {
-      setInfo("Email confirmed. You can sign in now.")
-      return
-    }
-    if (params.get("verify") === "1") {
-      setInfo("Check your inbox and confirm your email before signing in.")
-      return
-    }
-    setInfo("")
-  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -106,5 +100,19 @@ export default function LoginPage() {
         </form>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-[80vh] flex items-center justify-center">
+          <p className="text-gray-300 text-lg">Loading...</p>
+        </div>
+      }
+    >
+      <LoginPageContent />
+    </Suspense>
   )
 }

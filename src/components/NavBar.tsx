@@ -84,11 +84,33 @@ export default function NavBar() {
   const isActive = (href: string) =>
     pathname === href || (pathname !== null && pathname.startsWith(href + "/"))
 
+  // Clear or reset state during render — rather than from inside effects that
+  // would cascade an extra render — when an upstream value changes. Matches
+  // the React 19 pattern used in MemoryImage / ProfileAvatar.
+  const [prevSearchTrim, setPrevSearchTrim] = useState("")
+  const trimmedSearch = search.trim()
+  if (trimmedSearch !== prevSearchTrim) {
+    setPrevSearchTrim(trimmedSearch)
+    if (!trimmedSearch && searchResults.length > 0) setSearchResults([])
+  }
+
+  const [prevUserId, setPrevUserId] = useState(user?.id ?? null)
+  const currentUserId = user?.id ?? null
+  if (currentUserId !== prevUserId) {
+    setPrevUserId(currentUserId)
+    if (!currentUserId && myPersonId !== null) setMyPersonId(null)
+  }
+
+  const [prevPathname, setPrevPathname] = useState(pathname)
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname)
+    if (mobileMenuOpen) setMobileMenuOpen(false)
+    if (userMenuOpen) setUserMenuOpen(false)
+    if (showResults) setShowResults(false)
+  }
+
   useEffect(() => {
-    if (!search.trim()) {
-      setSearchResults([])
-      return
-    }
+    if (!search.trim()) return
 
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(async () => {
@@ -116,10 +138,7 @@ export default function NavBar() {
 
   // Resolve current user's person record so the menu can link to their profile
   useEffect(() => {
-    if (!user) {
-      setMyPersonId(null)
-      return
-    }
+    if (!user) return
     let cancelled = false
     supabase
       .from("people")
@@ -149,13 +168,6 @@ export default function NavBar() {
     document.addEventListener("mousedown", handleClick)
     return () => document.removeEventListener("mousedown", handleClick)
   }, [])
-
-  // Close menus on route change
-  useEffect(() => {
-    setMobileMenuOpen(false)
-    setUserMenuOpen(false)
-    setShowResults(false)
-  }, [pathname])
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut()

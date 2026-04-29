@@ -36,12 +36,22 @@ const AddMemberModal = ({ onClose, currentPersonId, onLinked }: AddMemberModalPr
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const titleId = useId()
 
-  useEffect(() => {
-    if (!search.trim()) {
-      setResults([])
-      setSearched(false)
-      return
+  // Track the last `search` value we saw so the empty-input case can clear
+  // results during render rather than from inside an effect (which would
+  // cascade an extra re-render — matches the React 19 pattern from
+  // MemoryImage).
+  const [prevSearchTrim, setPrevSearchTrim] = useState("")
+  const trimmed = search.trim()
+  if (trimmed !== prevSearchTrim) {
+    setPrevSearchTrim(trimmed)
+    if (!trimmed) {
+      if (results.length > 0) setResults([])
+      if (searched) setSearched(false)
     }
+  }
+
+  useEffect(() => {
+    if (!search.trim()) return
 
     if (debounceRef.current) clearTimeout(debounceRef.current)
 

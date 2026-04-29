@@ -1,9 +1,26 @@
 "use client"
 
-import { useState, useEffect, useId } from "react"
+import { useState, useId, useSyncExternalStore } from "react"
 import Modal from "@/components/Modal"
 
 const WELCOME_SEEN_KEY = "family_legacy_welcome_seen"
+
+// Subscribe to the welcome-seen flag in localStorage. We don't actually need
+// cross-tab sync (the flag is set once and never cleared during a session), so
+// the subscriber is a no-op. Routing the read through useSyncExternalStore
+// avoids the React 19 set-state-in-effect anti-pattern while staying SSR-safe.
+function subscribeWelcomeSeen() {
+  return () => {}
+}
+
+function getWelcomeSeenSnapshot(): boolean {
+  if (typeof window === "undefined") return true
+  return window.localStorage.getItem(WELCOME_SEEN_KEY) !== null
+}
+
+function getWelcomeSeenServerSnapshot(): boolean {
+  return true
+}
 
 const steps = [
   {
@@ -49,21 +66,22 @@ const steps = [
 ]
 
 export default function WelcomeModal() {
-  const [visible, setVisible] = useState(false)
+  const seen = useSyncExternalStore(
+    subscribeWelcomeSeen,
+    getWelcomeSeenSnapshot,
+    getWelcomeSeenServerSnapshot,
+  )
+  const [dismissed, setDismissed] = useState(false)
   const [step, setStep] = useState(0)
   const titleId = useId()
 
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    const seen = localStorage.getItem(WELCOME_SEEN_KEY)
-    if (!seen) {
-      setVisible(true)
-    }
-  }, [])
+  const visible = !seen && !dismissed
 
   const dismiss = () => {
-    localStorage.setItem(WELCOME_SEEN_KEY, "1")
-    setVisible(false)
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(WELCOME_SEEN_KEY, "1")
+    }
+    setDismissed(true)
   }
 
   const next = () => {
