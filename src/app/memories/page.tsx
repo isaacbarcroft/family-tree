@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useAuth } from "@/components/AuthProvider"
 import { listMemories, updateMemory, deleteMemory } from "@/lib/db"
 import type { Memory } from "@/models/Memory"
@@ -30,7 +30,7 @@ export default function MemoriesPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const { user } = useAuth()
 
-  const fetchPeopleForMemories = async (memData: Memory[]) => {
+  const fetchPeopleForMemories = useCallback(async (memData: Memory[]) => {
     const allPeopleIds = Array.from(new Set(memData.flatMap((m) => m.peopleIds)))
     if (allPeopleIds.length > 0) {
       const { data: people } = await supabase
@@ -47,9 +47,9 @@ export default function MemoriesPage() {
         })
       }
     }
-  }
+  }, [])
 
-  const fetchMemories = async (pageNum = 1, replace = true) => {
+  const fetchMemories = useCallback(async (pageNum = 1, replace = true) => {
     try {
       const result = await listMemories({ page: pageNum, pageSize: PAGE_SIZE.MEMORIES, paginate: true })
       const data = result.data
@@ -63,11 +63,11 @@ export default function MemoriesPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [fetchPeopleForMemories])
 
   useEffect(() => {
     fetchMemories()
-  }, [])
+  }, [fetchMemories])
 
   const hasMore = total !== null && memories.length < total
 

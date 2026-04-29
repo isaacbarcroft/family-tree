@@ -1,71 +1,115 @@
 "use client"
 
-import { Suspense, useEffect, useState } from "react"
+import {
+  Suspense,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import Link from "next/link"
 
+const INVALID_LINK_MESSAGE = "Invalid or expired reset link. Please request a new one."
+const TOKEN_PARSE_FAILURE_MESSAGE = "Failed to process reset token. Please request a new link."
+
+interface RecoverySession {
+  access_token: string
+  refresh_token: string | undefined
+  user: { id: unknown; email: unknown }
+}
+
+type HashParseResult =
+  | { kind: "pending" }
+  | { kind: "error"; message: string }
+  | { kind: "ok"; session: RecoverySession }
+
+function subscribeHash(callback: () => void): () => void {
+  if (typeof window === "undefined") return () => {}
+  window.addEventListener("hashchange", callback)
+  return () => window.removeEventListener("hashchange", callback)
+}
+
+function getHashSnapshot(): string {
+  if (typeof window === "undefined") return ""
+  return window.location.hash
+}
+
+function getHashServerSnapshot(): string {
+  return ""
+}
+
+// Parse the recovery hash Supabase sends with the email link, e.g.
+// `#access_token=...&type=recovery&refresh_token=...`. Pure function so it can
+// run during render — no setState-in-effect cascade.
+export function parseRecoveryHash(rawHash: string): HashParseResult {
+  if (typeof window === "undefined") return { kind: "pending" }
+
+  const hash = rawHash.startsWith("#") ? rawHash.slice(1) : rawHash
+  if (!hash) return { kind: "error", message: INVALID_LINK_MESSAGE }
+
+  const params = new URLSearchParams(hash)
+  const accessToken = params.get("access_token")
+  const refreshToken = params.get("refresh_token")
+  const type = params.get("type")
+
+  if (type !== "recovery" || !accessToken) {
+    return { kind: "error", message: INVALID_LINK_MESSAGE }
+  }
+
+  try {
+    const payload = JSON.parse(atob(accessToken.split(".")[1]))
+    return {
+      kind: "ok",
+      session: {
+        access_token: accessToken,
+        refresh_token: refreshToken || undefined,
+        user: { id: payload.sub, email: payload.email },
+      },
+    }
+  } catch {
+    return { kind: "error", message: TOKEN_PARSE_FAILURE_MESSAGE }
+  }
+}
+
 function ResetPasswordContent() {
   const [password, setPassword] = useState("")
   const [confirm, setConfirm] = useState("")
-  const [error, setError] = useState("")
+  const [submitError, setSubmitError] = useState("")
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
-  const [sessionReady, setSessionReady] = useState(false)
   const router = useRouter()
 
+  const rawHash = useSyncExternalStore(subscribeHash, getHashSnapshot, getHashServerSnapshot)
+  const parsed = useMemo(() => parseRecoveryHash(rawHash), [rawHash])
+  const sessionReady = parsed.kind === "ok"
+  const hashError = parsed.kind === "error" ? parsed.message : ""
+  const error = submitError || hashError
+
+  // Persist the recovery session to localStorage so `supabase.auth.updateUser`
+  // can find it. Lives in an effect because it's a write-side side effect, not
+  // a state update.
   useEffect(() => {
-    // Supabase sends the recovery token as a hash fragment: #access_token=...&type=recovery
+    if (parsed.kind !== "ok") return
     if (typeof window === "undefined") return
-
-    const hash = window.location.hash.substring(1)
-    if (!hash) {
-      setError("Invalid or expired reset link. Please request a new one.")
-      return
-    }
-
-    const params = new URLSearchParams(hash)
-    const accessToken = params.get("access_token")
-    const refreshToken = params.get("refresh_token")
-    const type = params.get("type")
-
-    if (type !== "recovery" || !accessToken) {
-      setError("Invalid or expired reset link. Please request a new one.")
-      return
-    }
-
-    // Store the recovery session so updateUser can use it
-    try {
-      const payload = JSON.parse(atob(accessToken.split(".")[1]))
-      const session = {
-        access_token: accessToken,
-        refresh_token: refreshToken || undefined,
-        user: {
-          id: payload.sub,
-          email: payload.email,
-        },
-      }
-      window.localStorage.setItem(
-        "family_tree_supabase_session",
-        JSON.stringify(session)
-      )
-      setSessionReady(true)
-    } catch {
-      setError("Failed to process reset token. Please request a new link.")
-    }
-  }, [])
+    window.localStorage.setItem(
+      "family_tree_supabase_session",
+      JSON.stringify(parsed.session),
+    )
+  }, [parsed])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError("")
+    setSubmitError("")
 
     if (password.length < 6) {
-      setError("Password must be at least 6 characters")
+      setSubmitError("Password must be at least 6 characters")
       return
     }
 
     if (password !== confirm) {
-      setError("Passwords do not match")
+      setSubmitError("Passwords do not match")
       return
     }
 
@@ -78,7 +122,7 @@ function ResetPasswordContent() {
     setLoading(false)
 
     if (updateError) {
-      setError(updateError.message)
+      setSubmitError(updateError.message)
       return
     }
 

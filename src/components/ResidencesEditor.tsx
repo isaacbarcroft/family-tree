@@ -197,13 +197,19 @@ function ResidenceRow({ residence, onPatch, onRemove }: RowProps) {
   const [dateFrom, setDateFrom] = useState(residence.dateFrom ?? "")
   const [dateTo, setDateTo] = useState(residence.dateTo ?? "")
   const [label, setLabel] = useState(residence.label ?? "")
+  const [prevResidence, setPrevResidence] = useState(residence)
 
-  useEffect(() => {
+  // When the caller swaps the residence (e.g. another save updated this row),
+  // re-sync the inputs. Doing it during render avoids the cascading re-render
+  // a useEffect would cause; matches the pattern used in MemoryImage /
+  // ProfileAvatar.
+  if (residence !== prevResidence) {
+    setPrevResidence(residence)
     setRawPlace(residence.rawPlace)
     setDateFrom(residence.dateFrom ?? "")
     setDateTo(residence.dateTo ?? "")
     setLabel(residence.label ?? "")
-  }, [residence])
+  }
 
   const commit = (field: keyof Residence, current: string, initial: string | null | undefined) => {
     const normalized = current.trim() === "" ? null : current.trim()

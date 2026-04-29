@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useAuth } from "@/components/AuthProvider"
 import { listEvents, updateEvent, deleteEvent } from "@/lib/db"
 import type { Event } from "@/models/Event"
@@ -29,7 +29,7 @@ export default function EventsPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const { user } = useAuth()
 
-  const fetchPeopleForEvents = async (eventData: Event[]) => {
+  const fetchPeopleForEvents = useCallback(async (eventData: Event[]) => {
     const allPeopleIds = Array.from(new Set(eventData.flatMap((e) => e.peopleIds)))
     if (allPeopleIds.length > 0) {
       const { data: people } = await supabase
@@ -46,9 +46,9 @@ export default function EventsPage() {
         })
       }
     }
-  }
+  }, [])
 
-  const fetchEvents = async (pageNum = 1, replace = true) => {
+  const fetchEvents = useCallback(async (pageNum = 1, replace = true) => {
     try {
       const result = await listEvents({ page: pageNum, pageSize: PAGE_SIZE.EVENTS, paginate: true })
       const data = result.data
@@ -62,11 +62,11 @@ export default function EventsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [fetchPeopleForEvents])
 
   useEffect(() => {
     fetchEvents()
-  }, [])
+  }, [fetchEvents])
 
   const hasMore = total !== null && events.length < total
 
