@@ -38,6 +38,7 @@ export default function AddEventModal({ onClose, onCreated }: AddEventModalProps
       .from("people")
       .select("*")
       .ilike("searchName", `${term}%`)
+      .is("deletedAt", null)
       .limit(8)
       .then(({ data, error: err }) => {
         if (err) return

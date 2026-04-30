@@ -30,7 +30,9 @@ vi.mock("@/lib/supabase", () => ({
     from: () => ({
       select: () => ({
         ilike: () => ({
-          limit: () => Promise.resolve(nextSearchResult),
+          is: () => ({
+            limit: () => Promise.resolve(nextSearchResult),
+          }),
         }),
       }),
     }),
