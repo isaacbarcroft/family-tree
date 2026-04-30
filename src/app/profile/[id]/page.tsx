@@ -12,6 +12,7 @@ import ProtectedRoute from "@/components/ProtectedRoute"
 import {
   getPersonById,
   listPeople,
+  listReactionsForMemories,
   savePerson,
   updatePerson,
   listEventsForPerson,
@@ -24,12 +25,14 @@ import {
 import type { Person } from "@/models/Person"
 import type { Event } from "@/models/Event"
 import type { Memory } from "@/models/Memory"
+import type { MemoryReaction } from "@/models/MemoryReaction"
 import type { Relationship } from "@/models/Relationship"
 import AddMemoryModal from "@/components/AddMemoryModal"
 import { useAuth } from "@/components/AuthProvider"
 import { ProfileAvatar } from "@/components/ProfileAvatar"
 import { MemoryImage } from "@/components/MemoryImage"
 import AudioPlayer from "@/components/AudioPlayer"
+import MemoryReactions from "@/components/MemoryReactions"
 import { uploadProfilePhoto } from "@/lib/storage"
 import { v4 as uuidv4 } from "uuid"
 import Link from "next/link"
@@ -70,6 +73,7 @@ function ProfileContent() {
   const [person, setPerson] = useState<Person | null>(null)
   const [events, setEvents] = useState<Event[]>([])
   const [memories, setMemories] = useState<Memory[]>([])
+  const [reactionsByMemory, setReactionsByMemory] = useState<Map<string, MemoryReaction[]>>(new Map())
   const [personFamilies, setPersonFamilies] = useState<
     import("@/models/Family").Family[]
   >([])
@@ -112,6 +116,22 @@ function ProfileContent() {
         setPersonFamilies(families)
         setRelationships(rels)
         setAllPeople(peopleList)
+        if (personMemories.length > 0) {
+          try {
+            const reactions = await listReactionsForMemories(
+              personMemories.map((m) => m.id)
+            )
+            const map = new Map<string, MemoryReaction[]>()
+            for (const m of personMemories) map.set(m.id, [])
+            for (const r of reactions) {
+              const list = map.get(r.memoryId)
+              if (list) list.push(r)
+            }
+            setReactionsByMemory(map)
+          } catch (reactionsErr) {
+            console.error("Failed to load reactions", reactionsErr)
+          }
+        }
       } catch (err: unknown) {
         console.error(err)
         setError("Unable to load this page.")
@@ -717,6 +737,20 @@ function ProfileContent() {
                             />
                           </div>
                         )}
+                        <div className="mt-2">
+                          <MemoryReactions
+                            memoryId={m.id}
+                            reactions={reactionsByMemory.get(m.id) ?? []}
+                            currentUserId={user?.id ?? null}
+                            onChange={(next) => {
+                              setReactionsByMemory((prev) => {
+                                const map = new Map(prev)
+                                map.set(m.id, next)
+                                return map
+                              })
+                            }}
+                          />
+                        </div>
                       </div>
                     </div>
                   ))}

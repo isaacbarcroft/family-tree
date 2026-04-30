@@ -2,6 +2,7 @@ import { supabase, getAccessToken } from "./supabase"
 import type { Person } from "@/models/Person"
 import type { Event } from "@/models/Event"
 import type { Memory } from "@/models/Memory"
+import type { MemoryReaction } from "@/models/MemoryReaction"
 import type { Relationship } from "@/models/Relationship"
 import type { GeocodedPlace } from "@/models/GeocodedPlace"
 import type { Residence } from "@/models/Residence"
@@ -450,6 +451,50 @@ export async function deleteMemory(id: string) {
 
 export async function deleteFamily(id: string) {
   const { error } = await supabase.from("families").delete().eq("id", id)
+  if (error) throw error
+}
+
+// ---- Memory reactions ----
+
+export async function listReactionsForMemories(memoryIds: string[]): Promise<MemoryReaction[]> {
+  if (memoryIds.length === 0) return []
+
+  const { data, error } = await supabase
+    .from("memory_reactions")
+    .select("*")
+    .in("memoryId", memoryIds)
+
+  if (error) throw error
+  return (data ?? []) as MemoryReaction[]
+}
+
+export async function addReaction(
+  memoryId: string,
+  userId: string,
+  emoji: string
+): Promise<MemoryReaction> {
+  const { data, error } = await supabase
+    .from("memory_reactions")
+    .insert({ memoryId, userId, emoji })
+    .select("*")
+    .single()
+
+  if (error) throw error
+  return data as MemoryReaction
+}
+
+export async function removeReaction(
+  memoryId: string,
+  userId: string,
+  emoji: string
+): Promise<void> {
+  const { error } = await supabase
+    .from("memory_reactions")
+    .delete()
+    .eq("memoryId", memoryId)
+    .eq("userId", userId)
+    .eq("emoji", emoji)
+
   if (error) throw error
 }
 
