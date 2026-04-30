@@ -37,6 +37,7 @@ export default function MemoriesPage() {
         .from("people")
         .select("*")
         .in("id", allPeopleIds)
+        .is("deletedAt", null)
       if (people) {
         setPeopleMap((prev) => {
           const map = new Map(prev)

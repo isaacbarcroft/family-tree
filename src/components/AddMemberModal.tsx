@@ -62,6 +62,7 @@ const AddMemberModal = ({ onClose, currentPersonId, onLinked }: AddMemberModalPr
         .from("people")
         .select("*")
         .ilike("searchName", `${term}%`)
+        .is("deletedAt", null)
         .limit(10)
 
       if (error) {

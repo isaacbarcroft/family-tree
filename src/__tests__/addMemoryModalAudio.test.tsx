@@ -27,10 +27,14 @@ vi.mock("@/lib/supabase", () => ({
     from: () => ({
       select: () => ({
         eq: () => ({
-          single: () => Promise.resolve({ data: null, error: null }),
+          is: () => ({
+            single: () => Promise.resolve({ data: null, error: null }),
+          }),
         }),
         ilike: () => ({
-          limit: () => Promise.resolve({ data: [], error: null }),
+          is: () => ({
+            limit: () => Promise.resolve({ data: [], error: null }),
+          }),
         }),
       }),
     }),

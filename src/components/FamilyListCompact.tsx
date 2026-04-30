@@ -19,7 +19,11 @@ const FamilyListCompact = ({ ids = [] }: FamilyListCompactProps) => {
         return
       }
 
-      const { data, error } = await supabase.from("families").select("*").in("id", ids)
+      const { data, error } = await supabase
+        .from("families")
+        .select("*")
+        .in("id", ids)
+        .is("deletedAt", null)
       if (error) {
         console.error("Failed to load families", error)
         setFamilies([])

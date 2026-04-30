@@ -6,4 +6,5 @@ export interface Family {
   members?: string[]
   createdBy: string
   createdAt: string
+  deletedAt?: string | null
 }
