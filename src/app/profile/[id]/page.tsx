@@ -30,6 +30,7 @@ import { useAuth } from "@/components/AuthProvider"
 import { ProfileAvatar } from "@/components/ProfileAvatar"
 import { MemoryImage } from "@/components/MemoryImage"
 import AudioPlayer from "@/components/AudioPlayer"
+import MemoryReactions from "@/components/MemoryReactions"
 import { uploadProfilePhoto } from "@/lib/storage"
 import { v4 as uuidv4 } from "uuid"
 import Link from "next/link"
@@ -717,6 +718,7 @@ function ProfileContent() {
                             />
                           </div>
                         )}
+                        <MemoryReactions memoryId={m.id} className="mt-2" />
                       </div>
                     </div>
                   ))}

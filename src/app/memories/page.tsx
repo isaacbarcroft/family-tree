@@ -13,6 +13,7 @@ import Link from "next/link"
 import { SkeletonLine, SkeletonCard } from "@/components/SkeletonLoader"
 import { MemoryImage } from "@/components/MemoryImage"
 import AudioPlayer from "@/components/AudioPlayer"
+import MemoryReactions from "@/components/MemoryReactions"
 import { PAGE_SIZE } from "@/config/constants"
 
 export default function MemoriesPage() {
@@ -309,6 +310,10 @@ export default function MemoriesPage() {
                                 })}
                               </div>
                             )}
+
+                            <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+                              <MemoryReactions memoryId={m.id} />
+                            </div>
                           </>
                         )}
                       </>

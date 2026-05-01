@@ -2,6 +2,8 @@ import { supabase, getAccessToken } from "./supabase"
 import type { Person } from "@/models/Person"
 import type { Event } from "@/models/Event"
 import type { Memory } from "@/models/Memory"
+import type { MemoryReaction } from "@/models/MemoryReaction"
+import type { ReactionEmoji } from "@/constants/reactions"
 import type { Relationship } from "@/models/Relationship"
 import type { GeocodedPlace } from "@/models/GeocodedPlace"
 import type { Residence } from "@/models/Residence"
@@ -470,6 +472,58 @@ export async function listEventsForPerson(personId: string) {
     .order("date", { ascending: true })
   if (error) throw error
   return (data ?? []) as Event[]
+}
+
+// ---- Memory reactions ----
+export async function listReactionsForMemory(memoryId: string): Promise<MemoryReaction[]> {
+  const { data, error } = await supabase
+    .from("memory_reactions")
+    .select("*")
+    .eq("memoryId", memoryId)
+  if (error) throw error
+  return (data ?? []) as MemoryReaction[]
+}
+
+export async function listReactionsForMemories(memoryIds: string[]): Promise<MemoryReaction[]> {
+  if (memoryIds.length === 0) return []
+  const { data, error } = await supabase
+    .from("memory_reactions")
+    .select("*")
+    .in("memoryId", memoryIds)
+  if (error) throw error
+  return (data ?? []) as MemoryReaction[]
+}
+
+export async function addReaction(input: {
+  memoryId: string
+  userId: string
+  emoji: ReactionEmoji
+}): Promise<MemoryReaction> {
+  const { data, error } = await supabase
+    .from("memory_reactions")
+    .insert({
+      memoryId: input.memoryId,
+      userId: input.userId,
+      emoji: input.emoji,
+    })
+    .select("*")
+    .single()
+  if (error) throw error
+  return data as MemoryReaction
+}
+
+export async function removeReaction(input: {
+  memoryId: string
+  userId: string
+  emoji: ReactionEmoji
+}): Promise<void> {
+  const { error } = await supabase
+    .from("memory_reactions")
+    .delete()
+    .eq("memoryId", input.memoryId)
+    .eq("userId", input.userId)
+    .eq("emoji", input.emoji)
+  if (error) throw error
 }
 
 // ---- Relationships ----
