@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase"
 import { RELATIONSHIP_SUBTYPES, MARRIAGE_STATUSES } from "@/constants/enums"
 import Modal from "@/components/Modal"
 import { getErrorMessage } from "@/utils/errorMessage"
+import { escapeLikePattern } from "@/utils/likeEscape"
 
 interface AddMemberModalProps {
   onClose: () => void
@@ -57,7 +58,7 @@ const AddMemberModal = ({ onClose, currentPersonId, onLinked }: AddMemberModalPr
 
     debounceRef.current = setTimeout(async () => {
       setLoading(true)
-      const term = search.toLowerCase()
+      const term = escapeLikePattern(search.toLowerCase())
       const { data, error } = await supabase
         .from("people")
         .select("*")

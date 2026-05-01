@@ -7,6 +7,7 @@ import type { ReactionEmoji } from "@/constants/reactions"
 import type { Relationship } from "@/models/Relationship"
 import type { GeocodedPlace } from "@/models/GeocodedPlace"
 import type { Residence } from "@/models/Residence"
+import { escapeLikePattern } from "@/utils/likeEscape"
 
 function buildSearchName(firstName?: string, middleName?: string, lastName?: string) {
   return [firstName, middleName, lastName].filter(Boolean).join(" ").toLowerCase().trim()
@@ -115,11 +116,13 @@ async function autoLinkToFamilyByLastName(person: Person) {
   const lastName = person.lastName.trim()
   if (!lastName) return
 
-  // Check if a family with this last name already exists
+  // Check if a family with this last name already exists. Use ilike for
+  // case-insensitive equality and escape special chars so a surname like
+  // "O_Brien" or "100%" is matched literally instead of as a wildcard.
   const { data: familiesRaw } = await supabase
     .from("families")
     .select("*")
-    .ilike("name", lastName)
+    .ilike("name", escapeLikePattern(lastName))
     .is("deletedAt", null)
     .limit(1)
 

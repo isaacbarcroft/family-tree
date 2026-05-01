@@ -2,6 +2,7 @@ import { supabase } from "@/lib/supabase"
 import type { AppUser } from "@/lib/supabase"
 import type { Person } from "@/models/Person"
 import { linkPersonToFamily } from "@/lib/db"
+import { escapeLikePattern } from "@/utils/likeEscape"
 
 function buildSearchName(firstName?: string, middleName?: string, lastName?: string) {
   return [firstName, middleName, lastName].filter(Boolean).join(" ").toLowerCase().trim()
@@ -104,11 +105,13 @@ export async function getOrCreatePersonForUser(user: AppUser) {
   }
 
   if (!claimable && firstName && lastName) {
+    // Case-insensitive exact match; escape so "_" / "%" / "*" / "\" in the
+    // signup name aren't interpreted as LIKE wildcards.
     const { data: byName } = await supabase
       .from("people")
       .select("*")
-      .ilike("firstName", firstName)
-      .ilike("lastName", lastName)
+      .ilike("firstName", escapeLikePattern(firstName))
+      .ilike("lastName", escapeLikePattern(lastName))
       .is("userId", null)
       .is("deletedAt", null)
       .limit(1)

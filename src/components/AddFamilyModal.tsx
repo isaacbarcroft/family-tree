@@ -6,6 +6,7 @@ import type { Family } from "@/models/Family"
 import { useAuth } from "@/components/AuthProvider"
 import { supabase } from "@/lib/supabase"
 import { getErrorMessage } from "@/utils/errorMessage"
+import { escapeLikePattern } from "@/utils/likeEscape"
 import Modal from "@/components/Modal"
 
 interface AddFamilyModalProps {
@@ -40,7 +41,7 @@ const AddFamilyModal = ({
 
     debounceRef.current = setTimeout(async () => {
       setLoading(true)
-      const term = search.trim()
+      const term = escapeLikePattern(search.trim())
       const { data, error: queryError } = await supabase
         .from("families")
         .select("*")
