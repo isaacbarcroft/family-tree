@@ -120,6 +120,7 @@ async function autoLinkToFamilyByLastName(person: Person) {
     .from("families")
     .select("*")
     .ilike("name", lastName)
+    .is("deletedAt", null)
     .limit(1)
 
   const families = (familiesRaw ?? []) as { id: string }[]
@@ -171,6 +172,7 @@ export async function listPeople(options?: PaginationOptions & { paginate?: bool
     const { data, error, count } = await supabase
       .from("people")
       .select("*")
+      .is("deletedAt", null)
       .order("lastName", { ascending: true })
       .range(from, to)
 
@@ -178,7 +180,10 @@ export async function listPeople(options?: PaginationOptions & { paginate?: bool
     return { data: (data ?? []) as Person[], total: count, page, pageSize }
   }
 
-  const { data, error } = await supabase.from("people").select("*")
+  const { data, error } = await supabase
+    .from("people")
+    .select("*")
+    .is("deletedAt", null)
   if (error) throw error
   return (data ?? []) as Person[]
 }
@@ -188,6 +193,7 @@ export async function getPersonById(id: string) {
     .from("people")
     .select("*")
     .eq("id", id)
+    .is("deletedAt", null)
     .maybeSingle()
 
   if (error) throw error
@@ -205,6 +211,7 @@ export async function listPeopleByIds(ids: string[]): Promise<Person[]> {
     .from("people")
     .select("*")
     .in("id", ids)
+    .is("deletedAt", null)
 
   if (error) throw error
   return sortByIds((data ?? []) as Person[], ids, (p) => p.id)
@@ -262,6 +269,7 @@ export async function listFamiliesForPerson(personId: string) {
     .from("families")
     .select("*")
     .contains("members", [personId])
+    .is("deletedAt", null)
 
   if (error) throw error
   return (data ?? []) as import("@/models/Family").Family[]
@@ -287,70 +295,16 @@ export async function unlinkSpouses(personAId: string, personBId: string) {
   await removeFromArray("people", personBId, "spouseIds", personAId)
 }
 
+// Soft-delete: set `deletedAt` instead of removing the row. Bi-directional
+// references in parent/child/spouse/family.members arrays are intentionally
+// left untouched so a future restore is a single column reset. Reads filter
+// `deletedAt is null`, so dangling references resolve to "missing" naturally
+// (treeBuilder, listPeopleByIds, etc. already handle that).
 export async function deletePerson(id: string) {
-  // Clean up bi-directional references before deleting the row itself.
-  // Fetch affected people/families in one query each, compute the
-  // updated arrays client-side, then batch-upsert — avoids the N+1
-  // SELECT+UPDATE pattern that grew linearly with the number of
-  // relationships.
-  const person = await getPersonById(id)
-
-  if (person) {
-    const relatedPersonIds = Array.from(
-      new Set([
-        ...(person.parentIds ?? []),
-        ...(person.childIds ?? []),
-        ...(person.spouseIds ?? []),
-      ])
-    )
-    const familyIds = person.familyIds ?? []
-
-    if (relatedPersonIds.length > 0) {
-      const { data, error } = await supabase
-        .from("people")
-        .select("*")
-        .in("id", relatedPersonIds)
-      if (error) throw error
-
-      const peopleUpdates = ((data ?? []) as Person[]).map((p) => ({
-        id: p.id,
-        parentIds: (p.parentIds ?? []).filter((pid) => pid !== id),
-        childIds: (p.childIds ?? []).filter((cid) => cid !== id),
-        spouseIds: (p.spouseIds ?? []).filter((sid) => sid !== id),
-      }))
-
-      if (peopleUpdates.length > 0) {
-        const { error: updateError } = await supabase
-          .from("people")
-          .upsert(peopleUpdates, { onConflict: "id" })
-        if (updateError) throw updateError
-      }
-    }
-
-    if (familyIds.length > 0) {
-      const { data, error } = await supabase
-        .from("families")
-        .select("*")
-        .in("id", familyIds)
-      if (error) throw error
-
-      const familyUpdates = (
-        (data ?? []) as import("@/models/Family").Family[]
-      ).map((f) => ({
-        id: f.id,
-        members: (f.members ?? []).filter((mid) => mid !== id),
-      }))
-
-      if (familyUpdates.length > 0) {
-        const { error: updateError } = await supabase
-          .from("families")
-          .upsert(familyUpdates, { onConflict: "id" })
-        if (updateError) throw updateError
-      }
-    }
-  }
-
-  const { error } = await supabase.from("people").delete().eq("id", id)
+  const { error } = await supabase
+    .from("people")
+    .update({ deletedAt: new Date().toISOString() })
+    .eq("id", id)
   if (error) throw error
 }
 
@@ -378,6 +332,7 @@ export async function listEvents(options?: PaginationOptions & { paginate?: bool
     const { data, error, count } = await supabase
       .from("events")
       .select("*")
+      .is("deletedAt", null)
       .order("date", { ascending: true })
       .range(from, to)
 
@@ -388,6 +343,7 @@ export async function listEvents(options?: PaginationOptions & { paginate?: bool
   const { data, error } = await supabase
     .from("events")
     .select("*")
+    .is("deletedAt", null)
     .order("date", { ascending: true })
 
   if (error) throw error
@@ -400,7 +356,10 @@ export async function updateEvent(id: string, updates: Partial<Event>) {
 }
 
 export async function deleteEvent(id: string) {
-  const { error } = await supabase.from("events").delete().eq("id", id)
+  const { error } = await supabase
+    .from("events")
+    .update({ deletedAt: new Date().toISOString() })
+    .eq("id", id)
   if (error) throw error
 }
 
@@ -428,6 +387,7 @@ export async function listMemories(options?: PaginationOptions & { paginate?: bo
     const { data, error, count } = await supabase
       .from("memories")
       .select("*")
+      .is("deletedAt", null)
       .order("date", { ascending: false })
       .range(from, to)
 
@@ -435,7 +395,10 @@ export async function listMemories(options?: PaginationOptions & { paginate?: bo
     return { data: (data ?? []) as Memory[], total: count, page, pageSize }
   }
 
-  const { data, error } = await supabase.from("memories").select("*")
+  const { data, error } = await supabase
+    .from("memories")
+    .select("*")
+    .is("deletedAt", null)
   if (error) throw error
   return (data ?? []) as Memory[]
 }
@@ -446,12 +409,18 @@ export async function updateMemory(id: string, updates: Partial<Memory>) {
 }
 
 export async function deleteMemory(id: string) {
-  const { error } = await supabase.from("memories").delete().eq("id", id)
+  const { error } = await supabase
+    .from("memories")
+    .update({ deletedAt: new Date().toISOString() })
+    .eq("id", id)
   if (error) throw error
 }
 
 export async function deleteFamily(id: string) {
-  const { error } = await supabase.from("families").delete().eq("id", id)
+  const { error } = await supabase
+    .from("families")
+    .update({ deletedAt: new Date().toISOString() })
+    .eq("id", id)
   if (error) throw error
 }
 
@@ -467,6 +436,7 @@ export async function listFamilies(options?: PaginationOptions & { paginate?: bo
     const { data, error, count } = await supabase
       .from("families")
       .select("*")
+      .is("deletedAt", null)
       .order("name", { ascending: true })
       .range(from, to)
 
@@ -477,6 +447,7 @@ export async function listFamilies(options?: PaginationOptions & { paginate?: bo
   const { data, error } = await supabase
     .from("families")
     .select("*")
+    .is("deletedAt", null)
     .order("name", { ascending: true })
   if (error) throw error
   return (data ?? []) as import("@/models/Family").Family[]
@@ -487,6 +458,7 @@ export async function listMemoriesForPerson(personId: string) {
     .from("memories")
     .select("*")
     .contains("peopleIds", [personId])
+    .is("deletedAt", null)
   if (error) throw error
   return (data ?? []) as Memory[]
 }
@@ -496,6 +468,7 @@ export async function listEventsForPerson(personId: string) {
     .from("events")
     .select("*")
     .contains("peopleIds", [personId])
+    .is("deletedAt", null)
     .order("date", { ascending: true })
   if (error) throw error
   return (data ?? []) as Event[]

@@ -29,4 +29,5 @@ export interface Person {
   searchName?: string
   deathPlace?: string
   familyIds?: string[]
+  deletedAt?: string | null
 }
