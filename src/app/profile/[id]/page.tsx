@@ -6,7 +6,7 @@ function ensureProtocol(url: string): string {
   return `https://${url}`
 }
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import ProtectedRoute from "@/components/ProtectedRoute"
 import {
@@ -17,6 +17,7 @@ import {
   listEventsForPerson,
   listMemoriesForPerson,
   listFamiliesForPerson,
+  listReactionsForMemories,
   listRelationshipsForPerson,
   unlinkParentChild,
   unlinkSpouses,
@@ -24,6 +25,7 @@ import {
 import type { Person } from "@/models/Person"
 import type { Event } from "@/models/Event"
 import type { Memory } from "@/models/Memory"
+import type { MemoryReaction } from "@/models/MemoryReaction"
 import type { Relationship } from "@/models/Relationship"
 import AddMemoryModal from "@/components/AddMemoryModal"
 import { useAuth } from "@/components/AuthProvider"
@@ -43,6 +45,7 @@ import { convertHeicToJpeg, isHeicFile, isHeicFileByMagic } from "@/utils/heic"
 import { formatDate } from "@/utils/dates"
 import { getErrorMessage } from "@/utils/errorMessage"
 import { findRelationship } from "@/utils/relationship"
+import { groupReactionsByMemoryId } from "@/utils/groupReactions"
 
 const obituaryKeywords = ["obituary", "obituaries", "legacy", "memorial"]
 
@@ -71,6 +74,9 @@ function ProfileContent() {
   const [person, setPerson] = useState<Person | null>(null)
   const [events, setEvents] = useState<Event[]>([])
   const [memories, setMemories] = useState<Memory[]>([])
+  const [reactionsByMemoryId, setReactionsByMemoryId] = useState<
+    Map<string, MemoryReaction[]>
+  >(new Map())
   const [personFamilies, setPersonFamilies] = useState<
     import("@/models/Family").Family[]
   >([])
@@ -94,6 +100,28 @@ function ProfileContent() {
     if (searchParams.get("edit") === "true") setEditing(true)
   }, [searchParams])
 
+  // Bulk-fetch reactions for a list of memories in a single PostgREST round
+  // trip, then group by memoryId. Avoids the per-tile N+1 the MemoryReactions
+  // component would otherwise issue when initialReactions is omitted.
+  const loadReactionsFor = useCallback(
+    async (mems: Memory[]): Promise<Map<string, MemoryReaction[]>> => {
+      const ids = mems.map((m) => m.id)
+      if (ids.length === 0) return groupReactionsByMemoryId(ids, [])
+      const rows = await listReactionsForMemories(ids).catch(
+        () => [] as MemoryReaction[]
+      )
+      return groupReactionsByMemoryId(ids, rows)
+    },
+    []
+  )
+
+  const refreshMemoriesAndReactions = useCallback(async () => {
+    const mems = await listMemoriesForPerson(personId)
+    setMemories(mems)
+    const grouped = await loadReactionsFor(mems)
+    setReactionsByMemoryId(grouped)
+  }, [personId, loadReactionsFor])
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -113,6 +141,8 @@ function ProfileContent() {
         setPersonFamilies(families)
         setRelationships(rels)
         setAllPeople(peopleList)
+        const grouped = await loadReactionsFor(personMemories)
+        setReactionsByMemoryId(grouped)
       } catch (err: unknown) {
         console.error(err)
         setError("Unable to load this page.")
@@ -121,7 +151,7 @@ function ProfileContent() {
       }
     }
     fetchData()
-  }, [personId])
+  }, [personId, loadReactionsFor])
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -718,7 +748,11 @@ function ProfileContent() {
                             />
                           </div>
                         )}
-                        <MemoryReactions memoryId={m.id} className="mt-2" />
+                        <MemoryReactions
+                          memoryId={m.id}
+                          initialReactions={reactionsByMemoryId.get(m.id) ?? []}
+                          className="mt-2"
+                        />
                       </div>
                     </div>
                   ))}
@@ -749,10 +783,7 @@ function ProfileContent() {
       {showMemoryModal && (
         <AddMemoryModal
           onClose={() => setShowMemoryModal(false)}
-          onCreated={async () => {
-            const m = await listMemoriesForPerson(personId)
-            setMemories(m)
-          }}
+          onCreated={refreshMemoriesAndReactions}
           preTaggedPersonId={person.id}
         />
       )}
