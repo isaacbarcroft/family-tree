@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase"
 import { useState, useEffect, useRef } from "react"
 import type { Person } from "@/models/Person"
 import type { Family } from "@/models/Family"
+import { escapeLikePattern } from "@/utils/likeEscape"
 
 type NavLink = { href: string; label: string; icon: React.ReactNode }
 
@@ -114,7 +115,7 @@ export default function NavBar() {
 
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(async () => {
-      const term = search.toLowerCase()
+      const term = escapeLikePattern(search.toLowerCase())
       const [{ data: people }, { data: families }] = await Promise.all([
         supabase.from("people").select("*").ilike("searchName", `%${term}%`).limit(5),
         supabase.from("families").select("*").ilike("name", `%${term}%`).limit(3),

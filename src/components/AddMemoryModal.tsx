@@ -9,6 +9,7 @@ import type { Person } from "@/models/Person"
 import { convertHeicToJpeg, isHeicFile, isHeicFileByMagic } from "@/utils/heic"
 import { formatDuration } from "@/utils/duration"
 import { getErrorMessage } from "@/utils/errorMessage"
+import { escapeLikePattern } from "@/utils/likeEscape"
 import Modal from "@/components/Modal"
 
 interface AddMemoryModalProps {
@@ -67,7 +68,7 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
       setSearchResults([])
       return
     }
-    const term = search.toLowerCase()
+    const term = escapeLikePattern(search.toLowerCase())
     supabase
       .from("people")
       .select("*")
