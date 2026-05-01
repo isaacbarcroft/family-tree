@@ -117,8 +117,18 @@ export default function NavBar() {
     debounceRef.current = setTimeout(async () => {
       const term = escapeLikePattern(search.toLowerCase())
       const [{ data: people }, { data: families }] = await Promise.all([
-        supabase.from("people").select("*").ilike("searchName", `%${term}%`).limit(5),
-        supabase.from("families").select("*").ilike("name", `%${term}%`).limit(3),
+        supabase
+          .from("people")
+          .select("*")
+          .ilike("searchName", `%${term}%`)
+          .is("deletedAt", null)
+          .limit(5),
+        supabase
+          .from("families")
+          .select("*")
+          .ilike("name", `%${term}%`)
+          .is("deletedAt", null)
+          .limit(3),
       ])
 
       const results: { type: "person" | "family"; id: string; label: string }[] = []
@@ -145,6 +155,7 @@ export default function NavBar() {
       .from("people")
       .select("id")
       .eq("userId", user.id)
+      .is("deletedAt", null)
       .limit(1)
       .then(({ data }) => {
         if (cancelled) return

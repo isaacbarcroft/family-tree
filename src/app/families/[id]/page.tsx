@@ -38,6 +38,7 @@ export default function FamilyPage() {
           .from("families")
           .select("*")
           .eq("id", familyId)
+          .is("deletedAt", null)
           .single()
 
         if (familyError) throw familyError
@@ -52,6 +53,7 @@ export default function FamilyPage() {
           .from("people")
           .select("*")
           .in("id", fetchedFamily.members)
+          .is("deletedAt", null)
         if (peopleError) throw peopleError
         setMembers((peopleData ?? []) as Person[])
       } catch (err: unknown) {

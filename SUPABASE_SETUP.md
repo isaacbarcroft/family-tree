@@ -8,6 +8,8 @@ Run the SQL files in Supabase SQL Editor, in filename order:
 - `supabase/migrations/20260419_places.sql`
 - `supabase/migrations/20260419_residences.sql`
 - `supabase/migrations/20260423_app_users_rls_lockdown.sql`
+- `supabase/migrations/20260427_memory_audio.sql`
+- `supabase/migrations/20260430_soft_delete.sql`
 
 The initial migration creates:
 
@@ -84,3 +86,4 @@ In Supabase Dashboard:
 - With the `20260423_app_users_rls_lockdown` migration applied, only users in `public.app_users` can read or write data. Destructive mutations (update/delete) require the row creator or an admin.
 - Without that migration, policies allow any authenticated user to read/write every record. That is the legacy "MVP mode" from the initial schema and should only run on throwaway branches.
 - The signup form is not gated by the app. Tighten signups at the Supabase auth provider level (disable open signups, require invites) if you want defense in depth.
+- `20260430_soft_delete.sql` adds a `deletedAt timestamptz` column to `people`, `families`, `events`, and `memories`. The app now soft-deletes (UPDATE deletedAt) instead of hard-deleting, and every list query filters `deletedAt is null`. To restore a row, run `update <table> set "deletedAt" = null where id = '<row-id>';` from the SQL editor (admin restore UI is a deferred follow-up). To permanently purge a soft-deleted row, run `delete from <table> where id = '<row-id>' and "deletedAt" is not null;`.

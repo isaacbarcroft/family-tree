@@ -55,6 +55,7 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
         .from("people")
         .select("*")
         .eq("id", preTaggedPersonId)
+        .is("deletedAt", null)
         .single()
         .then(({ data }) => {
           if (data) setTaggedPeople([data as Person])
@@ -73,6 +74,7 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
       .from("people")
       .select("*")
       .ilike("searchName", `${term}%`)
+      .is("deletedAt", null)
       .limit(8)
       .then(({ data, error: err }) => {
         if (err) return

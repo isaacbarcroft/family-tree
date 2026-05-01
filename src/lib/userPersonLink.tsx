@@ -9,11 +9,14 @@ function buildSearchName(firstName?: string, middleName?: string, lastName?: str
 }
 
 export async function getOrCreatePersonForUser(user: AppUser) {
-  // 1. Already linked — return existing person
+  // 1. Already linked — return existing person.
+  // Soft-deleted rows are ignored so a resurrected sign-in falls through to
+  // the claim/create path; restoring a soft-deleted person is admin-only.
   const { data: existing, error: existingError } = await supabase
     .from("people")
     .select("*")
     .eq("userId", user.id)
+    .is("deletedAt", null)
     .limit(1)
     .maybeSingle()
 
@@ -38,6 +41,7 @@ export async function getOrCreatePersonForUser(user: AppUser) {
       .select("*")
       .eq("id", claimPersonId)
       .is("userId", null)
+      .is("deletedAt", null)
       .limit(1)
       .maybeSingle()
 
@@ -93,6 +97,7 @@ export async function getOrCreatePersonForUser(user: AppUser) {
       .select("*")
       .eq("email", email)
       .is("userId", null)
+      .is("deletedAt", null)
       .limit(1)
       .maybeSingle()
 
@@ -108,6 +113,7 @@ export async function getOrCreatePersonForUser(user: AppUser) {
       .ilike("firstName", escapeLikePattern(firstName))
       .ilike("lastName", escapeLikePattern(lastName))
       .is("userId", null)
+      .is("deletedAt", null)
       .limit(1)
       .maybeSingle()
 
