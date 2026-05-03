@@ -26,7 +26,7 @@ You've built a lot more than the original plan called for. Current stack is **Ne
 **What's broken or risky:**
 
 - ~~**P0 — RLS is wide open.** Fixed 2026-04-23.~~
-- **P0-4 through P0-6 — API route security gaps** found in 2026-05-01 audit. Seed route has no auth, convert-image has no auth, PostgREST filter helpers have an injection vector. See Critical Bugs section.
+- **P0-4 and P0-5 — API route security gaps** still open from 2026-05-01 audit. Seed route has no auth, convert-image has no auth. See Critical Bugs section. (P0-6 PostgREST filter injection fixed 2026-05-03.)
 - Accessibility is essentially absent outside NavBar (1.6 still pending, ~10-12h)
 
 **What's missing vs. "what would bring most value for a family app":**
@@ -93,20 +93,18 @@ You've built a lot more than the original plan called for. Current stack is **Ne
 **Fix:** Add `verifyUser(req)` check at the top of the `POST` handler, following the same pattern used in `src/app/api/geocode/route.ts:32-44`.
 **Effort:** 15 min
 
-### P0-6. PostgREST filter injection in `parseIn` / `parseContains`
+### ~~P0-6. PostgREST filter injection in `parseIn` / `parseContains`~~ Done 2026-05-03
 
 **Found:** 2026-05-01 audit
 **File:** `src/lib/supabase.ts` lines 137-143
 **Problem:** The `parseIn` and `parseContains` helper functions wrap values in double quotes but don't escape internal `"` or `\` characters. If user-controlled data (e.g., a person's name containing a quote) flows through `.in()` or `.contains()`, it breaks the PostgREST filter syntax and could alter query semantics. Compare with `src/app/api/geocode/route.ts:49-51` (`pgInValue`) which correctly escapes `\` → `\\` and `"` → `\"`.
-**Fix:** Add the same escaping to both functions:
+**Outcome:** Extracted a shared `escapePgFilterValue()` helper inside `src/lib/supabase.ts` that doubles backslashes first and then escapes embedded double quotes — the same `\` → `\\`, `"` → `\"` order used by `pgInValue` in the geocode route. Both `parseIn` and `parseContains` now route every value through it before wrapping in `"…"`. Today's call sites only pass UUIDs and constrained enums (so the bug was latent, not actively exploited), but the fix closes the door before any user-controlled string flows through `.in()` / `.contains()`.
+**Coverage:** New `src/__tests__/supabaseFilterEscape.test.ts` (8 cases) drives the real `QueryBuilder` against a stubbed `fetch`, decodes the URL, and asserts the rendered PostgREST filter:
 
-```ts
-function parseIn(values: string[]) {
-  return `(${values.map((v) => `"${v.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`).join(",")})`
-}
-```
+- `.in()` wraps plain values, escapes embedded `"`, escapes embedded `\`, pins the `\` → `\"` ordering with the regression input `a\"b`, and escapes every value in a multi-value list independently.
+- `.contains()` wraps plain values in `cs.{…}` braces, escapes embedded `"`, and escapes embedded `\`.
 
-**Effort:** 15 min (including test)
+Sanity-checked against the pre-fix code: 6 of the 8 cases fail when the helper is removed, confirming the regression is pinned. 338 tests + lint + `yarn build` green.
 
 ---
 

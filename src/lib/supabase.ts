@@ -134,12 +134,20 @@ export async function getAccessToken(): Promise<string | null> {
   return session?.access_token ?? null
 }
 
+// PostgREST `in.(...)` and `cs.{...}` filters wrap each value in double quotes.
+// Internal `\` and `"` characters must be escaped (`\` first, then `"`) so that
+// user-controlled strings — e.g. a person's name with a quote — don't terminate
+// the quoted token early and alter the query semantics.
+function escapePgFilterValue(v: string) {
+  return v.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
+}
+
 function parseIn(values: string[]) {
-  return `(${values.map((v) => `"${v}"`).join(",")})`
+  return `(${values.map((v) => `"${escapePgFilterValue(v)}"`).join(",")})`
 }
 
 function parseContains(values: string[]) {
-  return `{${values.map((v) => `"${v}"`).join(",")}}`
+  return `{${values.map((v) => `"${escapePgFilterValue(v)}"`).join(",")}}`
 }
 
 function normalizeError(status: number, payload: unknown) {
