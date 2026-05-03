@@ -3,6 +3,17 @@ import { NextResponse } from "next/server"
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ""
 
+// Seeding writes via the Supabase service role and bypasses RLS, so this route
+// must never be reachable in production. Outside development, return a 404 so
+// the endpoint is indistinguishable from a non-existent route.
+function isDevOnlyAllowed(): boolean {
+  return process.env.NODE_ENV === "development"
+}
+
+function notFoundResponse() {
+  return new NextResponse(null, { status: 404 })
+}
+
 async function supabaseRest(
   table: string,
   method: "POST" | "GET" | "DELETE",
@@ -121,6 +132,10 @@ function person(
 }
 
 export async function POST() {
+  if (!isDevOnlyAllowed()) {
+    return notFoundResponse()
+  }
+
   if (!supabaseUrl || !supabaseServiceKey) {
     return NextResponse.json(
       { error: "Missing SUPABASE_SERVICE_ROLE_KEY env var" },
@@ -519,6 +534,10 @@ export async function POST() {
 }
 
 export async function DELETE() {
+  if (!isDevOnlyAllowed()) {
+    return notFoundResponse()
+  }
+
   if (!supabaseUrl || !supabaseServiceKey) {
     return NextResponse.json(
       { error: "Missing SUPABASE_SERVICE_ROLE_KEY env var" },
