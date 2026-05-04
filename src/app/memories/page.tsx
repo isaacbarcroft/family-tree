@@ -14,6 +14,7 @@ import { SkeletonLine, SkeletonCard } from "@/components/SkeletonLoader"
 import { MemoryImage } from "@/components/MemoryImage"
 import AudioPlayer from "@/components/AudioPlayer"
 import MemoryReactions from "@/components/MemoryReactions"
+import MemoryComments from "@/components/MemoryComments"
 import { PAGE_SIZE } from "@/config/constants"
 
 export default function MemoriesPage() {
@@ -313,6 +314,10 @@ export default function MemoriesPage() {
 
                             <div className="mt-3" onClick={(e) => e.stopPropagation()}>
                               <MemoryReactions memoryId={m.id} />
+                            </div>
+
+                            <div className="mt-4" onClick={(e) => e.stopPropagation()}>
+                              <MemoryComments memoryId={m.id} />
                             </div>
                           </>
                         )}
