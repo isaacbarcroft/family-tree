@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { normalizePlace } from "@/models/GeocodedPlace"
 import type { GeocodedPlace, GeocodedPlaceStatus } from "@/models/GeocodedPlace"
 import { NOMINATIM_MIN_MS_BETWEEN_CALLS } from "@/config/constants"
+import { escapePgrstString } from "@/utils/pgrstEscape"
 
 export const runtime = "nodejs"
 
@@ -47,7 +48,7 @@ async function verifyUser(req: Request): Promise<boolean> {
 // internal backslashes and quotes. placeKey comes from free-form user input,
 // so an unescaped `"` would break the filter syntax.
 function pgInValue(v: string): string {
-  return `"${v.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`
+  return `"${escapePgrstString(v)}"`
 }
 
 async function supabaseRest<T = unknown>(
