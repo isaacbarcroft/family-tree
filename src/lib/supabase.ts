@@ -1,3 +1,5 @@
+import { escapeFilterValue } from "@/utils/postgrestFilter"
+
 export interface AppUser {
   id: string
   email?: string
@@ -135,11 +137,11 @@ export async function getAccessToken(): Promise<string | null> {
 }
 
 function parseIn(values: string[]) {
-  return `(${values.map((v) => `"${v}"`).join(",")})`
+  return `(${values.map((v) => `"${escapeFilterValue(v)}"`).join(",")})`
 }
 
 function parseContains(values: string[]) {
-  return `{${values.map((v) => `"${v}"`).join(",")}}`
+  return `{${values.map((v) => `"${escapeFilterValue(v)}"`).join(",")}}`
 }
 
 function normalizeError(status: number, payload: unknown) {

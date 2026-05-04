@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { normalizePlace } from "@/models/GeocodedPlace"
 import type { GeocodedPlace, GeocodedPlaceStatus } from "@/models/GeocodedPlace"
 import { NOMINATIM_MIN_MS_BETWEEN_CALLS } from "@/config/constants"
+import { escapeFilterValue } from "@/utils/postgrestFilter"
 
 export const runtime = "nodejs"
 
@@ -41,13 +42,6 @@ async function verifyUser(req: Request): Promise<boolean> {
   } catch {
     return false
   }
-}
-
-// PostgREST `in.(...)` filter: wrap each value in double quotes and escape
-// internal backslashes and quotes. placeKey comes from free-form user input,
-// so an unescaped `"` would break the filter syntax.
-function pgInValue(v: string): string {
-  return `"${v.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`
 }
 
 async function supabaseRest<T = unknown>(
@@ -171,7 +165,10 @@ export async function POST(req: Request) {
 
   // Load existing rows in one call so we can skip anything already ok/failed
   const lookupParams = new URLSearchParams()
-  lookupParams.set("placeKey", `in.(${[...keyed.keys()].map(pgInValue).join(",")})`)
+  lookupParams.set(
+    "placeKey",
+    `in.(${[...keyed.keys()].map((k) => `"${escapeFilterValue(k)}"`).join(",")})`
+  )
   const existing = await supabaseRest<GeocodedPlace[]>("geocoded_places", "GET", {
     params: lookupParams.toString(),
   })

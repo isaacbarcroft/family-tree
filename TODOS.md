@@ -93,20 +93,17 @@ You've built a lot more than the original plan called for. Current stack is **Ne
 **Fix:** Add `verifyUser(req)` check at the top of the `POST` handler, following the same pattern used in `src/app/api/geocode/route.ts:32-44`.
 **Effort:** 15 min
 
-### P0-6. PostgREST filter injection in `parseIn` / `parseContains`
+### ~~P0-6. PostgREST filter injection in `parseIn` / `parseContains`~~ Done 2026-05-04
 
 **Found:** 2026-05-01 audit
 **File:** `src/lib/supabase.ts` lines 137-143
-**Problem:** The `parseIn` and `parseContains` helper functions wrap values in double quotes but don't escape internal `"` or `\` characters. If user-controlled data (e.g., a person's name containing a quote) flows through `.in()` or `.contains()`, it breaks the PostgREST filter syntax and could alter query semantics. Compare with `src/app/api/geocode/route.ts:49-51` (`pgInValue`) which correctly escapes `\` → `\\` and `"` → `\"`.
-**Fix:** Add the same escaping to both functions:
-
-```ts
-function parseIn(values: string[]) {
-  return `(${values.map((v) => `"${v.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`).join(",")})`
-}
-```
-
-**Effort:** 15 min (including test)
+**Problem:** The `parseIn` and `parseContains` helper functions wrapped values in double quotes but didn't escape internal `"` or `\` characters. If user-controlled data (e.g., a person's name containing a quote) flowed through `.in()` or `.contains()`, it broke the PostgREST filter syntax and could alter query semantics. The geocode route had its own correctly-escaping `pgInValue` helper, but the client-side `QueryBuilder` did not.
+**Outcome:** Extracted a single shared `escapeFilterValue(value)` helper in `src/utils/postgrestFilter.ts` that escapes `\` (first, so the next pass doesn't double-encode) then `"`. Wired it into both `parseIn` and `parseContains` in `src/lib/supabase.ts`, and replaced the duplicate inline `pgInValue` in `src/app/api/geocode/route.ts` so there's now one canonical implementation. New `parseContains` coverage was the missing piece — without escaping, a value like `weird "id"` inside `cs.{...}` would have terminated the array literal early.
+**Tests:**
+- `src/__tests__/postgrestFilter.test.ts` — 9 cases covering empty input, alphanumerics, intentional non-escaping of LIKE wildcards (`%`/`_`/`*` are not metacharacters in `in.`/`cs.`), backslash escaping, double-quote escaping, the backslash-then-quote ordering invariant, mixed strings, trailing-backslash safety, and a `URLSearchParams` round-trip pin.
+- `src/__tests__/supabaseFilterEscaping.test.ts` — 5 end-to-end cases that mock `fetch` and assert the URL emitted by `.in()` / `.contains()` contains the correctly escaped value (and that ordinary UUIDs are unchanged).
+- Existing `src/__tests__/geocodeRoute.test.ts` "escapes double quotes and backslashes in the placeKey lookup filter" still passes against the shared helper.
+**Verification:** `yarn lint`, `yarn test` (344 passed / 5 skipped), `yarn build` all green.
 
 ---
 
