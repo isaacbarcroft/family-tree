@@ -3,6 +3,7 @@ import type { Person } from "@/models/Person"
 import type { Event } from "@/models/Event"
 import type { Memory } from "@/models/Memory"
 import type { MemoryReaction } from "@/models/MemoryReaction"
+import type { MemoryComment } from "@/models/MemoryComment"
 import type { ReactionEmoji } from "@/constants/reactions"
 import type { Relationship } from "@/models/Relationship"
 import type { GeocodedPlace } from "@/models/GeocodedPlace"
@@ -526,6 +527,70 @@ export async function removeReaction(input: {
     .eq("memoryId", input.memoryId)
     .eq("userId", input.userId)
     .eq("emoji", input.emoji)
+  if (error) throw error
+}
+
+// ---- Memory comments ----
+export async function listCommentsForMemory(memoryId: string): Promise<MemoryComment[]> {
+  const { data, error } = await supabase
+    .from("memory_comments")
+    .select("*")
+    .eq("memoryId", memoryId)
+    .order("createdAt", { ascending: true })
+  if (error) throw error
+  return (data ?? []) as MemoryComment[]
+}
+
+export async function listCommentsForMemories(memoryIds: string[]): Promise<MemoryComment[]> {
+  if (memoryIds.length === 0) return []
+  const { data, error } = await supabase
+    .from("memory_comments")
+    .select("*")
+    .in("memoryId", memoryIds)
+    .order("createdAt", { ascending: true })
+  if (error) throw error
+  return (data ?? []) as MemoryComment[]
+}
+
+export async function addComment(input: {
+  memoryId: string
+  userId: string
+  body: string
+  parentCommentId?: string | null
+}): Promise<MemoryComment> {
+  const { data, error } = await supabase
+    .from("memory_comments")
+    .insert({
+      memoryId: input.memoryId,
+      userId: input.userId,
+      body: input.body,
+      parentCommentId: input.parentCommentId ?? null,
+    })
+    .select("*")
+    .single()
+  if (error) throw error
+  return data as MemoryComment
+}
+
+export async function updateComment(input: {
+  id: string
+  body: string
+}): Promise<MemoryComment> {
+  const { data, error } = await supabase
+    .from("memory_comments")
+    .update({ body: input.body })
+    .eq("id", input.id)
+    .select("*")
+    .single()
+  if (error) throw error
+  return data as MemoryComment
+}
+
+export async function deleteComment(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("memory_comments")
+    .delete()
+    .eq("id", id)
   if (error) throw error
 }
 
