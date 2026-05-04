@@ -3,9 +3,24 @@
 import { useState } from "react"
 import ProtectedRoute from "@/components/ProtectedRoute"
 
+const IS_DEV = process.env.NODE_ENV === "development"
+
 export default function SeedPage() {
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle")
   const [result, setResult] = useState<string>("")
+
+  if (!IS_DEV) {
+    return (
+      <ProtectedRoute>
+        <div className="max-w-xl mx-auto p-6">
+          <h1 className="text-3xl font-bold text-white mb-4">Seed Data</h1>
+          <p className="text-gray-300 text-base">
+            Seeding is only available in local development.
+          </p>
+        </div>
+      </ProtectedRoute>
+    )
+  }
 
   const handleAction = async (method: "POST" | "DELETE") => {
     setStatus("loading")
