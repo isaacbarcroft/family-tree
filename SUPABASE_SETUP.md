@@ -12,6 +12,7 @@ Run the SQL files in Supabase SQL Editor, in filename order:
 - `supabase/migrations/20260429_memory_reactions.sql`
 - `supabase/migrations/20260430_soft_delete.sql`
 - `supabase/migrations/20260501_memory_comments.sql`
+- `supabase/migrations/20260505_notification_prefs.sql`
 
 The initial migration creates:
 
@@ -90,3 +91,29 @@ In Supabase Dashboard:
 - The signup form is not gated by the app. Tighten signups at the Supabase auth provider level (disable open signups, require invites) if you want defense in depth.
 - `20260430_soft_delete.sql` adds a `deletedAt timestamptz` column to `people`, `families`, `events`, and `memories`. The app now soft-deletes (UPDATE deletedAt) instead of hard-deleting, and every list query filters `deletedAt is null`. To restore a row, run `update <table> set "deletedAt" = null where id = '<row-id>';` from the SQL editor (admin restore UI is a deferred follow-up). To permanently purge a soft-deleted row, run `delete from <table> where id = '<row-id>' and "deletedAt" is not null;`.
 - `20260501_memory_comments.sql` adds `public.memory_comments` (id, memoryId, userId, body, parentCommentId, createdAt, updatedAt) for threaded comments on memories. RLS uses the `app_users` allowlist: SELECT for any approved user, INSERT requires `userId = auth.uid()`, UPDATE requires the row owner (no admin override on edit, by design), DELETE requires owner or admin. A trigger pins replies to one level deep; another trigger refreshes `updatedAt` on edit. Cascade FKs on `memories(id)` and `memory_comments(id)` mean deleting a memory or a parent comment removes the thread.
+- `20260505_notification_prefs.sql` adds three columns to `public.app_users`: `notificationPrefs jsonb` (default `{"digest":"weekly","reactions":true,"comments":true}`), `lastDigestSentAt timestamptz` (null = never sent; the digest worker uses the column to skip already-shipped activity), and `unsubscribeToken uuid` (random per row, unique index, used by `/api/notifications/unsubscribe`). RLS is untouched — the digest and unsubscribe routes both use the service role and bypass RLS, so the existing `app_users_admin_update` policy still keeps user-facing writes admin-only. Rollback: `20260505_notification_prefs_rollback.sql`.
+
+## 5) Memory-activity digest cron
+
+`/api/notifications/digest` (POST) batches reactions and comments since each recipient's `lastDigestSentAt` and emails the memory's author via Resend. The route is gated by an `x-cron-secret` header that must match `DIGEST_CRON_SECRET`. Wire one of:
+
+- **Supabase Cron (`pg_cron`)**: schedule a daily call to your deployed app URL, e.g.
+  ```sql
+  select cron.schedule(
+    'memory_digest_daily',
+    '0 14 * * *',
+    $$select net.http_post(
+      url => 'https://<your-app>/api/notifications/digest',
+      headers => jsonb_build_object('x-cron-secret', '<DIGEST_CRON_SECRET>')
+    );$$
+  );
+  ```
+- **Vercel Cron**: add a `vercel.json` `crons` entry pointing at `/api/notifications/digest` (Vercel injects the secret via env vars and you forward it via `headers`).
+
+Required env vars for the route:
+
+- `DIGEST_CRON_SECRET` — shared secret matched against the `x-cron-secret` header.
+- `NEXT_PUBLIC_APP_URL` — used to construct unsubscribe links (`https://<host>/api/notifications/unsubscribe?token=...`). Falls back to `APP_URL`, then a placeholder if neither is set.
+- `RESEND_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — already documented above.
+
+The route returns `{ ok, sent, skipped }`. On send failure it returns 500 without bumping `lastDigestSentAt` so the next cron run retries the same recipients.
