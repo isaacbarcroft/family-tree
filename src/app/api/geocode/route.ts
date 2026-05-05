@@ -3,6 +3,7 @@ import { normalizePlace } from "@/models/GeocodedPlace"
 import type { GeocodedPlace, GeocodedPlaceStatus } from "@/models/GeocodedPlace"
 import { NOMINATIM_MIN_MS_BETWEEN_CALLS } from "@/config/constants"
 import { escapePgrstString } from "@/utils/pgrstEscape"
+import { verifyUser } from "@/lib/verifyUser"
 
 export const runtime = "nodejs"
 
@@ -28,20 +29,6 @@ function waitForRateLimit(): Promise<void> {
   })
   ratePromise = next
   return next.then(() => undefined)
-}
-
-async function verifyUser(req: Request): Promise<boolean> {
-  const auth = req.headers.get("authorization") ?? ""
-  const match = auth.match(/^Bearer\s+(.+)$/i)
-  if (!match) return false
-  try {
-    const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
-      headers: { apikey: supabaseAnonKey, Authorization: `Bearer ${match[1]}` },
-    })
-    return res.ok
-  } catch {
-    return false
-  }
 }
 
 // PostgREST `in.(...)` filter: wrap each value in double quotes and escape
