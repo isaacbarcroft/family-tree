@@ -1,3 +1,5 @@
+import { getAccessToken } from "@/lib/supabase"
+
 let scriptLoadingPromise: Promise<void> | null = null
 
 declare global {
@@ -109,11 +111,14 @@ async function convertWithBrowser(file: File): Promise<File> {
 }
 
 async function convertWithServer(file: File): Promise<File> {
+  const token = await getAccessToken()
+
   const form = new FormData()
   form.append("file", file)
 
   const response = await fetch("/api/convert-image", {
     method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: form,
   })
 
