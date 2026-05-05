@@ -9,4 +9,5 @@ export interface Event {
   peopleIds: string[]
   createdBy: string
   createdAt: string
+  deletedAt?: string | null
 }

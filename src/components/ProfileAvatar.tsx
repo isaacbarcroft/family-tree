@@ -1,7 +1,7 @@
 "use client"
 
 import Image from "next/image"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { isSupabaseStorageUrl, toDisplayImageUrl } from "@/utils/imageUrl"
 import { stringToColor } from "@/utils/colors"
 
@@ -29,11 +29,15 @@ export function ProfileAvatar({
   className = "",
 }: ProfileAvatarProps) {
   const [error, setError] = useState(false)
+  const [prevSrc, setPrevSrc] = useState(src)
 
-  // Reset error when src changes (e.g. after photo upload)
-  useEffect(() => {
+  // Reset the error flag when the caller swaps the source (e.g. after photo
+  // upload). Doing this during render — the same React 19 pattern used by
+  // MemoryImage — avoids the cascading re-render a useEffect would cause.
+  if (src !== prevSrc) {
+    setPrevSrc(src)
     setError(false)
-  }, [src])
+  }
 
   const displayUrl = toDisplayImageUrl(src)
   const useNativeImg = isSupabaseStorageUrl(src) || (typeof src === "string" && src.startsWith("blob:"))

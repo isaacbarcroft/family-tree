@@ -37,6 +37,7 @@ export default function FamilyPage() {
           .from("families")
           .select("*")
           .eq("id", familyId)
+          .is("deletedAt", null)
           .single();
         if (familyError) throw familyError;
         const fetchedFamily = data as Family;
@@ -48,7 +49,8 @@ export default function FamilyPage() {
         const { data: peopleData, error: peopleError } = await supabase
           .from("people")
           .select("*")
-          .in("id", fetchedFamily.members);
+          .in("id", fetchedFamily.members)
+          .is("deletedAt", null);
         if (peopleError) throw peopleError;
         setMembers((peopleData ?? []) as Person[]);
       } catch (err: unknown) {

@@ -11,6 +11,7 @@ import EmptyState from "@/components/EmptyState";
 import { SkeletonPage } from "@/components/SkeletonLoader";
 import ImportGedcomModal from "@/components/ImportGedcomModal";
 import { Avatar, Button, Icon, PhotoFrame } from "@/components/ui";
+import { PAGE_SIZE } from "@/config/constants";
 
 type View = "grid" | "list";
 
@@ -25,7 +26,6 @@ function lifespan(p: Person): string {
 
 export default function FamilyTreePage() {
   const { user } = useAuth();
-  const PAGE_SIZE = 25;
 
   const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,7 +43,7 @@ export default function FamilyTreePage() {
   const [showImportModal, setShowImportModal] = useState(false);
 
   const fetchPage = async (pageNum: number, replace = false) => {
-    const result = await listPeople({ page: pageNum, pageSize: PAGE_SIZE, paginate: true });
+    const result = await listPeople({ page: pageNum, pageSize: PAGE_SIZE.PEOPLE, paginate: true });
     setPeople((prev) => (replace ? result.data : [...prev, ...result.data]));
     setTotal(result.total);
     setPage(pageNum);

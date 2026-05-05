@@ -37,6 +37,7 @@ const FamilyTreeView = ({ familyId }: FamilyTreeViewProps) => {
             .from("people")
             .select("*")
             .in("id", memberIds)
+            .is("deletedAt", null)
 
           if (peopleError) throw peopleError
           people = (peopleData ?? []) as Person[]

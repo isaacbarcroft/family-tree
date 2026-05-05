@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { deleteEvent, listEvents, updateEvent } from "@/lib/db";
@@ -13,8 +13,7 @@ import { SkeletonCard, SkeletonLine } from "@/components/SkeletonLoader";
 import { Button, Chip, type IconName } from "@/components/ui";
 import { formatDate } from "@/utils/dates";
 import { EVENT_TYPES, type EventType } from "@/constants/enums";
-
-const PAGE_SIZE = 25;
+import { PAGE_SIZE } from "@/config/constants";
 
 const EVENT_ICON: Record<EventType, IconName> = {
   life: "event",
@@ -42,24 +41,25 @@ export default function EventsPage() {
   const [editForm, setEditForm] = useState<Partial<Event>>({});
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  const fetchPeopleForEvents = async (eventData: Event[]) => {
+  const fetchPeopleForEvents = useCallback(async (eventData: Event[]) => {
     const allPeopleIds = Array.from(new Set(eventData.flatMap((e) => e.peopleIds)));
     if (allPeopleIds.length === 0) return;
     const { data: people } = await supabase
       .from("people")
       .select("*")
-      .in("id", allPeopleIds);
+      .in("id", allPeopleIds)
+      .is("deletedAt", null);
     if (!people) return;
     setPeopleMap((prev) => {
       const map = new Map(prev);
       for (const p of people as Person[]) map.set(p.id, p);
       return map;
     });
-  };
+  }, []);
 
-  const fetchEvents = async (pageNum = 1, replace = true) => {
+  const fetchEvents = useCallback(async (pageNum = 1, replace = true) => {
     try {
-      const result = await listEvents({ page: pageNum, pageSize: PAGE_SIZE, paginate: true });
+      const result = await listEvents({ page: pageNum, pageSize: PAGE_SIZE.EVENTS, paginate: true });
       const data = result.data;
       setEvents((prev) => (replace ? data : [...prev, ...data]));
       setTotal(result.total);
@@ -71,11 +71,11 @@ export default function EventsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchPeopleForEvents]);
 
   useEffect(() => {
     fetchEvents();
-  }, []);
+  }, [fetchEvents]);
 
   const hasMore = total !== null && events.length < total;
 

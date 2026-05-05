@@ -11,8 +11,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { SkeletonCard } from "@/components/SkeletonLoader";
 import { Button, Icon } from "@/components/ui";
 import { formatDate } from "@/utils/dates";
-
-const PAGE_SIZE = 24;
+import { PAGE_SIZE } from "@/config/constants";
 
 export default function FamiliesPage() {
   const { user } = useAuth();
@@ -29,7 +28,7 @@ export default function FamiliesPage() {
     try {
       const result = await listFamilies({
         page: pageNum,
-        pageSize: PAGE_SIZE,
+        pageSize: PAGE_SIZE.FAMILIES,
         paginate: true,
       });
       setFamilies((prev) => (replace ? result.data : [...prev, ...result.data]));

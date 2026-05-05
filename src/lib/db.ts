@@ -2,9 +2,13 @@ import { supabase, getAccessToken } from "./supabase"
 import type { Person } from "@/models/Person"
 import type { Event } from "@/models/Event"
 import type { Memory } from "@/models/Memory"
+import type { MemoryReaction } from "@/models/MemoryReaction"
+import type { MemoryComment } from "@/models/MemoryComment"
+import type { ReactionEmoji } from "@/constants/reactions"
 import type { Relationship } from "@/models/Relationship"
 import type { GeocodedPlace } from "@/models/GeocodedPlace"
 import type { Residence } from "@/models/Residence"
+import { escapeLikePattern } from "@/utils/likeEscape"
 
 function buildSearchName(firstName?: string, middleName?: string, lastName?: string) {
   return [firstName, middleName, lastName].filter(Boolean).join(" ").toLowerCase().trim()
@@ -113,11 +117,14 @@ async function autoLinkToFamilyByLastName(person: Person) {
   const lastName = person.lastName.trim()
   if (!lastName) return
 
-  // Check if a family with this last name already exists
+  // Check if a family with this last name already exists. Use ilike for
+  // case-insensitive equality and escape special chars so a surname like
+  // "O_Brien" or "100%" is matched literally instead of as a wildcard.
   const { data: familiesRaw } = await supabase
     .from("families")
     .select("*")
-    .ilike("name", lastName)
+    .ilike("name", escapeLikePattern(lastName))
+    .is("deletedAt", null)
     .limit(1)
 
   const families = (familiesRaw ?? []) as { id: string }[]
@@ -169,6 +176,7 @@ export async function listPeople(options?: PaginationOptions & { paginate?: bool
     const { data, error, count } = await supabase
       .from("people")
       .select("*")
+      .is("deletedAt", null)
       .order("lastName", { ascending: true })
       .range(from, to)
 
@@ -176,7 +184,10 @@ export async function listPeople(options?: PaginationOptions & { paginate?: bool
     return { data: (data ?? []) as Person[], total: count, page, pageSize }
   }
 
-  const { data, error } = await supabase.from("people").select("*")
+  const { data, error } = await supabase
+    .from("people")
+    .select("*")
+    .is("deletedAt", null)
   if (error) throw error
   return (data ?? []) as Person[]
 }
@@ -186,6 +197,7 @@ export async function getPersonById(id: string) {
     .from("people")
     .select("*")
     .eq("id", id)
+    .is("deletedAt", null)
     .maybeSingle()
 
   if (error) throw error
@@ -203,6 +215,7 @@ export async function listPeopleByIds(ids: string[]): Promise<Person[]> {
     .from("people")
     .select("*")
     .in("id", ids)
+    .is("deletedAt", null)
 
   if (error) throw error
   return sortByIds((data ?? []) as Person[], ids, (p) => p.id)
@@ -260,6 +273,7 @@ export async function listFamiliesForPerson(personId: string) {
     .from("families")
     .select("*")
     .contains("members", [personId])
+    .is("deletedAt", null)
 
   if (error) throw error
   return (data ?? []) as import("@/models/Family").Family[]
@@ -285,70 +299,16 @@ export async function unlinkSpouses(personAId: string, personBId: string) {
   await removeFromArray("people", personBId, "spouseIds", personAId)
 }
 
+// Soft-delete: set `deletedAt` instead of removing the row. Bi-directional
+// references in parent/child/spouse/family.members arrays are intentionally
+// left untouched so a future restore is a single column reset. Reads filter
+// `deletedAt is null`, so dangling references resolve to "missing" naturally
+// (treeBuilder, listPeopleByIds, etc. already handle that).
 export async function deletePerson(id: string) {
-  // Clean up bi-directional references before deleting the row itself.
-  // Fetch affected people/families in one query each, compute the
-  // updated arrays client-side, then batch-upsert — avoids the N+1
-  // SELECT+UPDATE pattern that grew linearly with the number of
-  // relationships.
-  const person = await getPersonById(id)
-
-  if (person) {
-    const relatedPersonIds = Array.from(
-      new Set([
-        ...(person.parentIds ?? []),
-        ...(person.childIds ?? []),
-        ...(person.spouseIds ?? []),
-      ])
-    )
-    const familyIds = person.familyIds ?? []
-
-    if (relatedPersonIds.length > 0) {
-      const { data, error } = await supabase
-        .from("people")
-        .select("*")
-        .in("id", relatedPersonIds)
-      if (error) throw error
-
-      const peopleUpdates = ((data ?? []) as Person[]).map((p) => ({
-        id: p.id,
-        parentIds: (p.parentIds ?? []).filter((pid) => pid !== id),
-        childIds: (p.childIds ?? []).filter((cid) => cid !== id),
-        spouseIds: (p.spouseIds ?? []).filter((sid) => sid !== id),
-      }))
-
-      if (peopleUpdates.length > 0) {
-        const { error: updateError } = await supabase
-          .from("people")
-          .upsert(peopleUpdates, { onConflict: "id" })
-        if (updateError) throw updateError
-      }
-    }
-
-    if (familyIds.length > 0) {
-      const { data, error } = await supabase
-        .from("families")
-        .select("*")
-        .in("id", familyIds)
-      if (error) throw error
-
-      const familyUpdates = (
-        (data ?? []) as import("@/models/Family").Family[]
-      ).map((f) => ({
-        id: f.id,
-        members: (f.members ?? []).filter((mid) => mid !== id),
-      }))
-
-      if (familyUpdates.length > 0) {
-        const { error: updateError } = await supabase
-          .from("families")
-          .upsert(familyUpdates, { onConflict: "id" })
-        if (updateError) throw updateError
-      }
-    }
-  }
-
-  const { error } = await supabase.from("people").delete().eq("id", id)
+  const { error } = await supabase
+    .from("people")
+    .update({ deletedAt: new Date().toISOString() })
+    .eq("id", id)
   if (error) throw error
 }
 
@@ -376,6 +336,7 @@ export async function listEvents(options?: PaginationOptions & { paginate?: bool
     const { data, error, count } = await supabase
       .from("events")
       .select("*")
+      .is("deletedAt", null)
       .order("date", { ascending: true })
       .range(from, to)
 
@@ -386,6 +347,7 @@ export async function listEvents(options?: PaginationOptions & { paginate?: bool
   const { data, error } = await supabase
     .from("events")
     .select("*")
+    .is("deletedAt", null)
     .order("date", { ascending: true })
 
   if (error) throw error
@@ -398,7 +360,10 @@ export async function updateEvent(id: string, updates: Partial<Event>) {
 }
 
 export async function deleteEvent(id: string) {
-  const { error } = await supabase.from("events").delete().eq("id", id)
+  const { error } = await supabase
+    .from("events")
+    .update({ deletedAt: new Date().toISOString() })
+    .eq("id", id)
   if (error) throw error
 }
 
@@ -426,6 +391,7 @@ export async function listMemories(options?: PaginationOptions & { paginate?: bo
     const { data, error, count } = await supabase
       .from("memories")
       .select("*")
+      .is("deletedAt", null)
       .order("date", { ascending: false })
       .range(from, to)
 
@@ -433,7 +399,10 @@ export async function listMemories(options?: PaginationOptions & { paginate?: bo
     return { data: (data ?? []) as Memory[], total: count, page, pageSize }
   }
 
-  const { data, error } = await supabase.from("memories").select("*")
+  const { data, error } = await supabase
+    .from("memories")
+    .select("*")
+    .is("deletedAt", null)
   if (error) throw error
   return (data ?? []) as Memory[]
 }
@@ -444,12 +413,18 @@ export async function updateMemory(id: string, updates: Partial<Memory>) {
 }
 
 export async function deleteMemory(id: string) {
-  const { error } = await supabase.from("memories").delete().eq("id", id)
+  const { error } = await supabase
+    .from("memories")
+    .update({ deletedAt: new Date().toISOString() })
+    .eq("id", id)
   if (error) throw error
 }
 
 export async function deleteFamily(id: string) {
-  const { error } = await supabase.from("families").delete().eq("id", id)
+  const { error } = await supabase
+    .from("families")
+    .update({ deletedAt: new Date().toISOString() })
+    .eq("id", id)
   if (error) throw error
 }
 
@@ -465,6 +440,7 @@ export async function listFamilies(options?: PaginationOptions & { paginate?: bo
     const { data, error, count } = await supabase
       .from("families")
       .select("*")
+      .is("deletedAt", null)
       .order("name", { ascending: true })
       .range(from, to)
 
@@ -475,6 +451,7 @@ export async function listFamilies(options?: PaginationOptions & { paginate?: bo
   const { data, error } = await supabase
     .from("families")
     .select("*")
+    .is("deletedAt", null)
     .order("name", { ascending: true })
   if (error) throw error
   return (data ?? []) as import("@/models/Family").Family[]
@@ -485,6 +462,7 @@ export async function listMemoriesForPerson(personId: string) {
     .from("memories")
     .select("*")
     .contains("peopleIds", [personId])
+    .is("deletedAt", null)
   if (error) throw error
   return (data ?? []) as Memory[]
 }
@@ -494,9 +472,126 @@ export async function listEventsForPerson(personId: string) {
     .from("events")
     .select("*")
     .contains("peopleIds", [personId])
+    .is("deletedAt", null)
     .order("date", { ascending: true })
   if (error) throw error
   return (data ?? []) as Event[]
+}
+
+// ---- Memory reactions ----
+export async function listReactionsForMemory(memoryId: string): Promise<MemoryReaction[]> {
+  const { data, error } = await supabase
+    .from("memory_reactions")
+    .select("*")
+    .eq("memoryId", memoryId)
+  if (error) throw error
+  return (data ?? []) as MemoryReaction[]
+}
+
+export async function listReactionsForMemories(memoryIds: string[]): Promise<MemoryReaction[]> {
+  if (memoryIds.length === 0) return []
+  const { data, error } = await supabase
+    .from("memory_reactions")
+    .select("*")
+    .in("memoryId", memoryIds)
+  if (error) throw error
+  return (data ?? []) as MemoryReaction[]
+}
+
+export async function addReaction(input: {
+  memoryId: string
+  userId: string
+  emoji: ReactionEmoji
+}): Promise<MemoryReaction> {
+  const { data, error } = await supabase
+    .from("memory_reactions")
+    .insert({
+      memoryId: input.memoryId,
+      userId: input.userId,
+      emoji: input.emoji,
+    })
+    .select("*")
+    .single()
+  if (error) throw error
+  return data as MemoryReaction
+}
+
+export async function removeReaction(input: {
+  memoryId: string
+  userId: string
+  emoji: ReactionEmoji
+}): Promise<void> {
+  const { error } = await supabase
+    .from("memory_reactions")
+    .delete()
+    .eq("memoryId", input.memoryId)
+    .eq("userId", input.userId)
+    .eq("emoji", input.emoji)
+  if (error) throw error
+}
+
+// ---- Memory comments ----
+export async function listCommentsForMemory(memoryId: string): Promise<MemoryComment[]> {
+  const { data, error } = await supabase
+    .from("memory_comments")
+    .select("*")
+    .eq("memoryId", memoryId)
+    .order("createdAt", { ascending: true })
+  if (error) throw error
+  return (data ?? []) as MemoryComment[]
+}
+
+export async function listCommentsForMemories(memoryIds: string[]): Promise<MemoryComment[]> {
+  if (memoryIds.length === 0) return []
+  const { data, error } = await supabase
+    .from("memory_comments")
+    .select("*")
+    .in("memoryId", memoryIds)
+    .order("createdAt", { ascending: true })
+  if (error) throw error
+  return (data ?? []) as MemoryComment[]
+}
+
+export async function addComment(input: {
+  memoryId: string
+  userId: string
+  body: string
+  parentCommentId?: string | null
+}): Promise<MemoryComment> {
+  const { data, error } = await supabase
+    .from("memory_comments")
+    .insert({
+      memoryId: input.memoryId,
+      userId: input.userId,
+      body: input.body,
+      parentCommentId: input.parentCommentId ?? null,
+    })
+    .select("*")
+    .single()
+  if (error) throw error
+  return data as MemoryComment
+}
+
+export async function updateComment(input: {
+  id: string
+  body: string
+}): Promise<MemoryComment> {
+  const { data, error } = await supabase
+    .from("memory_comments")
+    .update({ body: input.body })
+    .eq("id", input.id)
+    .select("*")
+    .single()
+  if (error) throw error
+  return data as MemoryComment
+}
+
+export async function deleteComment(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("memory_comments")
+    .delete()
+    .eq("id", id)
+  if (error) throw error
 }
 
 // ---- Relationships ----

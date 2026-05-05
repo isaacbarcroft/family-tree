@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { deleteMemory, listMemories, updateMemory } from "@/lib/db";
@@ -8,13 +8,15 @@ import type { Memory } from "@/models/Memory";
 import type { Person } from "@/models/Person";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AddMemoryModal from "@/components/AddMemoryModal";
+import AudioPlayer from "@/components/AudioPlayer";
+import MemoryReactions from "@/components/MemoryReactions";
+import MemoryComments from "@/components/MemoryComments";
 import { supabase } from "@/lib/supabase";
 import { SkeletonCard, SkeletonLine } from "@/components/SkeletonLoader";
 import { Button, Chip, Icon, PhotoFrame } from "@/components/ui";
 import { formatDate } from "@/utils/dates";
 import { toDisplayImageUrl } from "@/utils/imageUrl";
-
-const PAGE_SIZE = 24;
+import { PAGE_SIZE } from "@/config/constants";
 
 export default function MemoriesPage() {
   const { user } = useAuth();
@@ -31,26 +33,27 @@ export default function MemoriesPage() {
   const [editForm, setEditForm] = useState<Partial<Memory>>({});
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  const fetchPeopleForMemories = async (memData: Memory[]) => {
+  const fetchPeopleForMemories = useCallback(async (memData: Memory[]) => {
     const allPeopleIds = Array.from(new Set(memData.flatMap((m) => m.peopleIds)));
     if (allPeopleIds.length === 0) return;
     const { data: people } = await supabase
       .from("people")
       .select("*")
-      .in("id", allPeopleIds);
+      .in("id", allPeopleIds)
+      .is("deletedAt", null);
     if (!people) return;
     setPeopleMap((prev) => {
       const map = new Map(prev);
       for (const p of people as Person[]) map.set(p.id, p);
       return map;
     });
-  };
+  }, []);
 
-  const fetchMemories = async (pageNum = 1, replace = true) => {
+  const fetchMemories = useCallback(async (pageNum = 1, replace = true) => {
     try {
       const result = await listMemories({
         page: pageNum,
-        pageSize: PAGE_SIZE,
+        pageSize: PAGE_SIZE.MEMORIES,
         paginate: true,
       });
       const data = result.data;
@@ -64,11 +67,11 @@ export default function MemoriesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchPeopleForMemories]);
 
   useEffect(() => {
     fetchMemories();
-  }, []);
+  }, [fetchMemories]);
 
   const hasMore = total !== null && memories.length < total;
 
@@ -394,6 +397,7 @@ function MemoryCard({
             <p className="muted mt-1" style={{ fontSize: 13 }}>
               {m.date ? formatDate(m.date) : ""}
               {m.peopleIds.length > 0 ? ` · ${m.peopleIds.length} tagged` : ""}
+              {m.audioUrl ? " · voice" : ""}
             </p>
 
             {isExpanded ? (
@@ -405,6 +409,16 @@ function MemoryCard({
                   >
                     {m.description}
                   </p>
+                ) : null}
+
+                {m.audioUrl ? (
+                  <div className="mt-4">
+                    <AudioPlayer
+                      src={m.audioUrl}
+                      durationSeconds={m.durationSeconds}
+                      label={`Voice memory: ${m.title}`}
+                    />
+                  </div>
                 ) : null}
 
                 {m.imageUrls && m.imageUrls.length > 1 ? (
@@ -440,6 +454,14 @@ function MemoryCard({
                     })}
                   </div>
                 ) : null}
+
+                <div className="mt-4">
+                  <MemoryReactions memoryId={m.id} />
+                </div>
+
+                <div className="mt-4">
+                  <MemoryComments memoryId={m.id} />
+                </div>
               </>
             ) : null}
           </>

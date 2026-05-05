@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { normalizePlace } from "@/models/GeocodedPlace"
 import type { GeocodedPlace, GeocodedPlaceStatus } from "@/models/GeocodedPlace"
+import { NOMINATIM_MIN_MS_BETWEEN_CALLS } from "@/config/constants"
+import { escapePgrstString } from "@/utils/pgrstEscape"
 
 export const runtime = "nodejs"
 
@@ -10,7 +12,6 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 const NOMINATIM_USER_AGENT = "FamilyLegacy/0.1 (contact: isaacbarcroft@gmail.com)"
-const MIN_MS_BETWEEN_CALLS = 1100
 
 // Chain concurrent calls on a single promise so each waiter is serialized
 // behind the previous one. This keeps the 1 req/sec spacing correct even
@@ -21,7 +22,7 @@ let ratePromise: Promise<number> = Promise.resolve(0)
 
 function waitForRateLimit(): Promise<void> {
   const next = ratePromise.then(async (last) => {
-    const wait = Math.max(0, MIN_MS_BETWEEN_CALLS - (Date.now() - last))
+    const wait = Math.max(0, NOMINATIM_MIN_MS_BETWEEN_CALLS - (Date.now() - last))
     if (wait > 0) await new Promise((r) => setTimeout(r, wait))
     return Date.now()
   })
@@ -47,7 +48,7 @@ async function verifyUser(req: Request): Promise<boolean> {
 // internal backslashes and quotes. placeKey comes from free-form user input,
 // so an unescaped `"` would break the filter syntax.
 function pgInValue(v: string): string {
-  return `"${v.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`
+  return `"${escapePgrstString(v)}"`
 }
 
 async function supabaseRest<T = unknown>(

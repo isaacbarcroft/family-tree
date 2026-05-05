@@ -12,6 +12,7 @@ import { SkeletonCard, SkeletonLine } from "@/components/SkeletonLoader";
 import { Avatar, Button, Chip, Icon, PhotoFrame } from "@/components/ui";
 import { formatDate, getAge, getNextBirthday } from "@/utils/dates";
 import { toDisplayImageUrl } from "@/utils/imageUrl";
+import { HOME_RECENT } from "@/config/constants";
 
 export default function Home() {
   const { user } = useAuth();
@@ -203,10 +204,10 @@ function HomeAuthenticated({ user, people, memories, events, myPerson }: HomePro
     .map((p) => ({ person: p, ...getNextBirthday(p.birthDate!) }))
     .filter((b) => b.daysUntil <= 31)
     .sort((a, b) => a.daysUntil - b.daysUntil)
-    .slice(0, 5);
+    .slice(0, HOME_RECENT.UPCOMING_BIRTHDAYS);
 
   const featuredMemory = memories.find((m) => m.imageUrls && m.imageUrls.length > 0) ?? memories[0] ?? null;
-  const recentMemories = memories.slice(0, 4);
+  const recentMemories = memories.slice(0, HOME_RECENT.MEMORIES);
 
   const greeting = myPerson?.firstName
     ? myPerson.firstName
@@ -272,6 +273,21 @@ function HomeAuthenticated({ user, people, memories, events, myPerson }: HomePro
   const inMemory = people
     .filter((p) => p.deathDate)
     .sort((a, b) => (b.deathDate ?? "").localeCompare(a.deathDate ?? ""))[0];
+
+  // Completeness nudges for the current user's own profile only
+  const nudges: { message: string; href: string }[] = [];
+  if (!isNewUser && myPerson) {
+    const profileHref = `/profile/${myPerson.id}?edit=true`;
+    if (!myPerson.birthDate) {
+      nudges.push({ message: "You have no birth date", href: profileHref });
+    }
+    if (!myPerson.profilePhotoUrl) {
+      nudges.push({ message: "You haven't added a photo yet", href: profileHref });
+    }
+    if ((myPerson.parentIds?.length ?? 0) === 0) {
+      nudges.push({ message: "You have no parents listed", href: profileHref });
+    }
+  }
 
   return (
     <div
@@ -360,6 +376,44 @@ function HomeAuthenticated({ user, people, memories, events, myPerson }: HomePro
             steps={gettingStarted}
             completedSteps={completedSteps}
           />
+        </section>
+      ) : null}
+
+      {/* Suggested actions — gentle nudges for active users */}
+      {nudges.length > 0 && !isNewUser ? (
+        <section className="mb-14">
+          <p className="eyebrow" style={{ marginBottom: 12 }}>
+            Suggested actions
+          </p>
+          <div className="space-y-2">
+            {nudges.slice(0, HOME_RECENT.NUDGES).map((nudge) => (
+              <Link
+                key={nudge.message}
+                href={nudge.href}
+                className="flex items-center gap-3 rounded-xl px-4 py-3"
+                style={{
+                  background: "var(--card)",
+                  border: "1px solid var(--hairline)",
+                  textDecoration: "none",
+                  color: "var(--ink)",
+                }}
+              >
+                <span
+                  className="h-2 w-2 flex-shrink-0 rounded-full"
+                  style={{ background: "var(--sage-deep)" }}
+                />
+                <span className="flex-1 text-sm" style={{ color: "var(--ink-2)" }}>
+                  {nudge.message}
+                </span>
+                <span
+                  className="flex-shrink-0 text-sm font-medium"
+                  style={{ color: "var(--sage-deep)" }}
+                >
+                  Fix
+                </span>
+              </Link>
+            ))}
+          </div>
         </section>
       ) : null}
 

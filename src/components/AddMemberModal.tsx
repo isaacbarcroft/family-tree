@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase"
 import { RELATIONSHIP_SUBTYPES, MARRIAGE_STATUSES } from "@/constants/enums"
 import Modal from "@/components/Modal"
 import { getErrorMessage } from "@/utils/errorMessage"
+import { escapeLikePattern } from "@/utils/likeEscape"
 
 interface AddMemberModalProps {
   onClose: () => void
@@ -36,22 +37,33 @@ const AddMemberModal = ({ onClose, currentPersonId, onLinked }: AddMemberModalPr
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const titleId = useId()
 
-  useEffect(() => {
-    if (!search.trim()) {
-      setResults([])
-      setSearched(false)
-      return
+  // Track the last `search` value we saw so the empty-input case can clear
+  // results during render rather than from inside an effect (which would
+  // cascade an extra re-render — matches the React 19 pattern from
+  // MemoryImage).
+  const [prevSearchTrim, setPrevSearchTrim] = useState("")
+  const trimmed = search.trim()
+  if (trimmed !== prevSearchTrim) {
+    setPrevSearchTrim(trimmed)
+    if (!trimmed) {
+      if (results.length > 0) setResults([])
+      if (searched) setSearched(false)
     }
+  }
+
+  useEffect(() => {
+    if (!search.trim()) return
 
     if (debounceRef.current) clearTimeout(debounceRef.current)
 
     debounceRef.current = setTimeout(async () => {
       setLoading(true)
-      const term = search.toLowerCase()
+      const term = escapeLikePattern(search.toLowerCase())
       const { data, error } = await supabase
         .from("people")
         .select("*")
         .ilike("searchName", `${term}%`)
+        .is("deletedAt", null)
         .limit(10)
 
       if (error) {
@@ -155,7 +167,7 @@ const AddMemberModal = ({ onClose, currentPersonId, onLinked }: AddMemberModalPr
       setError(
         getErrorMessage(
           err,
-          `Created ${firstName} but failed to link them. Open their profile to link manually.`,
+          `Created ${firstName} but failed to link them. Open their page to link manually.`,
         ),
       )
       setCreating(false)

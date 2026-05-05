@@ -3,6 +3,14 @@ import { NextResponse } from "next/server"
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ""
 
+// Seed routes write directly with the service role and bypass RLS, so they
+// must never run outside local development. In production / preview / test
+// the handlers respond 404 to mimic a non-existent route.
+function notFoundOutsideDev(): NextResponse | null {
+  if (process.env.NODE_ENV === "development") return null
+  return new NextResponse(null, { status: 404 })
+}
+
 async function supabaseRest(
   table: string,
   method: "POST" | "GET" | "DELETE",
@@ -121,6 +129,9 @@ function person(
 }
 
 export async function POST() {
+  const blocked = notFoundOutsideDev()
+  if (blocked) return blocked
+
   if (!supabaseUrl || !supabaseServiceKey) {
     return NextResponse.json(
       { error: "Missing SUPABASE_SERVICE_ROLE_KEY env var" },
@@ -519,6 +530,9 @@ export async function POST() {
 }
 
 export async function DELETE() {
+  const blocked = notFoundOutsideDev()
+  if (blocked) return blocked
+
   if (!supabaseUrl || !supabaseServiceKey) {
     return NextResponse.json(
       { error: "Missing SUPABASE_SERVICE_ROLE_KEY env var" },

@@ -16,6 +16,7 @@ import type { GeocodedPlace } from "@/models/GeocodedPlace";
 import type { Person } from "@/models/Person";
 import type { Residence } from "@/models/Residence";
 import type { PlacePin } from "@/components/PlacesMap";
+import { PLACES_MAP_HEIGHT } from "@/config/constants";
 
 const PlacesMap = dynamic(() => import("@/components/PlacesMap"), {
   ssr: false,
@@ -23,7 +24,7 @@ const PlacesMap = dynamic(() => import("@/components/PlacesMap"), {
     <div
       className="w-full animate-pulse rounded-md"
       style={{
-        height: "70vh",
+        height: PLACES_MAP_HEIGHT,
         background: "var(--paper-2)",
         border: "1px solid var(--hairline)",
       }}
@@ -223,7 +224,7 @@ export default function PlacesPage() {
             <div
               className="w-full animate-pulse rounded-md"
               style={{
-                height: "70vh",
+                height: PLACES_MAP_HEIGHT,
                 background: "var(--paper-2)",
                 border: "1px solid var(--hairline)",
               }}

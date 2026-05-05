@@ -3,7 +3,6 @@ import { Fraunces, Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/AuthProvider";
 import NavBar from "@/components/NavBar";
-import ErrorBoundary from "@/components/ErrorBoundary";
 import { ThemeScript } from "@/components/ThemeScript";
 
 const fraunces = Fraunces({
@@ -43,9 +42,7 @@ export default function RootLayout({
       <body>
         <AuthProvider>
           <NavBar />
-          <main>
-            <ErrorBoundary>{children}</ErrorBoundary>
-          </main>
+          <main>{children}</main>
         </AuthProvider>
       </body>
     </html>

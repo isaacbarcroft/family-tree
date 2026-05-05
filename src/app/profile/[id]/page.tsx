@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
@@ -10,6 +10,7 @@ import {
   listEventsForPerson,
   listFamiliesForPerson,
   listMemoriesForPerson,
+  listPeople,
   listPeopleByIds,
   listRelationshipsForPerson,
   savePerson,
@@ -33,6 +34,7 @@ import type { Relationship } from "@/models/Relationship";
 import { convertHeicToJpeg, isHeicFile, isHeicFileByMagic } from "@/utils/heic";
 import { formatDate } from "@/utils/dates";
 import { getErrorMessage } from "@/utils/errorMessage";
+import { findRelationship } from "@/utils/relationship";
 
 function ensureProtocol(url: string): string {
   if (/^https?:\/\//i.test(url)) return url;
@@ -107,10 +109,16 @@ function ProfileContent() {
   const [showMemoryModal, setShowMemoryModal] = useState(false);
   const [showDeceased, setShowDeceased] = useState(false);
   const [relationships, setRelationships] = useState<Relationship[]>([]);
+  const [allPeople, setAllPeople] = useState<Person[]>([]);
 
   useEffect(() => {
     if (searchParams.get("edit") === "true") setEditing(true);
   }, [searchParams]);
+
+  const refreshMemories = useCallback(async () => {
+    const mems = await listMemoriesForPerson(personId);
+    setMemories(mems);
+  }, [personId]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -119,16 +127,18 @@ function ProfileContent() {
         setPerson(p);
         setForm(p ?? {});
         if (p?.deathDate) setShowDeceased(true);
-        const [related, personMemories, families, rels] = await Promise.all([
+        const [related, personMemories, families, rels, peopleList] = await Promise.all([
           listEventsForPerson(personId),
           listMemoriesForPerson(personId),
           listFamiliesForPerson(personId),
           listRelationshipsForPerson(personId).catch(() => [] as Relationship[]),
+          listPeople().catch(() => [] as Person[]),
         ]);
         setEvents(related);
         setMemories(personMemories);
         setPersonFamilies(families);
         setRelationships(rels);
+        setAllPeople(peopleList);
       } catch (err: unknown) {
         console.error(err);
         setError("Unable to load profile data.");
@@ -269,6 +279,19 @@ function ProfileContent() {
     setTimeout(() => setClaimCopied(false), 2000);
   };
 
+  // "Your relationship" chip: derive how the viewing user is related to the
+  // displayed person. Hidden when viewing your own profile, when there's no
+  // signed-in person record, or when the two have no traceable connection.
+  const relationshipToViewer = useMemo(() => {
+    if (!user || !person) return null;
+    const me = allPeople.find((p) => p.userId === user.id) ?? null;
+    if (!me || me.id === person.id) return null;
+    const peopleById = new Map<string, Person>();
+    for (const p of allPeople) peopleById.set(p.id, p);
+    if (!peopleById.has(person.id)) peopleById.set(person.id, person);
+    return findRelationship(me.id, person.id, peopleById);
+  }, [allPeople, person, user]);
+
   if (loading) return <ProfileLoading />;
 
   if (error) {
@@ -398,6 +421,15 @@ function ProfileContent() {
               canClaim={!person.userId}
             />
 
+            {relationshipToViewer ? (
+              <div
+                className="px-6 md:px-16"
+                aria-label={`Your relationship to ${person.firstName}: ${relationshipToViewer.label}`}
+              >
+                <Chip tone="sage">Your {relationshipToViewer.label}</Chip>
+              </div>
+            ) : null}
+
             <VitalsAndConstellation
               person={person}
               relationships={relationships}
@@ -440,10 +472,7 @@ function ProfileContent() {
       {showMemoryModal ? (
         <AddMemoryModal
           onClose={() => setShowMemoryModal(false)}
-          onCreated={async () => {
-            const m = await listMemoriesForPerson(personId);
-            setMemories(m);
-          }}
+          onCreated={refreshMemories}
           preTaggedPersonId={person.id}
         />
       ) : null}

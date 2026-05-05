@@ -4,7 +4,10 @@ export interface Memory {
   description?: string
   date: string
   imageUrls?: string[]
+  audioUrl?: string
+  durationSeconds?: number
   peopleIds: string[]
   createdBy: string
   createdAt: string
+  deletedAt?: string | null
 }

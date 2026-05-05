@@ -1,9 +1,26 @@
 "use client"
 
-import { useState, useEffect, useId } from "react"
+import { useState, useId, useSyncExternalStore } from "react"
 import Modal from "@/components/Modal"
 
 const WELCOME_SEEN_KEY = "family_legacy_welcome_seen"
+
+// Subscribe to the welcome-seen flag in localStorage. We don't actually need
+// cross-tab sync (the flag is set once and never cleared during a session), so
+// the subscriber is a no-op. Routing the read through useSyncExternalStore
+// avoids the React 19 set-state-in-effect anti-pattern while staying SSR-safe.
+function subscribeWelcomeSeen() {
+  return () => {}
+}
+
+function getWelcomeSeenSnapshot(): boolean {
+  if (typeof window === "undefined") return true
+  return window.localStorage.getItem(WELCOME_SEEN_KEY) !== null
+}
+
+function getWelcomeSeenServerSnapshot(): boolean {
+  return true
+}
 
 const steps = [
   {
@@ -19,7 +36,7 @@ const steps = [
   {
     title: "Build Your Family Tree",
     description:
-      "Start by adding yourself, then add your parents, siblings, spouse, and children. Each person gets their own profile with photos, birthdays, and a bio.",
+      "Start by adding yourself, then add your parents, siblings, spouse, and children. Each person has their own page with photos, birthdays, and a bio.",
     icon: (
       <svg className="w-10 h-10 text-[var(--accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -39,7 +56,7 @@ const steps = [
   {
     title: "You're All Set!",
     description:
-      "Head to your dashboard to get started. Add a few family members, fill in your profile, and start building your legacy.",
+      "Head to your dashboard to get started. Add a few family members, fill in your details, and start building your legacy.",
     icon: (
       <svg className="w-10 h-10 text-[var(--accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -49,21 +66,22 @@ const steps = [
 ]
 
 export default function WelcomeModal() {
-  const [visible, setVisible] = useState(false)
+  const seen = useSyncExternalStore(
+    subscribeWelcomeSeen,
+    getWelcomeSeenSnapshot,
+    getWelcomeSeenServerSnapshot,
+  )
+  const [dismissed, setDismissed] = useState(false)
   const [step, setStep] = useState(0)
   const titleId = useId()
 
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    const seen = localStorage.getItem(WELCOME_SEEN_KEY)
-    if (!seen) {
-      setVisible(true)
-    }
-  }, [])
+  const visible = !seen && !dismissed
 
   const dismiss = () => {
-    localStorage.setItem(WELCOME_SEEN_KEY, "1")
-    setVisible(false)
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(WELCOME_SEEN_KEY, "1")
+    }
+    setDismissed(true)
   }
 
   const next = () => {

@@ -1,38 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
 import AuthHero from "@/components/AuthHero";
 import { Button } from "@/components/ui";
 
-export default function LoginPage() {
+function deriveInfo(params: URLSearchParams | null): string {
+  if (!params) return "";
+  if (params.get("confirmed") === "1") return "Email confirmed. You can sign in now.";
+  if (params.get("verify") === "1") return "Check your inbox and confirm your email before signing in.";
+  return "";
+}
+
+function LoginPageContent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [info, setInfo] = useState("");
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
+  const info = deriveInfo(searchParams);
 
   useEffect(() => {
     if (user) router.push("/");
   }, [user, router]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("confirmed") === "1") {
-      setInfo("Email confirmed. You can sign in now.");
-      return;
-    }
-    if (params.get("verify") === "1") {
-      setInfo("Check your inbox and confirm your email before signing in.");
-      return;
-    }
-    setInfo("");
-  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,5 +152,22 @@ function AuthInput({
         fontSize: 15,
       }}
     />
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          className="flex min-h-[80vh] items-center justify-center"
+          style={{ background: "var(--paper)", color: "var(--ink-3)" }}
+        >
+          <p style={{ fontSize: 15 }}>Loading…</p>
+        </div>
+      }
+    >
+      <LoginPageContent />
+    </Suspense>
   );
 }

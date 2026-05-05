@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 import type { Person } from "@/models/Person";
 import type { Family } from "@/models/Family";
 import { Avatar, Icon, Wordmark } from "./ui";
+import { escapeLikePattern } from "@/utils/likeEscape";
 
 type NavLink = { href: string; label: string };
 
@@ -56,18 +57,50 @@ export default function NavBar() {
     return pathname === href || pathname.startsWith(href + "/");
   };
 
+  // Clear or reset state during render — rather than from inside effects that
+  // would cascade an extra render — when an upstream value changes. Matches
+  // the React 19 pattern used in MemoryImage / ProfileAvatar.
+  const [prevSearchTrim, setPrevSearchTrim] = useState("");
+  const trimmedSearch = search.trim();
+  if (trimmedSearch !== prevSearchTrim) {
+    setPrevSearchTrim(trimmedSearch);
+    if (!trimmedSearch && searchResults.length > 0) setSearchResults([]);
+  }
+
+  const [prevUserId, setPrevUserId] = useState(user?.id ?? null);
+  const currentUserId = user?.id ?? null;
+  if (currentUserId !== prevUserId) {
+    setPrevUserId(currentUserId);
+    if (!currentUserId && myPersonId !== null) setMyPersonId(null);
+  }
+
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname);
+    if (mobileMenuOpen) setMobileMenuOpen(false);
+    if (userMenuOpen) setUserMenuOpen(false);
+    if (showResults) setShowResults(false);
+  }
+
   // Debounced search across people + families
   useEffect(() => {
-    if (!search.trim()) {
-      setSearchResults([]);
-      return;
-    }
+    if (!search.trim()) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
-      const term = search.toLowerCase();
+      const term = escapeLikePattern(search.toLowerCase());
       const [{ data: people }, { data: families }] = await Promise.all([
-        supabase.from("people").select("*").ilike("searchName", `%${term}%`).limit(5),
-        supabase.from("families").select("*").ilike("name", `%${term}%`).limit(3),
+        supabase
+          .from("people")
+          .select("*")
+          .ilike("searchName", `%${term}%`)
+          .is("deletedAt", null)
+          .limit(5),
+        supabase
+          .from("families")
+          .select("*")
+          .ilike("name", `%${term}%`)
+          .is("deletedAt", null)
+          .limit(3),
       ]);
       const results: SearchResult[] = [];
       if (people) {
@@ -87,15 +120,13 @@ export default function NavBar() {
 
   // Resolve the signed-in user's person record so the menu can deep-link to their profile
   useEffect(() => {
-    if (!user) {
-      setMyPersonId(null);
-      return;
-    }
+    if (!user) return;
     let cancelled = false;
     supabase
       .from("people")
       .select("id")
       .eq("userId", user.id)
+      .is("deletedAt", null)
       .limit(1)
       .then(({ data }) => {
         if (cancelled) return;
@@ -120,13 +151,6 @@ export default function NavBar() {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
-
-  // Close menus on route change
-  useEffect(() => {
-    setMobileMenuOpen(false);
-    setUserMenuOpen(false);
-    setShowResults(false);
-  }, [pathname]);
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();

@@ -8,6 +8,7 @@ import type { Person } from "@/models/Person"
 import { EVENT_TYPES } from "@/constants/enums"
 import type { EventType } from "@/constants/enums"
 import { getErrorMessage } from "@/utils/errorMessage"
+import { escapeLikePattern } from "@/utils/likeEscape"
 import Modal from "@/components/Modal"
 
 interface AddEventModalProps {
@@ -33,11 +34,12 @@ export default function AddEventModal({ onClose, onCreated }: AddEventModalProps
       setSearchResults([])
       return
     }
-    const term = search.toLowerCase()
+    const term = escapeLikePattern(search.toLowerCase())
     supabase
       .from("people")
       .select("*")
       .ilike("searchName", `${term}%`)
+      .is("deletedAt", null)
       .limit(8)
       .then(({ data, error: err }) => {
         if (err) return
