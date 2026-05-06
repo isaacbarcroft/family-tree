@@ -2,6 +2,8 @@
 // Supabase / Resend / Next imports so the logic can be unit-tested in
 // isolation.
 
+import { parseLocalDate } from "@/utils/dates"
+
 export type DigestFrequency = "off" | "daily" | "weekly"
 
 export interface NotificationPrefs {
@@ -27,7 +29,23 @@ export interface DigestCommentRow {
 export interface DigestMemoryRow {
   id: string
   title: string
+  date: string
   createdBy: string
+}
+
+export interface DigestEventRow {
+  id: string
+  title: string
+  date: string
+}
+
+export interface DigestPersonRow {
+  id: string
+  userId: string | null
+  firstName: string | null
+  lastName: string | null
+  birthDate: string | null
+  deathDate: string | null
 }
 
 export interface DigestRecipient {
@@ -52,11 +70,31 @@ export interface DigestEntry {
   actorNames: string[]
 }
 
+export interface DigestBirthdayEntry {
+  personId: string
+  displayName: string
+  age: number | null
+  occurrenceDate: string
+}
+
+export interface DigestAnniversaryEntry {
+  itemId: string
+  title: string
+  kind: "memory" | "event"
+  yearsAgo: number
+  occurrenceDate: string
+  originalDate: string
+}
+
 export interface DigestForRecipient {
   recipient: DigestRecipient
   entries: DigestEntry[]
+  birthdays: DigestBirthdayEntry[]
+  anniversaries: DigestAnniversaryEntry[]
   totalReactions: number
   totalComments: number
+  totalBirthdays: number
+  totalAnniversaries: number
 }
 
 const DEFAULT_PREFS: NotificationPrefs = {
@@ -64,6 +102,8 @@ const DEFAULT_PREFS: NotificationPrefs = {
   reactions: true,
   comments: true,
 }
+
+const ANNIVERSARY_YEARS = new Set([1, 5, 10, 25])
 
 export function normalizePrefs(raw: unknown): NotificationPrefs {
   if (typeof raw !== "object" || raw === null) return { ...DEFAULT_PREFS }
@@ -111,6 +151,41 @@ function isAfter(rowCreatedAt: string, sinceIso: string | null): boolean {
   return new Date(rowCreatedAt).getTime() > new Date(sinceIso).getTime()
 }
 
+function displayNameForPerson(person: DigestPersonRow): string {
+  const fullName = [person.firstName, person.lastName].filter(Boolean).join(" ").trim()
+  if (fullName) return fullName
+  return "A family member"
+}
+
+function findOccurrenceInWindow(
+  sourceDate: string,
+  sinceIso: string,
+  now: Date
+): Date | null {
+  const source = parseLocalDate(sourceDate)
+  const sourceTime = source.getTime()
+  if (Number.isNaN(sourceTime)) return null
+
+  const since = new Date(sinceIso)
+  const sinceTime = since.getTime()
+  if (Number.isNaN(sinceTime)) return null
+
+  let year = since.getFullYear()
+  const nowYear = now.getFullYear()
+  while (year <= nowYear) {
+    const occurrence = new Date(year, source.getMonth(), source.getDate())
+    const occurrenceTime = occurrence.getTime()
+    if (!Number.isNaN(occurrenceTime)) {
+      if (occurrenceTime > sinceTime && occurrenceTime <= now.getTime()) {
+        return occurrence
+      }
+    }
+    year += 1
+  }
+
+  return null
+}
+
 // Group raw activity into per-recipient digests. Drops:
 //   - activity that pre-dates the recipient's lastDigestSentAt (so a daily
 //     digest doesn't include rows already shipped in yesterday's email)
@@ -126,6 +201,8 @@ function isAfter(rowCreatedAt: string, sinceIso: string | null): boolean {
 export function buildDigests(input: {
   recipients: DigestRecipient[]
   memories: DigestMemoryRow[]
+  events: DigestEventRow[]
+  people: DigestPersonRow[]
   reactions: DigestReactionRow[]
   comments: DigestCommentRow[]
   actorNames: DigestActorName[]
@@ -143,7 +220,10 @@ export function buildDigests(input: {
     if (!isDigestDue(recipient, input.now)) continue
 
     const since = recipient.lastDigestSentAt
+    const cycleStartIso = recipient.lastDigestSentAt ?? recipient.createdAt
     const entriesByMemoryId = new Map<string, DigestEntry>()
+    const birthdays: DigestBirthdayEntry[] = []
+    const anniversaries: DigestAnniversaryEntry[] = []
 
     function ensureEntry(memoryId: string): DigestEntry | null {
       const existing = entriesByMemoryId.get(memoryId)
@@ -190,10 +270,89 @@ export function buildDigests(input: {
       }
     }
 
+    for (const person of input.people) {
+      if (!person.birthDate) continue
+      if (person.deathDate) continue
+
+      const occurrence = findOccurrenceInWindow(
+        person.birthDate,
+        cycleStartIso,
+        input.now
+      )
+      if (!occurrence) continue
+
+      const birth = parseLocalDate(person.birthDate)
+      const birthTime = birth.getTime()
+      let age: number | null = null
+      if (!Number.isNaN(birthTime)) {
+        age = occurrence.getFullYear() - birth.getFullYear()
+      }
+
+      birthdays.push({
+        personId: person.id,
+        displayName: displayNameForPerson(person),
+        age,
+        occurrenceDate: occurrence.toISOString(),
+      })
+    }
+
+    for (const memory of input.memories) {
+      const occurrence = findOccurrenceInWindow(memory.date, cycleStartIso, input.now)
+      if (!occurrence) continue
+
+      const originalDate = parseLocalDate(memory.date)
+      const yearsAgo = occurrence.getFullYear() - originalDate.getFullYear()
+      if (!ANNIVERSARY_YEARS.has(yearsAgo)) continue
+
+      anniversaries.push({
+        itemId: memory.id,
+        title: memory.title,
+        kind: "memory",
+        yearsAgo,
+        occurrenceDate: occurrence.toISOString(),
+        originalDate: memory.date,
+      })
+    }
+
+    for (const event of input.events) {
+      const occurrence = findOccurrenceInWindow(event.date, cycleStartIso, input.now)
+      if (!occurrence) continue
+
+      const originalDate = parseLocalDate(event.date)
+      const yearsAgo = occurrence.getFullYear() - originalDate.getFullYear()
+      if (!ANNIVERSARY_YEARS.has(yearsAgo)) continue
+
+      anniversaries.push({
+        itemId: event.id,
+        title: event.title,
+        kind: "event",
+        yearsAgo,
+        occurrenceDate: occurrence.toISOString(),
+        originalDate: event.date,
+      })
+    }
+
     const entries = Array.from(entriesByMemoryId.values()).filter(
       (e) => e.reactionCount + e.commentCount > 0
     )
-    if (entries.length === 0) continue
+    birthdays.sort((a, b) => {
+      const timeDiff =
+        new Date(a.occurrenceDate).getTime() - new Date(b.occurrenceDate).getTime()
+      if (timeDiff !== 0) return timeDiff
+      return a.displayName.localeCompare(b.displayName)
+    })
+    anniversaries.sort((a, b) => {
+      const timeDiff =
+        new Date(a.occurrenceDate).getTime() - new Date(b.occurrenceDate).getTime()
+      if (timeDiff !== 0) return timeDiff
+      return a.title.localeCompare(b.title)
+    })
+
+    const totalBirthdays = birthdays.length
+    const totalAnniversaries = anniversaries.length
+    if (entries.length === 0 && totalBirthdays === 0 && totalAnniversaries === 0) {
+      continue
+    }
 
     let totalReactions = 0
     let totalComments = 0
@@ -205,8 +364,12 @@ export function buildDigests(input: {
     result.push({
       recipient,
       entries,
+      birthdays,
+      anniversaries,
       totalReactions,
       totalComments,
+      totalBirthdays,
+      totalAnniversaries,
     })
   }
 

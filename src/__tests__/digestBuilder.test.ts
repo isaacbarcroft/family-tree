@@ -113,8 +113,38 @@ describe("isDigestDue", () => {
 
 describe("buildDigests", () => {
   const memories = [
-    { id: "m1", title: "Wedding day", createdBy: "owner1" },
-    { id: "m2", title: "Beach trip", createdBy: "owner2" },
+    { id: "m1", title: "Wedding day", date: "2021-05-04", createdBy: "owner1" },
+    { id: "m2", title: "Beach trip", date: "2019-05-03", createdBy: "owner2" },
+  ]
+  const events = [
+    { id: "e1", title: "Graduation", date: "2016-05-02" },
+    { id: "e2", title: "Housewarming", date: "2024-05-04" },
+  ]
+  const people = [
+    {
+      id: "p1",
+      userId: "actor1",
+      firstName: "Alex",
+      lastName: "Doe",
+      birthDate: "1990-05-04",
+      deathDate: null,
+    },
+    {
+      id: "p2",
+      userId: "actor2",
+      firstName: "Bea",
+      lastName: "Lee",
+      birthDate: "1988-05-02",
+      deathDate: null,
+    },
+    {
+      id: "p3",
+      userId: null,
+      firstName: "Grandpa",
+      lastName: "Jones",
+      birthDate: "1940-05-01",
+      deathDate: "2020-08-01",
+    },
   ]
   const actorNames = [
     { userId: "actor1", displayName: "Alex Doe" },
@@ -152,6 +182,8 @@ describe("buildDigests", () => {
     const out = buildDigests({
       recipients,
       memories,
+      events,
+      people,
       reactions,
       comments: [],
       actorNames,
@@ -183,12 +215,15 @@ describe("buildDigests", () => {
     const out = buildDigests({
       recipients,
       memories,
+      events,
+      people,
       reactions,
       comments: [],
       actorNames,
       now: NOW,
     })
-    expect(out).toEqual([])
+    expect(out).toHaveLength(1)
+    expect(out[0].entries).toEqual([])
   })
 
   it("excludes activity that pre-dates lastDigestSentAt", () => {
@@ -216,6 +251,8 @@ describe("buildDigests", () => {
     const out = buildDigests({
       recipients,
       memories,
+      events,
+      people,
       reactions,
       comments: [],
       actorNames,
@@ -244,12 +281,15 @@ describe("buildDigests", () => {
     const out = buildDigests({
       recipients,
       memories,
+      events,
+      people,
       reactions,
       comments: [],
       actorNames,
       now: NOW,
     })
-    expect(out).toEqual([])
+    expect(out).toHaveLength(1)
+    expect(out[0].entries).toEqual([])
   })
 
   it("respects muteReactions and muteComments prefs", () => {
@@ -279,6 +319,8 @@ describe("buildDigests", () => {
     const out = buildDigests({
       recipients,
       memories,
+      events,
+      people,
       reactions,
       comments,
       actorNames,
@@ -308,6 +350,8 @@ describe("buildDigests", () => {
     const out = buildDigests({
       recipients,
       memories,
+      events,
+      people,
       reactions,
       comments: [],
       actorNames,
@@ -334,6 +378,8 @@ describe("buildDigests", () => {
     const out = buildDigests({
       recipients,
       memories,
+      events,
+      people,
       reactions,
       comments: [],
       actorNames,
@@ -361,12 +407,15 @@ describe("buildDigests", () => {
     const out = buildDigests({
       recipients,
       memories,
+      events,
+      people,
       reactions,
       comments: [],
       actorNames,
       now: NOW,
     })
-    expect(out).toEqual([])
+    expect(out).toHaveLength(1)
+    expect(out[0].entries).toEqual([])
   })
 
   it("processes multiple recipients in one call", () => {
@@ -399,6 +448,8 @@ describe("buildDigests", () => {
     const out = buildDigests({
       recipients,
       memories,
+      events,
+      people,
       reactions,
       comments: [],
       actorNames,
@@ -409,5 +460,89 @@ describe("buildDigests", () => {
       "owner1",
       "owner2",
     ])
+  })
+
+  it("adds birthdays and anniversaries that fall within the digest window", () => {
+    const recipients = [
+      makeRecipient({
+        userId: "owner1",
+        prefs: { digest: "daily", reactions: true, comments: true },
+        lastDigestSentAt: "2026-05-01T00:00:00Z",
+      }),
+    ]
+
+    const out = buildDigests({
+      recipients,
+      memories,
+      events,
+      people,
+      reactions: [],
+      comments: [],
+      actorNames,
+      now: NOW,
+    })
+
+    expect(out).toHaveLength(1)
+    expect(out[0].entries).toEqual([])
+    expect(out[0].totalBirthdays).toBe(2)
+    expect(out[0].totalAnniversaries).toBe(2)
+    expect(out[0].birthdays.map((entry) => entry.displayName)).toEqual([
+      "Bea Lee",
+      "Alex Doe",
+    ])
+    expect(out[0].birthdays.map((entry) => entry.age)).toEqual([38, 36])
+    expect(out[0].anniversaries.map((entry) => `${entry.kind}:${entry.title}`)).toEqual([
+      "event:Graduation",
+      "memory:Wedding day",
+    ])
+  })
+
+  it("skips deceased people and non-milestone anniversaries", () => {
+    const recipients = [
+      makeRecipient({
+        userId: "owner1",
+        prefs: { digest: "daily", reactions: true, comments: true },
+        lastDigestSentAt: "2026-04-30T00:00:00Z",
+      }),
+    ]
+
+    const out = buildDigests({
+      recipients,
+      memories,
+      events,
+      people,
+      reactions: [],
+      comments: [],
+      actorNames,
+      now: NOW,
+    })
+
+    expect(out).toHaveLength(1)
+    expect(out[0].birthdays.some((entry) => entry.displayName === "Grandpa Jones")).toBe(false)
+    expect(out[0].anniversaries.some((entry) => entry.title === "Housewarming")).toBe(false)
+    expect(out[0].anniversaries.some((entry) => entry.title === "Beach trip")).toBe(false)
+  })
+
+  it("returns no digest when the window has no activity, birthdays, or anniversaries", () => {
+    const recipients = [
+      makeRecipient({
+        userId: "owner1",
+        prefs: { digest: "daily", reactions: true, comments: true },
+        lastDigestSentAt: "2026-05-05T11:30:00Z",
+      }),
+    ]
+
+    const out = buildDigests({
+      recipients,
+      memories,
+      events,
+      people,
+      reactions: [],
+      comments: [],
+      actorNames,
+      now: NOW,
+    })
+
+    expect(out).toEqual([])
   })
 })

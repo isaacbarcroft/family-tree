@@ -7,6 +7,10 @@ async function loadRoute() {
   return await import("@/app/api/seed/route")
 }
 
+function setNodeEnv(value: "development" | "production" | "test") {
+  process.env = { ...process.env, NODE_ENV: value }
+}
+
 describe("/api/seed route gating", () => {
   beforeEach(() => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://x.supabase.co"
@@ -19,35 +23,35 @@ describe("/api/seed route gating", () => {
   })
 
   it("POST returns 404 in production", async () => {
-    process.env.NODE_ENV = "production"
+    setNodeEnv("production")
     const { POST } = await loadRoute()
     const res = await POST()
     expect(res.status).toBe(404)
   })
 
   it("DELETE returns 404 in production", async () => {
-    process.env.NODE_ENV = "production"
+    setNodeEnv("production")
     const { DELETE } = await loadRoute()
     const res = await DELETE()
     expect(res.status).toBe(404)
   })
 
   it("POST returns 404 in test (non-dev) by default", async () => {
-    process.env.NODE_ENV = "test"
+    setNodeEnv("test")
     const { POST } = await loadRoute()
     const res = await POST()
     expect(res.status).toBe(404)
   })
 
   it("DELETE returns 404 in test (non-dev) by default", async () => {
-    process.env.NODE_ENV = "test"
+    setNodeEnv("test")
     const { DELETE } = await loadRoute()
     const res = await DELETE()
     expect(res.status).toBe(404)
   })
 
   it("POST does not call fetch when blocked", async () => {
-    process.env.NODE_ENV = "production"
+    setNodeEnv("production")
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(
       (async () => new Response("", { status: 200 })) as unknown as typeof fetch
     )
@@ -58,7 +62,7 @@ describe("/api/seed route gating", () => {
   })
 
   it("DELETE does not call fetch when blocked", async () => {
-    process.env.NODE_ENV = "production"
+    setNodeEnv("production")
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(
       (async () => new Response("", { status: 200 })) as unknown as typeof fetch
     )
@@ -69,7 +73,7 @@ describe("/api/seed route gating", () => {
   })
 
   it("POST passes the dev gate when NODE_ENV=development", async () => {
-    process.env.NODE_ENV = "development"
+    setNodeEnv("development")
     delete process.env.SUPABASE_SERVICE_ROLE_KEY
     const { POST } = await loadRoute()
     const res = await POST()
@@ -80,7 +84,7 @@ describe("/api/seed route gating", () => {
   })
 
   it("DELETE passes the dev gate when NODE_ENV=development", async () => {
-    process.env.NODE_ENV = "development"
+    setNodeEnv("development")
     delete process.env.SUPABASE_SERVICE_ROLE_KEY
     const { DELETE } = await loadRoute()
     const res = await DELETE()

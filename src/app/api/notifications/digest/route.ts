@@ -5,8 +5,10 @@ import {
   normalizePrefs,
   type DigestActorName,
   type DigestCommentRow,
+  type DigestEventRow,
   type DigestForRecipient,
   type DigestMemoryRow,
+  type DigestPersonRow,
   type DigestReactionRow,
   type DigestRecipient,
 } from "@/utils/digest"
@@ -36,9 +38,12 @@ interface AuthUserRow {
 }
 
 interface PersonRow {
+  id: string
   userId: string | null
   firstName: string | null
   lastName: string | null
+  birthDate: string | null
+  deathDate: string | null
 }
 
 async function supabaseGet<T>(
@@ -172,9 +177,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, sent: 0, skipped: 0 })
   }
 
-  // 2. Load all reactions and comments. Single-family scale: full-table scans
-  //    are fine. The digest builder filters by `> lastDigestSentAt` per user.
-  const [reactions, comments] = await Promise.all([
+  // 2. Load the full family-scale datasets once. The digest builder handles
+  //    per-user filtering, cadence windows, birthdays, and anniversaries.
+  const [reactions, comments, memories, events, peopleRows] = await Promise.all([
     supabaseGet<DigestReactionRow[]>(
       supabaseUrl,
       supabaseServiceKey,
@@ -185,55 +190,48 @@ export async function POST(request: NextRequest) {
       supabaseServiceKey,
       `/rest/v1/memory_comments?select=memoryId,userId,body,createdAt`
     ),
+    supabaseGet<DigestMemoryRow[]>(
+      supabaseUrl,
+      supabaseServiceKey,
+      `/rest/v1/memories?select=id,title,date,createdBy&deletedAt=is.null`
+    ),
+    supabaseGet<DigestEventRow[]>(
+      supabaseUrl,
+      supabaseServiceKey,
+      `/rest/v1/events?select=id,title,date&deletedAt=is.null`
+    ),
+    supabaseGet<PersonRow[]>(
+      supabaseUrl,
+      supabaseServiceKey,
+      `/rest/v1/people?select=id,userId,firstName,lastName,birthDate,deathDate&deletedAt=is.null`
+    ),
   ])
 
-  // 3. Load only the memories that have at least one reaction or comment.
-  //    We need title + createdBy to route the digest to the memory's author.
-  const referencedMemoryIds = Array.from(
-    new Set([
-      ...reactions.map((r) => r.memoryId),
-      ...comments.map((c) => c.memoryId),
-    ])
-  )
-  let memories: DigestMemoryRow[] = []
-  if (referencedMemoryIds.length > 0) {
-    const idList = referencedMemoryIds.join(",")
-    memories = await supabaseGet<DigestMemoryRow[]>(
-      supabaseUrl,
-      supabaseServiceKey,
-      `/rest/v1/memories?select=id,title,createdBy&id=in.(${idList})&deletedAt=is.null`
-    )
+  const people: DigestPersonRow[] = peopleRows.map((row) => ({
+    id: row.id,
+    userId: row.userId,
+    firstName: row.firstName,
+    lastName: row.lastName,
+    birthDate: row.birthDate,
+    deathDate: row.deathDate,
+  }))
+
+  const actorNames: DigestActorName[] = []
+  for (const person of people) {
+    if (typeof person.userId !== "string" || person.userId.length === 0) {
+      continue
+    }
+
+    const displayName =
+      [person.firstName, person.lastName].filter(Boolean).join(" ").trim() ||
+      "A family member"
+    actorNames.push({
+      userId: person.userId,
+      displayName,
+    })
   }
 
-  // 4. Look up display names for everyone who reacted or commented.
-  const actorIds = Array.from(
-    new Set<string>([
-      ...reactions.map((r) => r.userId),
-      ...comments.map((c) => c.userId),
-    ])
-  )
-  let actorNames: DigestActorName[] = []
-  if (actorIds.length > 0) {
-    const idList = actorIds.join(",")
-    const peopleRows = await supabaseGet<PersonRow[]>(
-      supabaseUrl,
-      supabaseServiceKey,
-      `/rest/v1/people?select=userId,firstName,lastName&userId=in.(${idList})`
-    )
-    actorNames = peopleRows
-      .filter(
-        (p): p is PersonRow & { userId: string } =>
-          typeof p.userId === "string" && p.userId.length > 0
-      )
-      .map((p) => ({
-        userId: p.userId,
-        displayName:
-          [p.firstName, p.lastName].filter(Boolean).join(" ").trim() ||
-          "A family member",
-      }))
-  }
-
-  // 5. Look up auth users to get email + first name for the recipients.
+  // 3. Look up auth users to get email + first name for the recipients.
   const recipientIds = appUsers.map((u) => u.userId)
   const authUsers = await fetchAuthUsersByIds(
     supabaseUrl,
@@ -261,6 +259,8 @@ export async function POST(request: NextRequest) {
   const digests = buildDigests({
     recipients,
     memories,
+    events,
+    people,
     reactions,
     comments,
     actorNames,
@@ -288,7 +288,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // 6. Stamp lastDigestSentAt for everyone we successfully emailed. PATCH
+  // 4. Stamp lastDigestSentAt for everyone we successfully emailed. PATCH
   //    one user at a time to keep the JSON body small and the failure mode
   //    obvious; single-family scale makes the round-trip count irrelevant.
   const stampIso = now.toISOString()
@@ -331,12 +331,18 @@ function emailFor(
     subject: buildDigestSubject({
       totalReactions: digest.totalReactions,
       totalComments: digest.totalComments,
+      totalBirthdays: digest.totalBirthdays,
+      totalAnniversaries: digest.totalAnniversaries,
     }),
     html: buildDigestHtml({
       firstName,
       totalReactions: digest.totalReactions,
       totalComments: digest.totalComments,
+      totalBirthdays: digest.totalBirthdays,
+      totalAnniversaries: digest.totalAnniversaries,
       entries: digest.entries,
+      birthdays: digest.birthdays,
+      anniversaries: digest.anniversaries,
       unsubscribeUrl: unsubscribeUrlFor(digest.recipient.unsubscribeToken),
       appUrl: appBaseUrl(),
     }),
