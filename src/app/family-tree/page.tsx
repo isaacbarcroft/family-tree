@@ -7,12 +7,34 @@ import { addPerson, listPeople, deletePerson } from "@/lib/db"
 import type { Person } from "@/models/Person"
 import { useAuth } from "@/components/AuthProvider"
 import { ProfileAvatar } from "@/components/ProfileAvatar"
-import { formatDate } from "@/utils/dates"
+import { parseLocalDate } from "@/utils/dates"
 import ConfirmDialog from "@/components/ConfirmDialog"
 import EmptyState from "@/components/EmptyState"
 import { SkeletonPage } from "@/components/SkeletonLoader"
 import ImportGedcomModal from "@/components/ImportGedcomModal"
 import { PAGE_SIZE } from "@/config/constants"
+
+function personYear(date?: string): number | null {
+  if (!date) return null
+  const year = parseLocalDate(date).getFullYear()
+  return Number.isFinite(year) ? year : null
+}
+
+function personLifespan(p: Person): string {
+  const birth = personYear(p.birthDate)
+  const death = personYear(p.deathDate)
+  if (birth && death) return `${birth}–${death}`
+  if (birth) return `b. ${birth}`
+  if (death) return `d. ${death}`
+  return ""
+}
+
+function personPlace(p: Person): string {
+  if (p.birthPlace) return p.birthPlace
+  const cityState = [p.city, p.state].filter(Boolean).join(", ")
+  if (cityState) return cityState
+  return p.country ?? ""
+}
 
 export default function FamilyTreePage() {
   const { user } = useAuth()
@@ -161,37 +183,34 @@ export default function FamilyTreePage() {
               </p>
             )}
             <ul className="space-y-2">
-              {people.map((p) => (
+              {people.map((p) => {
+                const lifespan = personLifespan(p)
+                const place = personPlace(p)
+                const meta = [lifespan, place].filter(Boolean).join(" · ")
+                return (
                 <li key={p.id} className="relative">
                   <Link
                     href={`/profile/${p.id}`}
-                    className="flex items-center justify-between bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl card-shadow p-4 pr-20 hover:bg-gray-800 hover:border-gray-700 transition cursor-pointer"
+                    className="flex items-center bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl card-shadow p-4 pr-20 hover:bg-gray-800 hover:border-gray-700 transition cursor-pointer"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                       <ProfileAvatar
                         src={p.profilePhotoUrl}
                         alt={`${p.firstName} ${p.lastName}`}
                         fallbackLetters={`${p.firstName} ${p.lastName}`}
                         size="sm"
-                        className="w-10 h-10"
+                        className="w-10 h-10 shrink-0"
                       />
-                      <div>
-                        <span className="font-medium text-white">
+                      <div className="min-w-0">
+                        <div className="font-medium text-white truncate">
                           {p.firstName} {p.lastName}
-                        </span>
-                        {p.roleType && (
-                          <span className="text-gray-300 text-base ml-2 capitalize">
-                            {p.roleType}
-                          </span>
+                        </div>
+                        {meta && (
+                          <div className="text-sm text-gray-400 truncate">
+                            {meta}
+                          </div>
                         )}
                       </div>
-                    </div>
-                    <div className="text-sm text-gray-300">
-                      {p.birthDate
-                        ? formatDate(p.birthDate)
-                        : p.createdAt
-                          ? `Added ${formatDate(p.createdAt)}`
-                          : ""}
                     </div>
                   </Link>
                   {user?.id === p.createdBy && (
@@ -216,7 +235,8 @@ export default function FamilyTreePage() {
                   </div>
                   )}
                 </li>
-              ))}
+                )
+              })}
             </ul>
             {hasMore && (
               <div className="text-center mt-6">

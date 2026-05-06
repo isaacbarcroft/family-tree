@@ -42,6 +42,8 @@ function installFetch(handler: FetchHandler) {
 
 describe("POST /api/notifications/digest", () => {
   beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date("2026-05-05T12:00:00Z"))
     batchSend.mockReset()
     batchSend.mockResolvedValue({ data: {}, error: null })
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co"
@@ -52,6 +54,7 @@ describe("POST /api/notifications/digest", () => {
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     vi.restoreAllMocks()
     process.env = { ...ORIGINAL_ENV }
   })
@@ -92,7 +95,7 @@ describe("POST /api/notifications/digest", () => {
     expect(batchSend).not.toHaveBeenCalled()
   })
 
-  it("sends a digest to a memory owner with new reactions and stamps lastDigestSentAt", async () => {
+  it("sends birthdays and anniversaries alongside memory activity and stamps lastDigestSentAt", async () => {
     const fetchSpy = vi.fn(async (url: string, init?: RequestInit) => {
       if (url.includes("/rest/v1/app_users") && (!init || init.method === undefined || init.method === "GET")) {
         return new Response(
@@ -104,7 +107,7 @@ describe("POST /api/notifications/digest", () => {
                 reactions: true,
                 comments: true,
               },
-              lastDigestSentAt: null,
+              lastDigestSentAt: "2026-05-01T00:00:00Z",
               unsubscribeToken: "00000000-0000-0000-0000-000000000001",
               createdAt: "2026-04-01T00:00:00Z",
             },
@@ -131,7 +134,15 @@ describe("POST /api/notifications/digest", () => {
       if (url.includes("/rest/v1/memories")) {
         return new Response(
           JSON.stringify([
-            { id: "m1", title: "Wedding", createdBy: "owner1" },
+            { id: "m1", title: "Wedding", date: "2021-05-04", createdBy: "owner1" },
+          ]),
+          { status: 200 }
+        )
+      }
+      if (url.includes("/rest/v1/events")) {
+        return new Response(
+          JSON.stringify([
+            { id: "e1", title: "Graduation", date: "2021-05-05" },
           ]),
           { status: 200 }
         )
@@ -139,7 +150,22 @@ describe("POST /api/notifications/digest", () => {
       if (url.includes("/rest/v1/people")) {
         return new Response(
           JSON.stringify([
-            { userId: "actor1", firstName: "Alex", lastName: "Doe" },
+            {
+              id: "p1",
+              userId: "actor1",
+              firstName: "Alex",
+              lastName: "Doe",
+              birthDate: "1990-05-04",
+              deathDate: null,
+            },
+            {
+              id: "p2",
+              userId: null,
+              firstName: "Maya",
+              lastName: "Stone",
+              birthDate: "1985-05-05",
+              deathDate: null,
+            },
           ]),
           { status: 200 }
         )
@@ -159,7 +185,7 @@ describe("POST /api/notifications/digest", () => {
         )
       }
       if (url.includes("/rest/v1/app_users") && init?.method === "PATCH") {
-        return new Response("", { status: 204 })
+        return new Response(null, { status: 204 })
       }
       throw new Error(`unexpected fetch ${url}`)
     })
@@ -178,7 +204,11 @@ describe("POST /api/notifications/digest", () => {
     expect(sent).toHaveLength(1)
     expect(sent[0].to).toBe("owner1@example.com")
     expect(sent[0].subject).toContain("1 new reaction")
+    expect(sent[0].subject).toContain("2 birthdays")
+    expect(sent[0].subject).toContain("2 family anniversaries")
     expect(sent[0].html).toContain("Alex Doe")
+    expect(sent[0].html).toContain("Maya Stone turns 41")
+    expect(sent[0].html).toContain("Graduation")
     expect(sent[0].html).toContain("Wedding")
     expect(sent[0].html).toContain("https://family.example/api/notifications/unsubscribe?token=")
 
@@ -188,7 +218,7 @@ describe("POST /api/notifications/digest", () => {
     expect(typeof patchBody.lastDigestSentAt).toBe("string")
   })
 
-  it("returns ok with sent=0 when no recipients have new activity", async () => {
+  it("returns ok with sent=0 when no recipients have activity or date-based reminders", async () => {
     installFetch(async (url) => {
       if (url.includes("/rest/v1/app_users")) {
         return new Response(
@@ -196,7 +226,7 @@ describe("POST /api/notifications/digest", () => {
             {
               userId: "owner1",
               notificationPrefs: { digest: "daily", reactions: true, comments: true },
-              lastDigestSentAt: "2026-05-05T00:00:00Z",
+              lastDigestSentAt: "2026-05-05T11:30:00Z",
               unsubscribeToken: "00000000-0000-0000-0000-000000000001",
               createdAt: "2026-04-01T00:00:00Z",
             },
@@ -210,8 +240,28 @@ describe("POST /api/notifications/digest", () => {
       if (url.includes("/rest/v1/memory_comments")) {
         return new Response("[]", { status: 200 })
       }
+      if (url.includes("/rest/v1/memories")) {
+        return new Response("[]", { status: 200 })
+      }
+      if (url.includes("/rest/v1/events")) {
+        return new Response("[]", { status: 200 })
+      }
+      if (url.includes("/rest/v1/people")) {
+        return new Response("[]", { status: 200 })
+      }
       if (url.includes("/auth/v1/admin/users")) {
-        return new Response(JSON.stringify({ users: [] }), { status: 200 })
+        return new Response(
+          JSON.stringify({
+            users: [
+              {
+                id: "owner1",
+                email: "owner1@example.com",
+                raw_user_meta_data: { first_name: "Owen" },
+              },
+            ],
+          }),
+          { status: 200 }
+        )
       }
       throw new Error(`unexpected fetch ${url}`)
     })
@@ -231,7 +281,7 @@ describe("POST /api/notifications/digest", () => {
             {
               userId: "owner1",
               notificationPrefs: { digest: "daily", reactions: true, comments: true },
-              lastDigestSentAt: null,
+              lastDigestSentAt: "2026-05-01T00:00:00Z",
               unsubscribeToken: "00000000-0000-0000-0000-000000000001",
               createdAt: "2026-04-01T00:00:00Z",
             },
@@ -258,13 +308,28 @@ describe("POST /api/notifications/digest", () => {
       if (url.includes("/rest/v1/memories")) {
         return new Response(
           JSON.stringify([
-            { id: "m1", title: "Wedding", createdBy: "owner1" },
+            { id: "m1", title: "Wedding", date: "2021-05-04", createdBy: "owner1" },
           ]),
           { status: 200 }
         )
       }
-      if (url.includes("/rest/v1/people")) {
+      if (url.includes("/rest/v1/events")) {
         return new Response("[]", { status: 200 })
+      }
+      if (url.includes("/rest/v1/people")) {
+        return new Response(
+          JSON.stringify([
+            {
+              id: "p1",
+              userId: "actor1",
+              firstName: "Alex",
+              lastName: "Doe",
+              birthDate: null,
+              deathDate: null,
+            },
+          ]),
+          { status: 200 }
+        )
       }
       if (url.includes("/auth/v1/admin/users")) {
         return new Response(
