@@ -16,11 +16,19 @@ interface AddMemoryModalProps {
   onClose: () => void
   onCreated: () => void
   preTaggedPersonId?: string
+  storyPrompt?: { id: string; text: string }
+  startWithRecording?: boolean
 }
 
-export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }: AddMemoryModalProps) {
+export default function AddMemoryModal({
+  onClose,
+  onCreated,
+  preTaggedPersonId,
+  storyPrompt,
+  startWithRecording = false,
+}: AddMemoryModalProps) {
   const { user } = useAuth()
-  const [title, setTitle] = useState("")
+  const [title, setTitle] = useState(storyPrompt?.text ?? "")
   const [description, setDescription] = useState("")
   const [date, setDate] = useState("")
   const [files, setFiles] = useState<File[]>([])
@@ -251,6 +259,16 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
     }
   }, [])
 
+  const autoStartedRef = useRef(false)
+  const startRecordingRef = useRef(startRecording)
+  startRecordingRef.current = startRecording
+  useEffect(() => {
+    if (!startWithRecording) return
+    if (autoStartedRef.current) return
+    autoStartedRef.current = true
+    startRecordingRef.current()
+  }, [startWithRecording])
+
   const handleSubmit = async () => {
     if (!title.trim() || !user) return
     setSubmitting(true)
@@ -282,6 +300,7 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
         audioUrl: uploadedAudioUrl,
         durationSeconds: uploadedDuration,
         peopleIds: taggedPeople.map((p) => p.id),
+        storyPromptId: storyPrompt?.id ?? null,
         createdBy: user.id,
         createdAt: new Date().toISOString(),
       })
@@ -303,6 +322,19 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
       panelClassName="bg-gray-900 border border-gray-700 rounded-lg p-6 w-full max-w-lg text-gray-100 shadow-lg max-h-[90vh] overflow-y-auto outline-none"
     >
       <h3 id={titleId} className="text-lg font-semibold mb-4 text-white">Add Memory</h3>
+
+      {storyPrompt && (
+        <div
+          role="note"
+          aria-label="Answering today's prompt"
+          className="mb-4 rounded-lg border border-[var(--accent)]/40 bg-[var(--accent)]/10 p-3"
+        >
+          <p className="text-xs uppercase tracking-wider text-[var(--accent)] font-semibold mb-1">
+            Answering today&apos;s prompt
+          </p>
+          <p className="text-gray-100 text-sm leading-snug">{storyPrompt.text}</p>
+        </div>
+      )}
 
       {error && <p className="text-red-400 text-sm mb-3">{error}</p>}
 

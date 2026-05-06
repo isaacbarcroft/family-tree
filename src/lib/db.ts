@@ -6,6 +6,7 @@ import type { MemoryReaction } from "@/models/MemoryReaction"
 import type { MemoryComment } from "@/models/MemoryComment"
 import type { ReactionEmoji } from "@/constants/reactions"
 import type { Relationship } from "@/models/Relationship"
+import type { StoryPrompt } from "@/models/StoryPrompt"
 import type { GeocodedPlace } from "@/models/GeocodedPlace"
 import type { Residence } from "@/models/Residence"
 import { escapeLikePattern } from "@/utils/likeEscape"
@@ -592,6 +593,32 @@ export async function deleteComment(id: string): Promise<void> {
     .delete()
     .eq("id", id)
   if (error) throw error
+}
+
+// ---- Story prompts ----
+export async function listStoryPrompts(): Promise<StoryPrompt[]> {
+  const { data, error } = await supabase
+    .from("story_prompts")
+    .select("*")
+    .is("isActive", true)
+    .order("createdAt", { ascending: true })
+  if (error) throw error
+  return (data ?? []) as StoryPrompt[]
+}
+
+export async function listAnsweredStoryPromptIdsForUser(userId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("memories")
+    .select("storyPromptId")
+    .eq("createdBy", userId)
+    .is("deletedAt", null)
+  if (error) throw error
+  const rows = (data ?? []) as Array<{ storyPromptId: string | null }>
+  const ids = new Set<string>()
+  for (const row of rows) {
+    if (row.storyPromptId) ids.add(row.storyPromptId)
+  }
+  return Array.from(ids)
 }
 
 // ---- Relationships ----

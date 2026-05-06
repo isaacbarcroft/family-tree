@@ -12,6 +12,7 @@ import { MemoryImage } from "@/components/MemoryImage"
 import { formatDate, getAge, getNextBirthday } from "@/utils/dates"
 import { SkeletonCard, SkeletonLine } from "@/components/SkeletonLoader"
 import WelcomeModal from "@/components/WelcomeModal"
+import StoryPromptWidget from "@/components/StoryPromptWidget"
 import { EVENT_TYPE_TAG_COLOR } from "@/constants/enums"
 import { HOME_RECENT } from "@/config/constants"
 
@@ -248,6 +249,9 @@ export default function Home() {
           <InviteFamilyButton familyId={myPerson?.familyIds?.[0]} />
         </div>
       </section>
+
+      {/* ── Story prompt of the day ── */}
+      <StoryPromptWidget userId={user.id} preTaggedPersonId={myPerson?.id} />
 
       {/* ── Getting Started (new users) ── */}
       {isNewUser && myPerson && completedSteps < gettingStarted.length && (
