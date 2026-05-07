@@ -203,4 +203,115 @@ describe("TreeNode", () => {
     // displayName and skip-render contract via referential prop equality.
     expect(TreeNode.displayName).toBe("TreeNode")
   })
+
+  it("exposes single-person nodes as keyboard-focusable buttons with an aria-label", () => {
+    const layout = singleLayoutNode(
+      { id: "p1", birth: "1920-01-01", death: "2005-06-15" },
+      "Alice Smith",
+    )
+
+    const { container } = renderInSvg(
+      <TreeNode node={layout} onNavigate={() => {}} />,
+    )
+
+    const group = container.querySelector("g[transform]")
+    expect(group?.getAttribute("role")).toBe("button")
+    expect(group?.getAttribute("tabindex")).toBe("0")
+    const label = group?.getAttribute("aria-label") ?? ""
+    expect(label).toContain("Alice Smith")
+    expect(label.toLowerCase()).toContain("page")
+  })
+
+  it("activates a single-person node on Enter and Space and prevents default for Space", () => {
+    const onNavigate = vi.fn()
+    const layout = singleLayoutNode({ id: "p1" }, "Alice Smith")
+
+    const { container } = renderInSvg(
+      <TreeNode node={layout} onNavigate={onNavigate} />,
+    )
+
+    const group = container.querySelector("g[transform]")
+    expect(group).not.toBeNull()
+
+    fireEvent.keyDown(group!, { key: "Enter" })
+    expect(onNavigate).toHaveBeenCalledWith("p1")
+
+    const spaceEvent = fireEvent.keyDown(group!, { key: " " })
+    // fireEvent returns false when preventDefault was called (and propagation
+    // wasn't stopped) — Testing Library docs:
+    // https://testing-library.com/docs/dom-testing-library/api-events/#fireevent-eventname
+    expect(spaceEvent).toBe(false)
+    expect(onNavigate).toHaveBeenCalledTimes(2)
+    expect(onNavigate).toHaveBeenLastCalledWith("p1")
+  })
+
+  it("ignores keys other than Enter and Space on a focused node", () => {
+    const onNavigate = vi.fn()
+    const layout = singleLayoutNode({ id: "p1" }, "Alice Smith")
+
+    const { container } = renderInSvg(
+      <TreeNode node={layout} onNavigate={onNavigate} />,
+    )
+
+    const group = container.querySelector("g[transform]")
+    fireEvent.keyDown(group!, { key: "Tab" })
+    fireEvent.keyDown(group!, { key: "ArrowRight" })
+    fireEvent.keyDown(group!, { key: "a" })
+    expect(onNavigate).not.toHaveBeenCalled()
+  })
+
+  it("does not make the synthetic family-root label focusable", () => {
+    // The family-root node has no id and no spouseId; it's a label, not a button.
+    const root: TreeNodeData = { name: "Smith Family", attributes: {} }
+    const layout = layoutTree(root)
+
+    const { container } = renderInSvg(
+      <TreeNode node={layout} onNavigate={() => {}} />,
+    )
+
+    const group = container.querySelector("g[transform]")
+    expect(group?.getAttribute("role")).toBeNull()
+    expect(group?.getAttribute("tabindex")).toBeNull()
+    expect(group?.getAttribute("aria-label")).toBeNull()
+  })
+
+  it("makes both halves of a couple keyboard-focusable with distinct aria-labels", () => {
+    const layout = coupleLayoutNode(
+      { id: "p1", spouseId: "p2" },
+      "Alice & Bob Smith",
+    )
+
+    const { container } = renderInSvg(
+      <TreeNode node={layout} onNavigate={() => {}} />,
+    )
+
+    const halves = Array.from(container.querySelectorAll("g")).filter(
+      (g) => g.getAttribute("role") === "button",
+    )
+    expect(halves.length).toBe(2)
+    const labels = halves.map((g) => g.getAttribute("aria-label"))
+    expect(labels[0]).toContain("Alice")
+    expect(labels[1]).toContain("Bob")
+    halves.forEach((g) => expect(g.getAttribute("tabindex")).toBe("0"))
+  })
+
+  it("activates couple halves on Enter and routes to the correct id", () => {
+    const onNavigate = vi.fn()
+    const layout = coupleLayoutNode(
+      { id: "p1", spouseId: "p2" },
+      "Alice & Bob Smith",
+    )
+
+    const { container } = renderInSvg(
+      <TreeNode node={layout} onNavigate={onNavigate} />,
+    )
+
+    const halves = Array.from(container.querySelectorAll("g")).filter(
+      (g) => g.getAttribute("role") === "button",
+    )
+    fireEvent.keyDown(halves[0], { key: "Enter" })
+    fireEvent.keyDown(halves[1], { key: "Enter" })
+    expect(onNavigate).toHaveBeenNthCalledWith(1, "p1")
+    expect(onNavigate).toHaveBeenNthCalledWith(2, "p2")
+  })
 })

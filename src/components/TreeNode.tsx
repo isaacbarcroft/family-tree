@@ -1,6 +1,6 @@
 "use client"
 
-import { memo } from "react"
+import { memo, type KeyboardEvent } from "react"
 import type { LayoutNode } from "@/utils/treeLayout"
 import { COUPLE_W, NODE_H, NODE_W } from "@/utils/treeLayout"
 import { stringToColor } from "@/utils/colors"
@@ -29,6 +29,23 @@ function getInitials(name: string): string {
     .join("")
     .slice(0, 2)
     .toUpperCase()
+}
+
+function buildAriaLabel(name: string, birth?: string, death?: string): string {
+  if (birth && death) return `View ${name}'s page, ${formatDate(birth)} to ${formatDate(death)}`
+  if (birth) return `View ${name}'s page, born ${formatDate(birth)}`
+  return `View ${name}'s page`
+}
+
+// Activate the node on Enter or Space (and prevent Space from scrolling the
+// container). Mirrors native button behavior so SVG nodes feel like buttons.
+function handleActivationKey(
+  event: KeyboardEvent<SVGGElement>,
+  activate: () => void,
+) {
+  if (event.key !== "Enter" && event.key !== " ") return
+  event.preventDefault()
+  activate()
 }
 
 interface TreeNodeProps {
@@ -67,6 +84,8 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
     const name2 = node.data.name.split(" & ")[1] || ""
     const photo1 = attrs.photo
     const photo2 = attrs.spousePhoto
+    const leftId = attrs.id
+    const rightId = attrs.spouseId
 
     return (
       <g transform={`translate(${nodeX}, ${nodeY})`}>
@@ -81,8 +100,15 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
 
         {/* Left person */}
         <g
-          onClick={() => attrs.id && onNavigate(attrs.id)}
-          style={{ cursor: "pointer" }}
+          role={leftId ? "button" : undefined}
+          tabIndex={leftId ? 0 : undefined}
+          aria-label={leftId ? buildAriaLabel(name1) : undefined}
+          onClick={() => leftId && onNavigate(leftId)}
+          onKeyDown={(e) => {
+            if (!leftId) return
+            handleActivationKey(e, () => onNavigate(leftId))
+          }}
+          style={{ cursor: leftId ? "pointer" : "default" }}
         >
           {photo1 ? (
             <>
@@ -124,8 +150,15 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
 
         {/* Right person (spouse) */}
         <g
-          onClick={() => attrs.spouseId && onNavigate(attrs.spouseId)}
-          style={{ cursor: "pointer" }}
+          role={rightId ? "button" : undefined}
+          tabIndex={rightId ? 0 : undefined}
+          aria-label={rightId ? buildAriaLabel(name2) : undefined}
+          onClick={() => rightId && onNavigate(rightId)}
+          onKeyDown={(e) => {
+            if (!rightId) return
+            handleActivationKey(e, () => onNavigate(rightId))
+          }}
+          style={{ cursor: rightId ? "pointer" : "default" }}
         >
           {photo2 ? (
             <>
@@ -160,12 +193,20 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
   const photo = attrs.photo
   const birthStr = attrs.birth ? formatDate(attrs.birth) : ""
   const deathStr = attrs.death ? formatDate(attrs.death) : ""
+  const personId = attrs.id
 
   return (
     <g
       transform={`translate(${nodeX}, ${nodeY})`}
-      onClick={() => attrs.id && onNavigate(attrs.id)}
-      style={{ cursor: attrs.id ? "pointer" : "default" }}
+      role={personId ? "button" : undefined}
+      tabIndex={personId ? 0 : undefined}
+      aria-label={personId ? buildAriaLabel(node.data.name, attrs.birth, attrs.death) : undefined}
+      onClick={() => personId && onNavigate(personId)}
+      onKeyDown={(e) => {
+        if (!personId) return
+        handleActivationKey(e, () => onNavigate(personId))
+      }}
+      style={{ cursor: personId ? "pointer" : "default" }}
     >
       <rect
         width={NODE_W}

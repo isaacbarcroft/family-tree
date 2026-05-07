@@ -143,7 +143,14 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
       >
         Reset view
       </button>
-      <svg ref={svgRef} width={dims.width} height={dims.height} style={{ cursor: "grab" }}>
+      <svg
+        ref={svgRef}
+        width={dims.width}
+        height={dims.height}
+        role="group"
+        aria-label="Family tree. Use Tab to move between people; press Enter or Space to open."
+        style={{ cursor: "grab" }}
+      >
         {/*
           Shared clip-paths. Default `clipPathUnits="userSpaceOnUse"` resolves
           each clip in the referencing element's local coordinate system, so
@@ -161,17 +168,20 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
           </clipPath>
         </defs>
         <g ref={gRef}>
-          {/* Edges */}
-          {edges.map((e, i) => (
-            <path
-              key={i}
-              d={edgePath(e)}
-              fill="none"
-              stroke="var(--card-border)"
-              strokeWidth={2}
-              opacity={0.6}
-            />
-          ))}
+          {/* Edges — decorative; the relationship is conveyed by the page layout
+              and per-node aria-labels, not by the SVG paths. */}
+          <g aria-hidden="true">
+            {edges.map((e, i) => (
+              <path
+                key={i}
+                d={edgePath(e)}
+                fill="none"
+                stroke="var(--card-border)"
+                strokeWidth={2}
+                opacity={0.6}
+              />
+            ))}
+          </g>
 
           {/* Nodes */}
           {nodes.map((node, i) => (
