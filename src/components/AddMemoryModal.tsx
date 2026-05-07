@@ -16,12 +16,26 @@ interface AddMemoryModalProps {
   onClose: () => void
   onCreated: () => void
   preTaggedPersonId?: string
+  storyPromptId?: string
+  storyPromptText?: string
+  initialTitle?: string
+  initialDescription?: string
+  autoStartRecording?: boolean
 }
 
-export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }: AddMemoryModalProps) {
+export default function AddMemoryModal({
+  onClose,
+  onCreated,
+  preTaggedPersonId,
+  storyPromptId,
+  storyPromptText,
+  initialTitle,
+  initialDescription,
+  autoStartRecording,
+}: AddMemoryModalProps) {
   const { user } = useAuth()
-  const [title, setTitle] = useState("")
-  const [description, setDescription] = useState("")
+  const [title, setTitle] = useState(initialTitle ?? "")
+  const [description, setDescription] = useState(initialDescription ?? "")
   const [date, setDate] = useState("")
   const [files, setFiles] = useState<File[]>([])
   const [previews, setPreviews] = useState<string[]>([])
@@ -234,6 +248,17 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
     recorder.stop()
   }
 
+  const autoStartedRef = useRef(false)
+  useEffect(() => {
+    if (!autoStartRecording) return
+    if (autoStartedRef.current) return
+    autoStartedRef.current = true
+    void startRecording()
+    // startRecording is intentionally not in deps: it captures fresh refs on
+    // each render and we only want the auto-start to fire once per mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStartRecording])
+
   useEffect(() => {
     return () => {
       stopRecordingTimer()
@@ -282,6 +307,7 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
         audioUrl: uploadedAudioUrl,
         durationSeconds: uploadedDuration,
         peopleIds: taggedPeople.map((p) => p.id),
+        storyPromptId: storyPromptId ?? null,
         createdBy: user.id,
         createdAt: new Date().toISOString(),
       })
@@ -303,6 +329,18 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
       panelClassName="bg-gray-900 border border-gray-700 rounded-lg p-6 w-full max-w-lg text-gray-100 shadow-lg max-h-[90vh] overflow-y-auto outline-none"
     >
       <h3 id={titleId} className="text-lg font-semibold mb-4 text-white">Add Memory</h3>
+
+      {storyPromptText && (
+        <div
+          className="mb-4 rounded-lg border border-[var(--accent)]/40 bg-[var(--accent)]/10 p-3 text-sm text-gray-100"
+          data-testid="story-prompt-banner"
+        >
+          <p className="text-xs uppercase tracking-wider text-[var(--accent)] mb-1">
+            Answering a prompt
+          </p>
+          <p className="text-base text-white">&ldquo;{storyPromptText}&rdquo;</p>
+        </div>
+      )}
 
       {error && <p className="text-red-400 text-sm mb-3">{error}</p>}
 

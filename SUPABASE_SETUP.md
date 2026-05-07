@@ -13,6 +13,7 @@ Run the SQL files in Supabase SQL Editor, in filename order:
 - `supabase/migrations/20260430_soft_delete.sql`
 - `supabase/migrations/20260501_memory_comments.sql`
 - `supabase/migrations/20260505_notification_prefs.sql`
+- `supabase/migrations/20260507_story_prompts.sql`
 
 The initial migration creates:
 
@@ -92,6 +93,7 @@ In Supabase Dashboard:
 - `20260430_soft_delete.sql` adds a `deletedAt timestamptz` column to `people`, `families`, `events`, and `memories`. The app now soft-deletes (UPDATE deletedAt) instead of hard-deleting, and every list query filters `deletedAt is null`. To restore a row, run `update <table> set "deletedAt" = null where id = '<row-id>';` from the SQL editor (admin restore UI is a deferred follow-up). To permanently purge a soft-deleted row, run `delete from <table> where id = '<row-id>' and "deletedAt" is not null;`.
 - `20260501_memory_comments.sql` adds `public.memory_comments` (id, memoryId, userId, body, parentCommentId, createdAt, updatedAt) for threaded comments on memories. RLS uses the `app_users` allowlist: SELECT for any approved user, INSERT requires `userId = auth.uid()`, UPDATE requires the row owner (no admin override on edit, by design), DELETE requires owner or admin. A trigger pins replies to one level deep; another trigger refreshes `updatedAt` on edit. Cascade FKs on `memories(id)` and `memory_comments(id)` mean deleting a memory or a parent comment removes the thread.
 - `20260505_notification_prefs.sql` adds three columns to `public.app_users`: `notificationPrefs jsonb` (default `{"digest":"weekly","reactions":true,"comments":true}`), `lastDigestSentAt timestamptz` (null = never sent; the digest worker uses the column to skip already-shipped activity), and `unsubscribeToken uuid` (random per row, unique index, used by `/api/notifications/unsubscribe`). RLS is untouched — the digest and unsubscribe routes both use the service role and bypass RLS, so the existing `app_users_admin_update` policy still keeps user-facing writes admin-only. Rollback: `20260505_notification_prefs_rollback.sql`.
+- `20260507_story_prompts.sql` adds `public.story_prompts (id, prompt, category, createdAt)` plus a nullable `memories.storyPromptId` column with `on delete set null`. The catalog is curated content: only `select` is granted to authenticated users, gated on the `is_approved_user()` allowlist; no insert/update/delete policy is defined, so only the service role can edit prompts. The migration seeds 56 prompts across seven categories (`childhood`, `career`, `love`, `faith`, `travel`, `holidays`, `pets`) via `insert ... on conflict (prompt) do nothing`, so re-running the migration is safe and additive. To extend the catalog later, append more `insert ... on conflict do nothing` rows in a new migration. Rollback: `20260507_story_prompts_rollback.sql`.
 
 ## 5) Memory-activity digest cron
 

@@ -4,6 +4,7 @@ import type { Event } from "@/models/Event"
 import type { Memory } from "@/models/Memory"
 import type { MemoryReaction } from "@/models/MemoryReaction"
 import type { MemoryComment } from "@/models/MemoryComment"
+import type { StoryPrompt } from "@/models/StoryPrompt"
 import type { ReactionEmoji } from "@/constants/reactions"
 import type { Relationship } from "@/models/Relationship"
 import type { GeocodedPlace } from "@/models/GeocodedPlace"
@@ -592,6 +593,23 @@ export async function deleteComment(id: string): Promise<void> {
     .delete()
     .eq("id", id)
   if (error) throw error
+}
+
+// ---- Story prompts ----
+export async function listStoryPrompts(): Promise<StoryPrompt[]> {
+  const { data, error } = await supabase.from("story_prompts").select("*")
+  if (error) throw error
+  return (data ?? []) as StoryPrompt[]
+}
+
+export async function getStoryPromptById(id: string): Promise<StoryPrompt | null> {
+  const { data, error } = await supabase
+    .from("story_prompts")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle()
+  if (error) throw error
+  return (data as StoryPrompt | null) ?? null
 }
 
 // ---- Relationships ----

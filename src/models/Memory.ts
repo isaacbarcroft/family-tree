@@ -7,6 +7,7 @@ export interface Memory {
   audioUrl?: string
   durationSeconds?: number
   peopleIds: string[]
+  storyPromptId?: string | null
   createdBy: string
   createdAt: string
   deletedAt?: string | null
