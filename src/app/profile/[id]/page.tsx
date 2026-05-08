@@ -232,6 +232,9 @@ function ProfileContent() {
       revokePreviewBlob();
       await updatePerson(personId, { profilePhotoUrl: url });
       setPerson((prev) => (prev ? { ...prev, profilePhotoUrl: url } : prev));
+      // Keep form in sync so a subsequent handleSave doesn't clobber the
+      // freshly-uploaded URL by re-sending the stale (often null) value.
+      setForm((prev) => ({ ...prev, profilePhotoUrl: url }));
     } catch (err: unknown) {
       console.error(err);
       setPhotoError(
@@ -408,9 +411,6 @@ function ProfileContent() {
             <Hero
               person={person}
               photoSrc={photoSrc}
-              onUploadPhoto={handlePhotoUpload}
-              uploading={photoUploading}
-              uploadError={photoError}
               lifespan={lifespan}
               birthplace={birthplace}
               livesIn={livesIn}
@@ -418,7 +418,7 @@ function ProfileContent() {
               onAddMemory={() => setShowMemoryModal(true)}
               onCopyClaim={handleCopyClaim}
               claimCopied={claimCopied}
-              canClaim={!person.userId}
+              canClaim={!person.userId && !person.deathDate}
             />
 
             {relationshipToViewer ? (
@@ -486,9 +486,6 @@ function ProfileContent() {
 type HeroProps = {
   person: Person;
   photoSrc: string | null;
-  onUploadPhoto: (file: File) => void;
-  uploading: boolean;
-  uploadError: string | null;
   lifespan: string | null;
   birthplace: string;
   livesIn: string | null;
@@ -502,9 +499,6 @@ type HeroProps = {
 function Hero({
   person,
   photoSrc,
-  onUploadPhoto,
-  uploading,
-  uploadError,
   lifespan,
   birthplace,
   livesIn,
@@ -628,40 +622,6 @@ function Hero({
         >
           Portrait
         </p>
-
-        {/* Photo upload affordance — small pencil button overlay */}
-        <label
-          className="absolute right-2 top-2 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full transition-colors"
-          style={{
-            background: "var(--paper)",
-            border: "1px solid var(--hairline-strong)",
-            color: "var(--ink)",
-            boxShadow: "var(--shadow-sm)",
-            opacity: uploading ? 0.6 : 1,
-          }}
-          aria-label={uploading ? "Uploading photo" : "Replace portrait"}
-        >
-          <Icon name={uploading ? "clock" : "pencil"} size={14} />
-          <input
-            type="file"
-            accept="image/*,.heic,.heif"
-            className="hidden"
-            disabled={uploading}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) onUploadPhoto(file);
-            }}
-          />
-        </label>
-
-        {uploadError ? (
-          <p
-            className="mt-3 text-center"
-            style={{ color: "var(--clay-deep)", fontSize: 13 }}
-          >
-            {uploadError}
-          </p>
-        ) : null}
       </div>
     </header>
   );
