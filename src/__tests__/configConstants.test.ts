@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
 import {
+  GENEALOGY_TREE_HEIGHT,
   HOME_RECENT,
   NOMINATIM_MIN_MS_BETWEEN_CALLS,
   PAGE_SIZE,
@@ -45,5 +46,12 @@ describe("config/constants PLACES_MAP_HEIGHT", () => {
   it("is a non-empty CSS length string", () => {
     expect(typeof PLACES_MAP_HEIGHT).toBe("string")
     expect(PLACES_MAP_HEIGHT).toMatch(/^\d+(?:\.\d+)?(?:px|vh|rem|em|%)$/)
+  })
+})
+
+describe("config/constants GENEALOGY_TREE_HEIGHT", () => {
+  it("is a non-empty CSS length string", () => {
+    expect(typeof GENEALOGY_TREE_HEIGHT).toBe("string")
+    expect(GENEALOGY_TREE_HEIGHT).toMatch(/^\d+(?:\.\d+)?(?:px|vh|rem|em|%)$/)
   })
 })

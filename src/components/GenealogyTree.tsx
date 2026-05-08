@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react"
 import { zoom as d3Zoom, zoomIdentity, type ZoomBehavior } from "d3-zoom"
 import { select } from "d3-selection"
 import type { TreeNode as TreeNodeData } from "@/utils/treeBuilder"
+import { GENEALOGY_TREE_HEIGHT } from "@/config/constants"
 import {
   collectEdges,
   computeBounds,
@@ -132,7 +133,7 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
   return (
     <div
       ref={containerRef}
-      style={{ width: "100%", height: "85vh" }}
+      style={{ width: "100%", height: GENEALOGY_TREE_HEIGHT }}
       className="relative bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl overflow-hidden"
     >
       <button
