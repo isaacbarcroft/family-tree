@@ -246,12 +246,12 @@ function TimelineRow({
 
   return (
     <div className="relative" style={{ paddingBottom: 32 }}>
-      {/* Year — left-aligned outside the rail */}
+      {/* Year — sits in the gutter to the left of the rail */}
       <span
         className="display"
         style={{
           position: "absolute",
-          left: -38,
+          left: -100,
           top: 6,
           fontSize: 18,
           fontWeight: 500,
@@ -262,12 +262,12 @@ function TimelineRow({
       >
         {year}
       </span>
-      {/* Dot */}
+      {/* Dot — centered on the vertical rail */}
       <span
         aria-hidden="true"
         style={{
           position: "absolute",
-          left: -5,
+          left: -35,
           top: 9,
           width: 11,
           height: 11,

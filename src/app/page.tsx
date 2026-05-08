@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { listEvents, listMemories, listPeople } from "@/lib/db";
+import type { AppUser } from "@/lib/supabase";
 import type { Event } from "@/models/Event";
 import type { Memory } from "@/models/Memory";
 import type { Person } from "@/models/Person";
@@ -191,7 +192,7 @@ function FeatureCard({
 // Authenticated home — editorial layout
 // =============================================================================
 type HomeProps = {
-  user: { id: string; email?: string };
+  user: AppUser;
   people: Person[];
   memories: Memory[];
   events: Event[];
@@ -209,15 +210,7 @@ function HomeAuthenticated({ user, people, memories, events, myPerson }: HomePro
   const featuredMemory = memories.find((m) => m.imageUrls && m.imageUrls.length > 0) ?? memories[0] ?? null;
   const recentMemories = memories.slice(0, HOME_RECENT.MEMORIES);
 
-  const greeting = myPerson?.firstName
-    ? myPerson.firstName
-    : user.email
-      ? user.email
-          .split("@")[0]
-          .split(/[._-]/)
-          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-          .join(" ")
-      : "there";
+  const greeting = resolveFirstName(myPerson, user);
 
   const today = new Date();
   const dateLine = today.toLocaleDateString("en-US", {
@@ -449,6 +442,23 @@ function timeOfDayGreeting(): string {
   if (hour < 12) return "Good morning";
   if (hour < 18) return "Good afternoon";
   return "Good evening";
+}
+
+export function resolveFirstName(person: Person | null, user: AppUser): string {
+  const fromPerson = person?.firstName?.trim();
+  if (fromPerson) return fromPerson;
+
+  const meta = user.user_metadata ?? {};
+  const rawFirst = meta.first_name;
+  const fromMeta = typeof rawFirst === "string" ? rawFirst.trim() : "";
+  if (fromMeta) return fromMeta;
+
+  const rawFull = meta.full_name;
+  const fullName = typeof rawFull === "string" ? rawFull.trim() : "";
+  const firstFromFull = fullName.split(/\s+/)[0]?.trim();
+  if (firstFromFull) return firstFromFull;
+
+  return "there";
 }
 
 function ledeText(c: { birthdayCount: number; memoryCount: number; eventCount: number }): string {
