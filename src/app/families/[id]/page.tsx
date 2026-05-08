@@ -10,6 +10,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { supabase } from "@/lib/supabase";
 import { formatDate } from "@/utils/dates";
 import { downloadGedcom } from "@/utils/gedcom";
+import { shareInvite } from "@/utils/share";
 import { Avatar, Button, Icon } from "@/components/ui";
 
 export default function FamilyPage() {
@@ -22,13 +23,17 @@ export default function FamilyPage() {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const copyInviteLink = useCallback(() => {
+  const copyInviteLink = useCallback(async () => {
     const url = `${window.location.origin}/signup?family=${familyId}`;
-    navigator.clipboard.writeText(url).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  }, [familyId]);
+    const familyName = family?.name?.trim();
+    const text = familyName
+      ? `You're invited to join the ${familyName} family on Family Legacy — our private family tree.`
+      : "You're invited to join our family on Family Legacy — our private family tree.";
+    const result = await shareInvite({ title: "Family Legacy", text, url });
+    if (result === "cancelled") return;
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [familyId, family?.name]);
 
   useEffect(() => {
     const fetchFamily = async () => {

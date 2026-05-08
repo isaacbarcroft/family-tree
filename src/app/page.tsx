@@ -13,6 +13,7 @@ import { SkeletonCard, SkeletonLine } from "@/components/SkeletonLoader";
 import { Avatar, Button, Chip, Icon, PhotoFrame } from "@/components/ui";
 import { formatDate, getAge, getNextBirthday } from "@/utils/dates";
 import { toDisplayImageUrl } from "@/utils/imageUrl";
+import { shareInvite } from "@/utils/share";
 import { HOME_RECENT } from "@/config/constants";
 
 export default function Home() {
@@ -948,13 +949,17 @@ function GettingStartedCard({
 function InviteFamilyButton({ familyId }: { familyId?: string }) {
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = useCallback(() => {
+  const handleCopy = useCallback(async () => {
     if (!familyId) return;
     const url = `${window.location.origin}/signup?family=${familyId}`;
-    navigator.clipboard.writeText(url).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+    const result = await shareInvite({
+      title: "Family Legacy",
+      text: "You're invited to join our family on Family Legacy — a private space for our family's history, photos, and memories.",
+      url,
     });
+    if (result === "cancelled") return;
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }, [familyId]);
 
   if (!familyId) {

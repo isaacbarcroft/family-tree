@@ -35,6 +35,7 @@ import { convertHeicToJpeg, isHeicFile, isHeicFileByMagic } from "@/utils/heic";
 import { formatDate } from "@/utils/dates";
 import { getErrorMessage } from "@/utils/errorMessage";
 import { findRelationship } from "@/utils/relationship";
+import { shareInvite } from "@/utils/share";
 
 function ensureProtocol(url: string): string {
   if (/^https?:\/\//i.test(url)) return url;
@@ -272,12 +273,18 @@ function ProfileContent() {
     await refreshPerson();
   };
 
-  const handleCopyClaim = () => {
+  const handleCopyClaim = async () => {
     if (!person) return;
     const url = `${window.location.origin}/signup?claim=${person.id}${
       person.familyIds?.[0] ? `&family=${person.familyIds[0]}` : ""
     }`;
-    navigator.clipboard.writeText(url);
+    const firstName = person.firstName?.trim() || "your";
+    const result = await shareInvite({
+      title: "Family Legacy",
+      text: `You're invited to claim ${firstName}'s profile on Family Legacy — our private family tree. Open the link to sign in and add your photos and memories.`,
+      url,
+    });
+    if (result === "cancelled") return;
     setClaimCopied(true);
     setTimeout(() => setClaimCopied(false), 2000);
   };
