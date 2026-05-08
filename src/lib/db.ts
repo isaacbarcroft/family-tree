@@ -5,6 +5,7 @@ import type { Memory } from "@/models/Memory"
 import type { MemoryReaction } from "@/models/MemoryReaction"
 import type { MemoryComment } from "@/models/MemoryComment"
 import type { ReactionEmoji } from "@/constants/reactions"
+import type { StoryPrompt } from "@/models/StoryPrompt"
 import type { Relationship } from "@/models/Relationship"
 import type { GeocodedPlace } from "@/models/GeocodedPlace"
 import type { Residence } from "@/models/Residence"
@@ -592,6 +593,40 @@ export async function deleteComment(id: string): Promise<void> {
     .delete()
     .eq("id", id)
   if (error) throw error
+}
+
+// ---- Story prompts ----
+export async function listStoryPrompts(): Promise<StoryPrompt[]> {
+  const { data, error } = await supabase
+    .from("story_prompts")
+    .select("*")
+    .is("deletedAt", null)
+    .order("createdAt", { ascending: true })
+  if (error) throw error
+  return (data ?? []) as StoryPrompt[]
+}
+
+/**
+ * Return the IDs of prompts the given user has already answered (i.e. there
+ * exists a non-deleted memory they created that links back to the prompt).
+ * Used by the home-page widget to filter the prompt rotation. Memories
+ * without a `promptId` (the vast majority) are filtered out client-side
+ * because the QueryBuilder does not expose a `not.is.null` filter.
+ */
+export async function listAnsweredPromptIdsForUser(userId: string): Promise<string[]> {
+  if (!userId) return []
+  const { data, error } = await supabase
+    .from("memories")
+    .select("promptId")
+    .eq("createdBy", userId)
+    .is("deletedAt", null)
+  if (error) throw error
+  const rows = (data ?? []) as { promptId: string | null }[]
+  const ids = new Set<string>()
+  for (const row of rows) {
+    if (row.promptId) ids.add(row.promptId)
+  }
+  return Array.from(ids)
 }
 
 // ---- Relationships ----

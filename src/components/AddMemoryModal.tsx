@@ -16,11 +16,12 @@ interface AddMemoryModalProps {
   onClose: () => void
   onCreated: () => void
   preTaggedPersonId?: string
+  prompt?: { id: string; body: string }
 }
 
-export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }: AddMemoryModalProps) {
+export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId, prompt }: AddMemoryModalProps) {
   const { user } = useAuth()
-  const [title, setTitle] = useState("")
+  const [title, setTitle] = useState(prompt?.body ?? "")
   const [description, setDescription] = useState("")
   const [date, setDate] = useState("")
   const [files, setFiles] = useState<File[]>([])
@@ -284,6 +285,7 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
         peopleIds: taggedPeople.map((p) => p.id),
         createdBy: user.id,
         createdAt: new Date().toISOString(),
+        promptId: prompt?.id,
       })
 
       onCreated()
@@ -302,7 +304,21 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
       labelledBy={titleId}
       panelClassName="bg-gray-900 border border-gray-700 rounded-lg p-6 w-full max-w-lg text-gray-100 shadow-lg max-h-[90vh] overflow-y-auto outline-none"
     >
-      <h3 id={titleId} className="text-lg font-semibold mb-4 text-white">Add Memory</h3>
+      <h3 id={titleId} className="text-lg font-semibold mb-4 text-white">
+        {prompt ? "Answer this prompt" : "Add Memory"}
+      </h3>
+
+      {prompt && (
+        <div
+          data-testid="prompt-context"
+          className="mb-4 rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 p-3"
+        >
+          <p className="text-xs uppercase tracking-wider text-[var(--accent)] font-medium mb-1">
+            Prompt
+          </p>
+          <p className="text-gray-100 text-sm leading-relaxed">{prompt.body}</p>
+        </div>
+      )}
 
       {error && <p className="text-red-400 text-sm mb-3">{error}</p>}
 
