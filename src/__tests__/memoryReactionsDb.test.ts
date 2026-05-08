@@ -29,7 +29,7 @@ interface ParsedCall {
   body: unknown
 }
 
-function parseCall(call: Parameters<typeof fetch>): ParsedCall {
+function parseCall(call: ReadonlyArray<unknown>): ParsedCall {
   const [url, init] = call as [string, RequestInit | undefined]
   const method = init?.method ?? "GET"
   const rawBody = init?.body

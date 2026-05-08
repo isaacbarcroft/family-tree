@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import convert from "heic-convert"
+import { verifyUser } from "@/lib/verifyUser"
 
 export const runtime = "nodejs"
 
@@ -18,6 +19,10 @@ function isHeicByMagic(buffer: Buffer) {
 }
 
 export async function POST(req: Request) {
+  if (!(await verifyUser(req))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
   try {
     const formData = await req.formData()
     const file = formData.get("file")

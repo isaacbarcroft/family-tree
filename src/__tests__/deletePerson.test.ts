@@ -29,7 +29,7 @@ type MockCall = {
   body: unknown
 }
 
-function parseCall(call: Parameters<typeof fetch>): MockCall {
+function parseCall(call: ReadonlyArray<unknown>): MockCall {
   const [url, init] = call as [string, RequestInit | undefined]
   const method = init?.method ?? "GET"
   const rawBody = init?.body

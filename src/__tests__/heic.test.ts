@@ -1,5 +1,9 @@
-import { describe, it, expect } from "vitest"
-import { isHeicFile } from "@/utils/heic"
+import { afterEach, describe, it, expect, vi } from "vitest"
+import { isHeicFile, convertHeicToJpeg } from "@/utils/heic"
+
+vi.mock("@/lib/supabase", () => ({
+  getAccessToken: vi.fn(async () => "test-access-token"),
+}))
 
 describe("isHeicFile", () => {
   it("detects .heic extension", () => {
@@ -35,5 +39,30 @@ describe("isHeicFile", () => {
   it("returns false for .png files", () => {
     const file = new File([], "photo.png", { type: "image/png" })
     expect(isHeicFile(file)).toBe(false)
+  })
+})
+
+describe("convertHeicToJpeg server fetch", () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it("sends the Bearer access token in the Authorization header", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((async () => {
+      return new Response(new Uint8Array([1, 2, 3]), {
+        status: 200,
+        headers: { "Content-Type": "image/jpeg" },
+      })
+    }) as unknown as typeof fetch)
+
+    const file = new File([new Uint8Array([0])], "img.heic", { type: "image/heic" })
+    const out = await convertHeicToJpeg(file)
+    expect(out.name).toBe("img.jpg")
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchSpy.mock.calls[0]
+    expect(String(url)).toBe("/api/convert-image")
+    const headers = (init?.headers ?? {}) as Record<string, string>
+    expect(headers.Authorization).toBe("Bearer test-access-token")
   })
 })
