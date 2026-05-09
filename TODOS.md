@@ -12,16 +12,15 @@
 
 **Quick wins first — under 1h total:**
 
-1. **T-16** — PhotoFrame lint regression, ~15 min. Restores the 0 errors / 0 warnings baseline.
-2. **T-17** — `/api/webhooks/new-user` auth spot check, ~10 min.
-3. **T-13** — wrap `GenealogyTree` in `next/dynamic`, ~30 min. Leaflet is already done in `places/page.tsx`.
+1. **T-17** — `/api/webhooks/new-user` auth spot check, ~10 min.
+2. **T-13** — wrap `GenealogyTree` in `next/dynamic`, ~30 min. Leaflet is already done in `places/page.tsx`.
 
 **Then in priority order:**
 
-4. **1.6 Accessibility** — start with `TreeNode.tsx` keyboard support. Highest-impact remaining gap; older relatives are the target audience.
-5. **T-15** — `middleware.ts` for route-level auth. Defense-in-depth on top of RLS.
-6. **1.4** — guided story prompts. Last unshipped Phase 1 engagement feature.
-7. **T-3** — extend `next/image` adoption beyond `ProfileAvatar`.
+3. **1.6 Accessibility** — start with `TreeNode.tsx` keyboard support. Highest-impact remaining gap; older relatives are the target audience.
+4. **T-15** — `middleware.ts` for route-level auth. Defense-in-depth on top of RLS.
+5. **1.4** — guided story prompts. Last unshipped Phase 1 engagement feature.
+6. **T-3** — extend `next/image` adoption beyond `ProfileAvatar`.
 
 ---
 
@@ -52,7 +51,6 @@ You've built a lot more than the original plan called for. Current stack is **Ne
 
 **What's broken or risky:**
 
-- **Lint regression.** 5 `react-hooks/set-state-in-effect` warnings in `src/components/ui/PhotoFrame.tsx:30` introduced by the UI refresh. Tracked as T-16.
 - **GenealogyTree still mouse-only.** The T-12 node-extraction refactor preserved the a11y gap — `TreeNode.tsx` interactive `<g>` elements have no `tabIndex`, `role`, `onKeyDown`, or `aria-label`. Tracked as the highest-impact item in 1.6.
 - **No edge-level auth.** `middleware.ts` does not exist; auth is entirely client-side via `AuthProvider`. Tracked as T-15.
 - Accessibility is essentially absent outside NavBar (1.6 still pending, ~10–12h)
@@ -394,13 +392,9 @@ See Completed log. Deferred sub-items (T-12.a real-device frame-rate measurement
 **Fix:** Add a `middleware.ts` at the project root that checks for a valid session cookie/token and redirects unauthenticated users to `/login` for protected routes. Exclude `/login`, `/signup`, `/auth/callback`, `/forgot-password`, `/reset-password`, and `/api/webhooks/*` and `/api/notifications/unsubscribe` (token-based, must work logged-out).
 **Effort:** 1h
 
-### T-16. Lint regression — `react-hooks/set-state-in-effect` in `PhotoFrame.tsx`
+### ~~T-16. Lint regression — `react-hooks/set-state-in-effect` + unused imports~~ ✅ Done 2026-05-09
 
-**Found:** 2026-05-08 audit
-**File:** `src/components/ui/PhotoFrame.tsx:30`
-**Problem:** `yarn lint` reports **5 warnings, 0 errors**, all in this one file. They were introduced by the UI refresh (PR #28 merged 2026-05-08). The repo previously cleaned these up on 2026-04-29 and held a 0/0 baseline; this is a regression.
-**Fix:** Apply the same render-time `prev*` tracking pattern used by `MemoryImage` and `ProfileAvatar` (see the 2026-04-29 cleanup entry in the Completed log). The pattern: instead of `useEffect(() => setFailed(false), [src])`, track the previous `src` in a `useRef` and reset state during render when `src` changes.
-**Effort:** 15 min
+See Completed log. All 5 warnings cleared; baseline back to 0/0.
 
 ### T-17. Spot-check `/api/webhooks/new-user` for a webhook-secret guard
 
@@ -453,6 +447,7 @@ This TODO list is long-form, strategy-heavy, and opinionated. **Worth comparing 
 
 ## Completed
 
+- 2026-05-09 — **T-16 Lint regression cleanup — restore 0/0 baseline.** UI refresh (PR #28) re-introduced `react-hooks/set-state-in-effect` warnings in three files plus two unused-import warnings; total 5 warnings, 0 errors. (TODO entry described it as "5 warnings in PhotoFrame.tsx" — actual breakdown was 3 set-state-in-effect across `src/components/ui/PhotoFrame.tsx`, `src/components/ui/Avatar.tsx`, and `src/components/NavBar.tsx`, plus unused `EmptyState` import in `src/app/family-tree/page.tsx` and unused `Icon` import in `src/app/timeline/page.tsx`.) Fixes: (1) `PhotoFrame` and `Avatar` now reset `failed` state via the render-time `prev*` pattern (matching `MemoryImage` / `ProfileAvatar`) instead of `useEffect(() => setFailed(false), [src])`. (2) `NavBar` switched to `useSyncExternalStore<Theme>(subscribeTheme, readTheme, () => "light")` with a module-level `themeListeners` `Set` pub/sub and an `applyTheme()` writer that updates the `<html>` class, persists to `localStorage`, and notifies listeners — replacing the `setTheme(readInitialTheme())` mount effect. The toggle button is gated behind `user`, which is null on SSR, so the `"light"` server snapshot is never user-visible. (3) Dropped the two unused imports. New tests: 2 cases (one each in `src/__tests__/ui/PhotoFrame.test.tsx` and `src/__tests__/ui/Avatar.test.tsx`) pin the regression — after a previous `src` errored, swapping in a new `src` re-renders the `<img>` (failed state must reset across the boundary). 513 tests pass / 5 skipped (was 511/5; added one regression-pin case to each of `PhotoFrame.test.tsx` and `Avatar.test.tsx`); `yarn lint` clean (0/0); `yarn build` green. Files: `src/components/ui/PhotoFrame.tsx`, `src/components/ui/Avatar.tsx`, `src/components/NavBar.tsx`, `src/app/family-tree/page.tsx`, `src/app/timeline/page.tsx`, `src/__tests__/ui/PhotoFrame.test.tsx`, `src/__tests__/ui/Avatar.test.tsx`, `TODOS.md`.
 - 2026-05-08 — **UI refresh (PR #28).** Merged the `ui-refresh` branch as `c9a56f8`. Introduced a new design-system primitives module under `src/components/ui/` containing `Avatar.tsx`, `Button.tsx`, `Chip.tsx`, `Icon.tsx`, `PhotoFrame.tsx`, `SectionTitle.tsx`, `Wordmark.tsx`, plus a barrel `index.ts`. People page redesigned to use the new components. Substantial visual + structural change; no schema changes. **Known regression:** `PhotoFrame.tsx` ships with 5 `react-hooks/set-state-in-effect` lint warnings (`yarn lint` was previously 0/0); tracked as T-16 with a 15-minute fix using the same `prev*` render-time pattern that `MemoryImage` / `ProfileAvatar` adopted on 2026-04-29.
 - 2026-05-08 — **Web Share API for invite links (`8742648`).** New `src/utils/share.ts` exports `shareInvite(payload: InviteShare): Promise<"shared" | "copied" | "cancelled">`. Uses `navigator.share` when available (and `navigator.canShare` to gate per-payload), falls back to `navigator.clipboard.writeText` with a "{text}\n{url}" composition so the recipient gets explanatory text alongside the URL instead of a bare link. `AbortError` from `navigator.share` is treated as user-cancelled rather than a failure (no clipboard fallback fires). 120-line `src/__tests__/share.test.ts` covers the share / copy / cancel branches. Wired into `src/app/families/[id]/page.tsx`, `src/app/profile/[id]/page.tsx`, and the home page invite affordance. No schema changes.
 - 2026-05-08 — **Profile edit / invite-to-claim consolidation (`0c4801a`).** `src/app/profile/[id]/page.tsx` lost 44 lines, gained 4 — collapsed the previously-duplicated edit-mode + invite-to-claim UI flows into a single shared affordance. No behavior regression; it's a structural simplification on top of the post-redesign profile page.

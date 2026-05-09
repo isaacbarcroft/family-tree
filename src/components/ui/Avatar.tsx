@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 type AvatarProps = {
   src?: string | null;
@@ -12,10 +12,15 @@ type AvatarProps = {
 
 export function Avatar({ src, name, size = 40, ring = false, className = "" }: AvatarProps) {
   const [failed, setFailed] = useState(false);
+  const [prevSrc, setPrevSrc] = useState(src);
 
-  useEffect(() => {
+  // Reset the error flag when the caller swaps the source. Render-time pattern
+  // (matching MemoryImage / ProfileAvatar) so we don't trigger a second render
+  // from inside an effect.
+  if (src !== prevSrc) {
+    setPrevSrc(src);
     setFailed(false);
-  }, [src]);
+  }
 
   const initials = name
     .split(" ")
