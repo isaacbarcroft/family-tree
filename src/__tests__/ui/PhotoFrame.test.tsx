@@ -25,6 +25,20 @@ describe("PhotoFrame", () => {
     expect(screen.getByText("photograph")).toBeInTheDocument();
   });
 
+  it("retries the new image after a previous src errored (resets failed state on src change)", () => {
+    const { rerender } = render(
+      <PhotoFrame src="https://example.com/missing.jpg" alt="Eleanor at 22" label="photograph" />,
+    );
+    fireEvent.error(screen.getByRole("img", { name: "Eleanor at 22" }));
+    expect(screen.getByText("photograph")).toBeInTheDocument();
+
+    rerender(
+      <PhotoFrame src="https://example.com/replacement.jpg" alt="Eleanor at 22" label="photograph" />,
+    );
+    const img = screen.getByRole("img", { name: "Eleanor at 22" });
+    expect(img.getAttribute("src")).toBe("https://example.com/replacement.jpg");
+  });
+
   it("applies the requested aspect ratio", () => {
     const { container } = render(<PhotoFrame ratio="3 / 2" />);
     const wrapper = container.firstElementChild as HTMLElement;

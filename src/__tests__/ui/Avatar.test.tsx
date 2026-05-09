@@ -22,6 +22,18 @@ describe("Avatar", () => {
     expect(screen.getByText("MD")).toBeInTheDocument();
   });
 
+  it("retries the new image after a previous src errored (resets failed state on src change)", () => {
+    const { rerender } = render(
+      <Avatar name="Margaret Doe" src="https://example.com/missing.jpg" />,
+    );
+    fireEvent.error(screen.getByRole("img", { name: "Margaret Doe" }));
+    expect(screen.getByText("MD")).toBeInTheDocument();
+
+    rerender(<Avatar name="Margaret Doe" src="https://example.com/replacement.jpg" />);
+    const img = screen.getByRole("img", { name: "Margaret Doe" });
+    expect(img.getAttribute("src")).toBe("https://example.com/replacement.jpg");
+  });
+
   it("caps initials at two characters", () => {
     render(<Avatar name="Mary Lou Catherine Smith" />);
     expect(screen.getByText("ML")).toBeInTheDocument();

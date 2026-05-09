@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useAuth } from "./AuthProvider";
 import { supabase } from "@/lib/supabase";
 import type { Person } from "@/models/Person";
@@ -24,9 +24,37 @@ const navLinks: NavLink[] = [
 
 type SearchResult = { type: "person" | "family"; id: string; label: string };
 
-function readInitialTheme(): "light" | "dark" {
+type Theme = "light" | "dark";
+
+// Module-level pub/sub so useSyncExternalStore can re-render every NavBar
+// instance when toggleTheme flips the <html> class.
+const themeListeners = new Set<() => void>();
+
+function readTheme(): Theme {
   if (typeof document === "undefined") return "light";
   return document.documentElement.classList.contains("theme-dark") ? "dark" : "light";
+}
+
+function subscribeTheme(callback: () => void): () => void {
+  themeListeners.add(callback);
+  return () => {
+    themeListeners.delete(callback);
+  };
+}
+
+function applyTheme(next: Theme) {
+  if (next === "dark") {
+    document.documentElement.classList.add("theme-dark");
+  }
+  if (next === "light") {
+    document.documentElement.classList.remove("theme-dark");
+  }
+  try {
+    localStorage.setItem("theme", next);
+  } catch {
+    // localStorage unavailable; user just won't get persistence
+  }
+  themeListeners.forEach((listener) => listener());
 }
 
 export default function NavBar() {
@@ -40,16 +68,16 @@ export default function NavBar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [myPersonId, setMyPersonId] = useState<string | null>(null);
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+
+  // Theme is applied to <html> pre-hydration by ThemeScript; we subscribe to it
+  // via useSyncExternalStore so the React tree stays in sync without a
+  // setState-in-effect bounce. The toggle button itself is gated behind `user`,
+  // which is null on SSR, so the server snapshot is never user-visible.
+  const theme = useSyncExternalStore<Theme>(subscribeTheme, readTheme, () => "light");
 
   const searchRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Theme is set on <html> by ThemeScript pre-hydration; sync React state once mounted.
-  useEffect(() => {
-    setTheme(readInitialTheme());
-  }, []);
 
   const isActive = (href: string) => {
     if (pathname === null) return false;
@@ -162,19 +190,7 @@ export default function NavBar() {
   };
 
   const toggleTheme = () => {
-    const next = theme === "dark" ? "light" : "dark";
-    setTheme(next);
-    if (next === "dark") {
-      document.documentElement.classList.add("theme-dark");
-    }
-    if (next === "light") {
-      document.documentElement.classList.remove("theme-dark");
-    }
-    try {
-      localStorage.setItem("theme", next);
-    } catch {
-      // localStorage unavailable; user just won't get persistence
-    }
+    applyTheme(theme === "dark" ? "light" : "dark");
   };
 
   return (

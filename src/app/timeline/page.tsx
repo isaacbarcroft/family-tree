@@ -8,7 +8,7 @@ import type { Event } from "@/models/Event";
 import type { Memory } from "@/models/Memory";
 import type { Person } from "@/models/Person";
 import { SkeletonCard, SkeletonLine } from "@/components/SkeletonLoader";
-import { Chip, Icon, PhotoFrame } from "@/components/ui";
+import { Chip, PhotoFrame } from "@/components/ui";
 import type { TimelineItem } from "@/utils/timeline";
 import { formatDate, parseLocalDate } from "@/utils/dates";
 import { toDisplayImageUrl } from "@/utils/imageUrl";

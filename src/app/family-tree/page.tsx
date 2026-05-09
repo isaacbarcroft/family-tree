@@ -7,7 +7,6 @@ import { addPerson, deletePerson, listPeople } from "@/lib/db";
 import type { Person } from "@/models/Person";
 import { useAuth } from "@/components/AuthProvider";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import EmptyState from "@/components/EmptyState";
 import { SkeletonPage } from "@/components/SkeletonLoader";
 import ImportGedcomModal from "@/components/ImportGedcomModal";
 import { Avatar, Button, Icon, PhotoFrame } from "@/components/ui";
