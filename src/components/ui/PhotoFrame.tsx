@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 type PhotoFrameProps = {
   src?: string | null;
@@ -25,10 +25,15 @@ export function PhotoFrame({
   frame = false,
 }: PhotoFrameProps) {
   const [failed, setFailed] = useState(false);
+  const [prevSrc, setPrevSrc] = useState(src);
 
-  useEffect(() => {
+  // Reset the failed flag when the caller swaps the source. Doing this during
+  // render (React 19 pattern) avoids the cascading re-render a useEffect would
+  // cause; matches MemoryImage / ProfileAvatar.
+  if (src !== prevSrc) {
+    setPrevSrc(src);
     setFailed(false);
-  }, [src]);
+  }
 
   const showImg = Boolean(src) && !failed;
 

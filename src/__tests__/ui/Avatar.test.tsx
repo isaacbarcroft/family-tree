@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Avatar } from "@/components/ui/Avatar";
 
 describe("Avatar", () => {
@@ -32,5 +32,26 @@ describe("Avatar", () => {
     const wrapper = container.firstElementChild as HTMLElement;
     expect(wrapper.style.width).toBe("64px");
     expect(wrapper.style.height).toBe("64px");
+  });
+
+  it("retries loading the image when src changes after a prior load failure", () => {
+    // Regression test for the React 19 set-state-in-effect refactor: when
+    // the caller swaps `src`, the failed flag must reset so the new image
+    // gets a chance to render. Previously this used useEffect; it now syncs
+    // during render via a prevSrc tracker (matches MemoryImage / ProfileAvatar).
+    const { rerender } = render(
+      <Avatar name="Eleanor Barcroft" src="https://example.com/old.jpg" />,
+    );
+
+    act(() => {
+      fireEvent.error(screen.getByAltText("Eleanor Barcroft"));
+    });
+    expect(screen.queryByAltText("Eleanor Barcroft")).not.toBeInTheDocument();
+    expect(screen.getByText("EB")).toBeInTheDocument();
+
+    rerender(<Avatar name="Eleanor Barcroft" src="https://example.com/new.jpg" />);
+
+    const retried = screen.getByAltText("Eleanor Barcroft") as HTMLImageElement;
+    expect(retried.getAttribute("src")).toBe("https://example.com/new.jpg");
   });
 });

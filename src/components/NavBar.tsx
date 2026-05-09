@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useAuth } from "./AuthProvider";
 import { supabase } from "@/lib/supabase";
 import type { Person } from "@/models/Person";
@@ -24,9 +24,26 @@ const navLinks: NavLink[] = [
 
 type SearchResult = { type: "person" | "family"; id: string; label: string };
 
-function readInitialTheme(): "light" | "dark" {
+// The <html class> is set pre-hydration by ThemeScript and is the source of
+// truth for theme. Reading it via useSyncExternalStore keeps NavBar SSR-safe
+// and avoids the React 19 set-state-in-effect anti-pattern.
+function subscribeTheme(callback: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  const observer = new MutationObserver(callback);
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["class"],
+  });
+  return () => observer.disconnect();
+}
+
+function getThemeSnapshot(): "light" | "dark" {
   if (typeof document === "undefined") return "light";
   return document.documentElement.classList.contains("theme-dark") ? "dark" : "light";
+}
+
+function getThemeServerSnapshot(): "light" | "dark" {
+  return "light";
 }
 
 export default function NavBar() {
@@ -40,16 +57,11 @@ export default function NavBar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [myPersonId, setMyPersonId] = useState<string | null>(null);
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const theme = useSyncExternalStore(subscribeTheme, getThemeSnapshot, getThemeServerSnapshot);
 
   const searchRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Theme is set on <html> by ThemeScript pre-hydration; sync React state once mounted.
-  useEffect(() => {
-    setTheme(readInitialTheme());
-  }, []);
 
   const isActive = (href: string) => {
     if (pathname === null) return false;
@@ -163,13 +175,14 @@ export default function NavBar() {
 
   const toggleTheme = () => {
     const next = theme === "dark" ? "light" : "dark";
-    setTheme(next);
     if (next === "dark") {
       document.documentElement.classList.add("theme-dark");
     }
     if (next === "light") {
       document.documentElement.classList.remove("theme-dark");
     }
+    // The <html class> mutation triggers the theme store to re-snapshot, so
+    // React state stays in sync without a manual setTheme call.
     try {
       localStorage.setItem("theme", next);
     } catch {

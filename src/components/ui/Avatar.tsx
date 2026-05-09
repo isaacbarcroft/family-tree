@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 type AvatarProps = {
   src?: string | null;
@@ -12,10 +12,15 @@ type AvatarProps = {
 
 export function Avatar({ src, name, size = 40, ring = false, className = "" }: AvatarProps) {
   const [failed, setFailed] = useState(false);
+  const [prevSrc, setPrevSrc] = useState(src);
 
-  useEffect(() => {
+  // Reset the failed flag when the caller swaps the source. Doing this during
+  // render (React 19 pattern) avoids the cascading re-render a useEffect would
+  // cause; matches MemoryImage / ProfileAvatar.
+  if (src !== prevSrc) {
+    setPrevSrc(src);
     setFailed(false);
-  }, [src]);
+  }
 
   const initials = name
     .split(" ")
