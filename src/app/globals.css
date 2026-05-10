@@ -1,84 +1,270 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   Family Legacy — design tokens (light, default)
+   See UI-redisgn/lib/tokens.css for the canonical source.
+   --------------------------------------------------------------------------- */
 :root {
-  --background: #0c0f17;
-  --foreground: #e8e6e3;
-  --accent: #c4956a;
-  --accent-hover: #d4a57a;
-  --card-bg: #141821;
-  --card-border: #1e2433;
-  --card-hover: #1a1f2e;
+  /* Paper surfaces */
+  --paper:   #f6f1e7;
+  --paper-2: #efe8d8;
+  --paper-3: #e7dfcc;
+
+  /* Ink (text) */
+  --ink:   #1f2a24;
+  --ink-2: #3a4a42;
+  --ink-3: #6b7b72;
+  --ink-4: #93a298;
+
+  /* Hairlines */
+  --hairline:        #d9cfb8;
+  --hairline-strong: #bfb498;
+
+  /* Sage — primary brand accent */
+  --sage:      #6b8674;
+  --sage-deep: #4a6555;
+  --sage-soft: #cfd9c8;
+  --sage-tint: #e4ebdf;
+
+  /* Clay — rare warm accent */
+  --clay:      #c48760;
+  --clay-deep: #a56c48;
+  --clay-tint: #f1dfcc;
+
+  /* Shadows */
+  --shadow-xs: 0 1px 2px rgba(31, 42, 36, 0.06);
+  --shadow-sm: 0 1px 2px rgba(31, 42, 36, 0.05), 0 2px 8px rgba(31, 42, 36, 0.06);
+  --shadow-md: 0 4px 16px rgba(31, 42, 36, 0.08), 0 1px 3px rgba(31, 42, 36, 0.05);
+  --shadow-lg: 0 12px 40px rgba(31, 42, 36, 0.12), 0 2px 6px rgba(31, 42, 36, 0.06);
+
+  /* Radii */
+  --r-sm:  6px;
+  --r-md:  10px;
+  --r-lg:  14px;
+  --r-xl:  20px;
+  --r-2xl: 28px;
+
+  /* Type families — populated by next/font in layout.tsx */
+  --font-display: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --font-body:    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  /* ---- Legacy aliases (REMOVE as each page is ported to new tokens) ----
+     These keep pre-refresh pages rendering during the phased UI migration.
+     Phases 4–7 port pages off these one by one. */
+  --background:     var(--paper);
+  --foreground:     var(--ink);
+  --accent:         var(--sage-deep);
+  --accent-hover:   var(--ink);
+  --card-bg:        var(--paper-2);
+  --card-border:    var(--hairline);
+  --card-hover:     var(--paper-3);
+  --font-geist-sans: var(--font-body);
+  --font-geist-mono: ui-monospace, "SF Mono", Menlo, monospace;
 }
 
+/* Dark theme — applied by toggling `.theme-dark` on <html> */
+.theme-dark {
+  --paper:   #161b18;
+  --paper-2: #1d2420;
+  --paper-3: #252d28;
+
+  --ink:   #ece6d6;
+  --ink-2: #c5bfaf;
+  --ink-3: #8f9084;
+  --ink-4: #6a6c62;
+
+  --hairline:        #2f3832;
+  --hairline-strong: #3f4942;
+
+  --sage:      #8fae97;
+  --sage-deep: #6b8674;
+  --sage-soft: #364239;
+  --sage-tint: #222a24;
+
+  --clay:      #d7a37e;
+  --clay-deep: #c48760;
+  --clay-tint: #3a2c22;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.55);
+}
+
+/* Tailwind v4 theme bindings — exposes tokens as Tailwind utilities */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-accent: var(--accent);
-  --color-accent-hover: var(--accent-hover);
-  --color-card-bg: var(--card-bg);
-  --color-card-border: var(--card-border);
-  --color-card-hover: var(--card-hover);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-paper:   var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-paper-3: var(--paper-3);
+  --color-ink:     var(--ink);
+  --color-ink-2:   var(--ink-2);
+  --color-ink-3:   var(--ink-3);
+  --color-ink-4:   var(--ink-4);
+  --color-hairline:        var(--hairline);
+  --color-hairline-strong: var(--hairline-strong);
+  --color-sage:      var(--sage);
+  --color-sage-deep: var(--sage-deep);
+  --color-sage-soft: var(--sage-soft);
+  --color-sage-tint: var(--sage-tint);
+  --color-clay:      var(--clay);
+  --color-clay-deep: var(--clay-deep);
+  --color-clay-tint: var(--clay-tint);
+  --font-sans:    var(--font-body);
+  --font-display: var(--font-display);
+}
+
+/* ---------------------------------------------------------------------------
+   Base
+   --------------------------------------------------------------------------- */
+html {
+  scroll-behavior: smooth;
+  background: var(--paper);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  letter-spacing: -0.005em;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Smooth scrolling */
-html {
-  scroll-behavior: smooth;
-}
-
-/* Better focus styles */
+/* Focus ring — sage, with offset */
 *:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--sage-deep);
   outline-offset: 2px;
-}
-
-/* Custom scrollbar for dark theme */
-::-webkit-scrollbar {
-  width: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: #141821;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #2a3040;
   border-radius: 4px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #3a4050;
+/* ---------------------------------------------------------------------------
+   Typographic helpers — used directly in JSX where semantic types are needed
+   --------------------------------------------------------------------------- */
+.display {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
 }
 
-/* Skeleton loading animation */
+.display-italic {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+.serif {
+  font-family: var(--font-display);
+}
+
+.eyebrow {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-3);
+}
+
+.muted {
+  color: var(--ink-3);
+}
+
+/* Soft hairline divider — used between sections */
+.divider {
+  height: 1px;
+  background: var(--hairline);
+}
+
+/* Striped fallback for missing photos */
+.photo-placeholder {
+  background:
+    repeating-linear-gradient(
+      135deg,
+      var(--paper-2) 0 12px,
+      var(--paper-3) 12px 24px
+    );
+  color: var(--ink-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+/* Soft paper grain for hero surfaces */
+.paper-grain {
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(107, 134, 116, 0.06) 0, transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(196, 135, 96, 0.05) 0, transparent 50%);
+}
+
+/* Tree connector lines */
+.dotted-line {
+  stroke: var(--hairline-strong);
+  stroke-width: 1.2;
+  stroke-dasharray: 2 3;
+  fill: none;
+}
+
+.solid-line {
+  stroke: var(--ink-3);
+  stroke-width: 1;
+  fill: none;
+}
+
+/* Quiet scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--hairline-strong);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Skeleton shimmer — kept from previous theme, retoned for paper */
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
 
 .skeleton {
-  background: linear-gradient(90deg, #1a1f2e 25%, #242a3a 50%, #1a1f2e 75%);
+  background: linear-gradient(90deg, var(--paper-2) 25%, var(--paper-3) 50%, var(--paper-2) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
   border-radius: 0.5rem;
 }
 
-/* Subtle card shadow */
-.card-shadow {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+/* ---------------------------------------------------------------------------
+   Button hover states — hover:bg-[var()] in Tailwind would conflict with the
+   inline-style approach the variant uses, so the hover rules live here.
+   --------------------------------------------------------------------------- */
+.ui-btn[data-variant="primary"]:hover {
+  background: var(--ink) !important;
+}
+.ui-btn[data-variant="ghost"]:hover {
+  background: var(--paper-2) !important;
+}
+.ui-btn[data-variant="quiet"]:hover {
+  background: var(--paper-3) !important;
 }
 
-/* Warm gradient for headers */
+/* Legacy gradient retoned to sage — used by pre-refresh page headers */
 .warm-gradient {
-  background: linear-gradient(135deg, #c4956a 0%, #a67c52 100%);
+  background: linear-gradient(135deg, var(--sage) 0%, var(--sage-deep) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+/* Legacy card shadow */
+.card-shadow {
+  box-shadow: var(--shadow-sm);
 }

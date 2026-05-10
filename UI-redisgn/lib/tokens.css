@@ -1,0 +1,325 @@
+/* Family Legacy — design tokens */
+
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,300;1,9..144,400;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap");
+
+:root {
+  /* Paper / light */
+  --paper: #f6f1e7;
+  --paper-2: #efe8d8; /* slightly darker cream for section bands */
+  --paper-3: #e7dfcc;
+  --ink: #1f2a24;
+  --ink-2: #3a4a42;
+  --ink-3: #6b7b72;
+  --ink-4: #93a298;
+  --hairline: #d9cfb8;
+  --hairline-strong: #bfb498;
+
+  /* Sage accents */
+  --sage: #6b8674;
+  --sage-deep: #4a6555;
+  --sage-soft: #cfd9c8;
+  --sage-tint: #e4ebdf;
+
+  /* Warm accent (rare — birthdays, today, emphasis) */
+  --clay: #c48760;
+  --clay-deep: #a56c48;
+  --clay-tint: #f1dfcc;
+
+  /* Shadows */
+  --shadow-xs: 0 1px 2px rgba(31, 42, 36, 0.06);
+  --shadow-sm: 0 1px 2px rgba(31, 42, 36, 0.05), 0 2px 8px rgba(31, 42, 36, 0.06);
+  --shadow-md: 0 4px 16px rgba(31, 42, 36, 0.08), 0 1px 3px rgba(31, 42, 36, 0.05);
+  --shadow-lg: 0 12px 40px rgba(31, 42, 36, 0.12), 0 2px 6px rgba(31, 42, 36, 0.06);
+
+  /* Radii */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+  --r-2xl: 28px;
+
+  /* Type */
+  --font-display: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  /* Density */
+  --sp-unit: 4px;
+  --density-scale: 1; /* multiplied by tweaks */
+}
+
+/* Dark mode */
+.theme-dark {
+  --paper: #161b18;
+  --paper-2: #1d2420;
+  --paper-3: #252d28;
+  --ink: #ece6d6;
+  --ink-2: #c5bfaf;
+  --ink-3: #8f9084;
+  --ink-4: #6a6c62;
+  --hairline: #2f3832;
+  --hairline-strong: #3f4942;
+
+  --sage: #8fae97;
+  --sage-deep: #6b8674;
+  --sage-soft: #364239;
+  --sage-tint: #222a24;
+
+  --clay: #d7a37e;
+  --clay-deep: #c48760;
+  --clay-tint: #3a2c22;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.55);
+}
+
+/* Alt palettes via tweaks */
+.palette-dust {
+  --sage: #a78a80;
+  --sage-deep: #7d6258;
+  --sage-soft: #e0d3cd;
+  --sage-tint: #eee3df;
+  --clay: #9c8ca8;
+}
+.palette-library {
+  --sage: #3f5a7a;
+  --sage-deep: #2b4060;
+  --sage-soft: #c9d4e2;
+  --sage-tint: #e2e8f0;
+  --clay: #b8914a;
+}
+.palette-heirloom {
+  --sage: #8d5a3a;
+  --sage-deep: #6b3f25;
+  --sage-soft: #dcc6b5;
+  --sage-tint: #eadecd;
+  --clay: #7a8a6a;
+}
+
+.theme-dark.palette-dust {
+  --sage: #c5a99f;
+  --sage-deep: #a78a80;
+  --sage-soft: #3a2f2b;
+}
+.theme-dark.palette-library {
+  --sage: #8ba6c8;
+  --sage-deep: #5e7a9c;
+  --sage-soft: #26303f;
+}
+.theme-dark.palette-heirloom {
+  --sage: #c58f6b;
+  --sage-deep: #9e6b45;
+  --sage-soft: #3a2a1f;
+}
+
+/* Density */
+.density-cozy {
+  --density-scale: 0.85;
+}
+.density-comfort {
+  --density-scale: 1;
+}
+.density-spacious {
+  --density-scale: 1.15;
+}
+
+/* Base */
+.app {
+  font-family: var(--font-body);
+  color: var(--ink);
+  background: var(--paper);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.005em;
+}
+.app * {
+  box-sizing: border-box;
+}
+
+/* Utility classes */
+.app .display {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+.app .display-italic {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+.app .serif {
+  font-family: var(--font-display);
+}
+.app .eyebrow {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-3);
+}
+.app .muted {
+  color: var(--ink-3);
+}
+.app .hairline {
+  border: 1px solid var(--hairline);
+}
+.app .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 14px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-height: 40px;
+  white-space: nowrap;
+}
+.app .btn-primary {
+  background: var(--sage-deep);
+  color: var(--paper);
+}
+.app .btn-primary:hover {
+  background: var(--ink);
+}
+.app .btn-ghost {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--hairline-strong);
+}
+.app .btn-ghost:hover {
+  background: var(--paper-2);
+}
+.app .btn-quiet {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+.app .btn-quiet:hover {
+  background: var(--paper-3);
+}
+.app .card {
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+}
+.app .card-soft {
+  background: var(--paper-2);
+  border-radius: var(--r-lg);
+}
+
+/* SVG placeholder pattern for missing photos */
+.app .photo-placeholder {
+  background:
+    repeating-linear-gradient(
+      135deg,
+      var(--paper-2) 0 12px,
+      var(--paper-3) 12px 24px
+    );
+  color: var(--ink-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+/* Focus */
+.app button:focus-visible,
+.app a:focus-visible,
+.app input:focus-visible {
+  outline: 2px solid var(--sage-deep);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Dotted connector lines used in the tree */
+.app .dotted-line {
+  stroke: var(--hairline-strong);
+  stroke-width: 1.2;
+  stroke-dasharray: 2 3;
+  fill: none;
+}
+.app .solid-line {
+  stroke: var(--ink-3);
+  stroke-width: 1;
+  fill: none;
+}
+
+/* Subtle divider used between sections */
+.app .divider {
+  height: 1px;
+  background: var(--hairline);
+}
+
+/* Chip */
+.app .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  border: 1px solid var(--hairline);
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.app .chip-sage {
+  background: var(--sage-tint);
+  border-color: var(--sage-soft);
+  color: var(--sage-deep);
+}
+.app .chip-clay {
+  background: var(--clay-tint);
+  border-color: var(--clay);
+  color: var(--clay-deep);
+}
+
+/* Avatar */
+.app .avatar {
+  border-radius: 999px;
+  object-fit: cover;
+  background: var(--sage-tint);
+  color: var(--sage-deep);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 500;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.app .avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Soft paper grain texture for hero surfaces */
+.app .paper-grain {
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(107, 134, 116, 0.06) 0, transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(196, 135, 96, 0.05) 0, transparent 50%);
+}
+
+/* Scrollbar */
+.app ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.app ::-webkit-scrollbar-thumb {
+  background: var(--hairline-strong);
+  border-radius: 3px;
+}
+.app ::-webkit-scrollbar-track {
+  background: transparent;
+}
