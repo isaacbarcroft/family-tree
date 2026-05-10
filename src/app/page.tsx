@@ -9,6 +9,7 @@ import type { Event } from "@/models/Event";
 import type { Memory } from "@/models/Memory";
 import type { Person } from "@/models/Person";
 import WelcomeModal from "@/components/WelcomeModal";
+import DailyPromptCard from "@/components/DailyPromptCard";
 import { SkeletonCard, SkeletonLine } from "@/components/SkeletonLoader";
 import { Avatar, Button, Chip, Icon, PhotoFrame } from "@/components/ui";
 import { formatDate, getAge, getNextBirthday } from "@/utils/dates";
@@ -352,6 +353,10 @@ function HomeAuthenticated({ user, people, memories, events, myPerson }: HomePro
           fallbackHref={familyTreeHref}
           familyTreeReady={Boolean(myPerson?.familyIds?.[0])}
         />
+      </section>
+
+      <section className="mb-14">
+        <DailyPromptCard />
       </section>
 
       {/* Lower grid: in-memory, recent additions, your branch */}
