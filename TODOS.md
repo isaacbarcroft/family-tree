@@ -10,17 +10,14 @@
 
 ## Next up
 
-**Quick wins first — under 1h total:**
+**In priority order:**
 
-1. **T-17** — `/api/webhooks/new-user` auth spot check, ~10 min.
-2. **T-13** — wrap `GenealogyTree` in `next/dynamic`, ~30 min. Leaflet is already done in `places/page.tsx`.
+1. **1.6 Accessibility** — start with `TreeNode.tsx` keyboard support. Highest-impact remaining gap; older relatives are the target audience.
+2. **T-15** — `middleware.ts` for route-level auth. Defense-in-depth on top of RLS.
+3. **1.4** — guided story prompts. Last unshipped Phase 1 engagement feature.
+4. **T-3** — extend `next/image` adoption beyond `ProfileAvatar`.
 
-**Then in priority order:**
-
-3. **1.6 Accessibility** — start with `TreeNode.tsx` keyboard support. Highest-impact remaining gap; older relatives are the target audience.
-4. **T-15** — `middleware.ts` for route-level auth. Defense-in-depth on top of RLS.
-5. **1.4** — guided story prompts. Last unshipped Phase 1 engagement feature.
-6. **T-3** — extend `next/image` adoption beyond `ProfileAvatar`.
+Quick wins T-17 (webhook secret spot-check, closed 2026-05-11) and T-13 (dynamic import for `GenealogyTree`, closed 2026-05-08) are done.
 
 ---
 
@@ -392,13 +389,9 @@ See Completed log. Deferred sub-item (T-13.a real bundle-size measurement via `@
 
 See Completed log. All 5 warnings cleared; baseline back to 0/0.
 
-### T-17. Spot-check `/api/webhooks/new-user` for a webhook-secret guard
+### ~~T-17. Spot-check `/api/webhooks/new-user` for a webhook-secret guard~~ ✅ Done 2026-05-11
 
-**Found:** 2026-05-08 audit
-**File:** `src/app/api/webhooks/new-user/route.ts`
-**Problem:** The route uses `SUPABASE_SERVICE_ROLE_KEY` to write directly to the database in response to a Supabase auth webhook. The 2026-05-01 audit noted the duplicate-param bug (T-14) but did not verify that the route checks an inbound webhook secret. If Supabase's auth-webhook signed-secret check isn't being verified, anyone hitting this URL could trigger person-creation side effects.
-**Fix:** Read the route, confirm or add a header check against `process.env.SUPABASE_AUTH_WEBHOOK_SECRET` (or whatever the existing convention is). If a check is already present, close this item with a note. If not, add one and a Vitest case mirroring the `verifyUser.test.ts` shape.
-**Effort:** 10 min
+Confirmed: the route already reads `SUPABASE_WEBHOOK_SECRET` from env and rejects any request whose `x-webhook-secret` header doesn't match with a 401 (see `src/app/api/webhooks/new-user/route.ts:26-40`). Both the wrong-secret and missing-header 401 paths are already pinned by `src/__tests__/webhookNewUser.test.ts:61-72`. No code changes required; this item is closed as a verified-already-fixed audit follow-up. See Completed log.
 
 ---
 
@@ -443,6 +436,7 @@ This TODO list is long-form, strategy-heavy, and opinionated. **Worth comparing 
 
 ## Completed
 
+- 2026-05-11 — **T-17 Webhook-secret guard spot-check on `/api/webhooks/new-user`.** Audit follow-up from the 2026-05-08 review asked whether the route's `SUPABASE_SERVICE_ROLE_KEY`-backed person-creation side effect was gated behind an inbound webhook secret. Read `src/app/api/webhooks/new-user/route.ts` end-to-end and confirmed the guard is already present: the route reads `process.env.SUPABASE_WEBHOOK_SECRET` alongside the other required env vars (returns 500 with `"Server misconfigured"` if any are missing) and then compares it against `request.headers.get("x-webhook-secret")` before parsing the JSON body or doing any database / Resend work, returning 401 `"Unauthorized"` on mismatch (route lines 26, 29, 37-40). Test coverage was likewise already in place: `src/__tests__/webhookNewUser.test.ts` pins both the "wrong secret returns 401" case (lines 61-66) and the "missing `x-webhook-secret` header returns 401" case (lines 68-72), and the happy-path tests all set `x-webhook-secret: whsec` to exercise the guard. Ran the 11 webhook tests via `yarn test --run src/__tests__/webhookNewUser.test.ts` — all pass; `yarn lint` clean (0/0). No code changes; closing the item with a note as the TODO entry called out as the appropriate outcome if the check was already present. Files: `TODOS.md` only.
 - 2026-05-09 — **T-16 Lint regression cleanup — restore 0/0 baseline.** UI refresh (PR #28) re-introduced `react-hooks/set-state-in-effect` warnings in three files plus two unused-import warnings; total 5 warnings, 0 errors. (TODO entry described it as "5 warnings in PhotoFrame.tsx" — actual breakdown was 3 set-state-in-effect across `src/components/ui/PhotoFrame.tsx`, `src/components/ui/Avatar.tsx`, and `src/components/NavBar.tsx`, plus unused `EmptyState` import in `src/app/family-tree/page.tsx` and unused `Icon` import in `src/app/timeline/page.tsx`.) Fixes: (1) `PhotoFrame` and `Avatar` now reset `failed` state via the render-time `prev*` pattern (matching `MemoryImage` / `ProfileAvatar`) instead of `useEffect(() => setFailed(false), [src])`. (2) `NavBar` switched to `useSyncExternalStore<Theme>(subscribeTheme, readTheme, () => "light")` with a module-level `themeListeners` `Set` pub/sub and an `applyTheme()` writer that updates the `<html>` class, persists to `localStorage`, and notifies listeners — replacing the `setTheme(readInitialTheme())` mount effect. The toggle button is gated behind `user`, which is null on SSR, so the `"light"` server snapshot is never user-visible. (3) Dropped the two unused imports. New tests: 2 cases (one each in `src/__tests__/ui/PhotoFrame.test.tsx` and `src/__tests__/ui/Avatar.test.tsx`) pin the regression — after a previous `src` errored, swapping in a new `src` re-renders the `<img>` (failed state must reset across the boundary). 513 tests pass / 5 skipped (was 511/5; added one regression-pin case to each of `PhotoFrame.test.tsx` and `Avatar.test.tsx`); `yarn lint` clean (0/0); `yarn build` green. Files: `src/components/ui/PhotoFrame.tsx`, `src/components/ui/Avatar.tsx`, `src/components/NavBar.tsx`, `src/app/family-tree/page.tsx`, `src/app/timeline/page.tsx`, `src/__tests__/ui/PhotoFrame.test.tsx`, `src/__tests__/ui/Avatar.test.tsx`, `TODOS.md`.
 - 2026-05-08 — **T-13 Dynamic-import the D3 family tree on `/families/[id]`.** `PlacesMap` was already dynamically imported on `/places`; only the D3 side of T-13 was outstanding. `FamilyTreeView` (which statically imports `GenealogyTree` → `d3-zoom` + `d3-selection`, ~40 KB combined) was used in exactly one place — `src/app/families/[id]/page.tsx` — so the fix is a one-call-site change. Switched the page to `const FamilyTreeView = dynamic(() => import("@/components/FamilyTreeView"), { ssr: false, loading: ... })` with a same-height pulse skeleton, mirroring the `PlacesMap` pattern. `ssr: false` is required because `GenealogyTree` uses `ResizeObserver` and DOM refs that aren't available during SSR. To keep the placeholder in lock-step with the real tree's container so the layout doesn't shift on chunk land, hoisted the SVG container's `"85vh"` to a new shared `GENEALOGY_TREE_HEIGHT` constant in `src/config/constants.ts` (parallel to the existing `PLACES_MAP_HEIGHT`); both `GenealogyTree.tsx` and the page-level skeleton reference it. Coverage: 1 new `GENEALOGY_TREE_HEIGHT` case in `configConstants.test.ts` (CSS length pin), and a 4-case regression-pin file `familyPageDynamicImport.test.ts` that reads `families/[id]/page.tsx` and asserts (a) `next/dynamic` is imported, (b) `FamilyTreeView` is loaded via `dynamic(() => import("@/components/FamilyTreeView"))`, (c) no top-level `import FamilyTreeView from ...` regression has snuck back in, (d) `ssr: false` + a `loading` placeholder referencing `GENEALOGY_TREE_HEIGHT` are present. 470 tests pass / 5 skipped; lint clean (0 errors / 0 warnings); `yarn build` green (`/families/[id]` still appears as `ƒ` in the route table). Files: `src/app/families/[id]/page.tsx`, `src/components/GenealogyTree.tsx`, `src/config/constants.ts`, `src/__tests__/configConstants.test.ts`, `src/__tests__/familyPageDynamicImport.test.ts` (new). Deferred (T-13.a): real bundle-size measurement via `@next/bundle-analyzer` — Turbopack's stock build doesn't print per-chunk byte counts, so the savings claim is from package weights, not a measured before/after; out of scope here because it would mean adding a dev dependency and a build-mode toggle.
 - 2026-05-08 — **UI refresh (PR #28).** Merged the `ui-refresh` branch as `c9a56f8`. Introduced a new design-system primitives module under `src/components/ui/` containing `Avatar.tsx`, `Button.tsx`, `Chip.tsx`, `Icon.tsx`, `PhotoFrame.tsx`, `SectionTitle.tsx`, `Wordmark.tsx`, plus a barrel `index.ts`. People page redesigned to use the new components. Substantial visual + structural change; no schema changes. **Known regression:** `PhotoFrame.tsx` ships with 5 `react-hooks/set-state-in-effect` lint warnings (`yarn lint` was previously 0/0); tracked as T-16 with a 15-minute fix using the same `prev*` render-time pattern that `MemoryImage` / `ProfileAvatar` adopted on 2026-04-29.
