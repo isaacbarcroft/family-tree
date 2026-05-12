@@ -46,6 +46,22 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
   const edges = useMemo(() => collectEdges(layout), [layout])
   const bounds = useMemo(() => computeBounds(nodes), [nodes])
 
+  // Total people in the rendered tree, used for the SVG accessible name. A
+  // couple node represents two people, a single-person node one, and the
+  // synthetic family-root label none.
+  const personCount = useMemo(() => {
+    return nodes.reduce((count, n) => {
+      const attrs = n.data.attributes ?? {}
+      if (attrs.id && attrs.spouseId) return count + 2
+      if (attrs.id || attrs.spouseId) return count + 1
+      return count
+    }, 0)
+  }, [nodes])
+
+  const treeAriaLabel =
+    `Family tree, ${personCount} ${personCount === 1 ? "person" : "people"}. ` +
+    "Use Tab to move between people, then press Enter or Space to open their page."
+
   // Reset the initial-fit flag whenever the tree data changes so the new tree gets centered.
   useEffect(() => {
     initialFitDoneRef.current = false
@@ -144,7 +160,13 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
       >
         Reset view
       </button>
-      <svg ref={svgRef} width={dims.width} height={dims.height} style={{ cursor: "grab" }}>
+      <svg
+        ref={svgRef}
+        width={dims.width}
+        height={dims.height}
+        style={{ cursor: "grab" }}
+        aria-label={treeAriaLabel}
+      >
         {/*
           Shared clip-paths. Default `clipPathUnits="userSpaceOnUse"` resolves
           each clip in the referencing element's local coordinate system, so
@@ -162,17 +184,24 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
           </clipPath>
         </defs>
         <g ref={gRef}>
-          {/* Edges */}
-          {edges.map((e, i) => (
-            <path
-              key={i}
-              d={edgePath(e)}
-              fill="none"
-              stroke="var(--card-border)"
-              strokeWidth={2}
-              opacity={0.6}
-            />
-          ))}
+          {/*
+            Edges are purely decorative relationship lines. Screen readers
+            already announce parentage via the tree-button labels and would
+            otherwise read each <path> as an unlabeled graphic, so the whole
+            edge layer is hidden from assistive tech.
+          */}
+          <g aria-hidden="true">
+            {edges.map((e, i) => (
+              <path
+                key={i}
+                d={edgePath(e)}
+                fill="none"
+                stroke="var(--card-border)"
+                strokeWidth={2}
+                opacity={0.6}
+              />
+            ))}
+          </g>
 
           {/* Nodes */}
           {nodes.map((node, i) => (
