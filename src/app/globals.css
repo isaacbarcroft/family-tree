@@ -216,6 +216,18 @@ body {
   fill: none;
 }
 
+/* Genealogy-tree node focus indicator — browsers render `outline` on SVG
+   groups inconsistently (outline-offset and border-radius are ignored), so
+   focus is painted as a stroke change on the group's primary visible child. */
+.tree-node-interactive {
+  outline: none;
+}
+.tree-node-interactive:focus-visible > rect,
+.tree-node-interactive:focus-visible > circle {
+  stroke: var(--sage-deep);
+  stroke-width: 3;
+}
+
 /* Quiet scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
