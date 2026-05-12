@@ -201,8 +201,7 @@ function ResidenceRow({ residence, onPatch, onRemove }: RowProps) {
 
   // When the caller swaps the residence (e.g. another save updated this row),
   // re-sync the inputs. Doing it during render avoids the cascading re-render
-  // a useEffect would cause; matches the pattern used in MemoryImage /
-  // ProfileAvatar.
+  // a useEffect would cause; matches the pattern used in ProfileAvatar.
   if (residence !== prevResidence) {
     setPrevResidence(residence)
     setRawPlace(residence.rawPlace)

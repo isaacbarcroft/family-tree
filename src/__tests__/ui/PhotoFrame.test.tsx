@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { PhotoFrame } from "@/components/ui/PhotoFrame";
 
+const SUPABASE_PREFIX =
+  "https://example.supabase.co/storage/v1/object/public/media/people/p/memories";
+
 describe("PhotoFrame", () => {
   it("renders the placeholder label when no src is provided", () => {
     render(<PhotoFrame label="missing photo" />);
@@ -50,5 +53,47 @@ describe("PhotoFrame", () => {
     const wrapper = container.firstElementChild as HTMLElement;
     expect(wrapper.style.border).toContain("1px solid");
     expect(wrapper.style.boxShadow).toContain("var(--shadow-sm)");
+  });
+
+  it("lazy-loads the image by default", () => {
+    render(<PhotoFrame src="https://example.com/photo.jpg" alt="Eleanor at 22" />);
+    const img = screen.getByRole("img", { name: "Eleanor at 22" }) as HTMLImageElement;
+    expect(img.getAttribute("loading")).toBe("lazy");
+  });
+
+  it("sets referrerPolicy=no-referrer so the Supabase URL is not leaked via the Referer header", () => {
+    render(<PhotoFrame src="https://example.com/photo.jpg" alt="Eleanor at 22" />);
+    const img = screen.getByRole("img", { name: "Eleanor at 22" }) as HTMLImageElement;
+    expect(img.getAttribute("referrerpolicy")).toBe("no-referrer");
+  });
+
+  it("routes Supabase HEIC URLs through the render-image endpoint for cross-browser display", () => {
+    render(
+      <PhotoFrame
+        src={`${SUPABASE_PREFIX}/photo.heic`}
+        alt="HEIC memory"
+      />,
+    );
+    const img = screen.getByRole("img", { name: "HEIC memory" }) as HTMLImageElement;
+    expect(img.getAttribute("src")).toBe(
+      `${SUPABASE_PREFIX.replace(
+        "/storage/v1/object/public/",
+        "/storage/v1/render/image/public/",
+      )}/photo.heic?format=jpeg&quality=85`,
+    );
+  });
+
+  it("passes non-HEIC URLs through unchanged", () => {
+    render(
+      <PhotoFrame src={`${SUPABASE_PREFIX}/photo.jpg`} alt="JPEG memory" />,
+    );
+    const img = screen.getByRole("img", { name: "JPEG memory" }) as HTMLImageElement;
+    expect(img.getAttribute("src")).toBe(`${SUPABASE_PREFIX}/photo.jpg`);
+  });
+
+  it("passes blob: object URLs through unchanged (used by upload previews)", () => {
+    render(<PhotoFrame src="blob:https://app/abc-123" alt="preview" />);
+    const img = screen.getByRole("img", { name: "preview" }) as HTMLImageElement;
+    expect(img.getAttribute("src")).toBe("blob:https://app/abc-123");
   });
 });

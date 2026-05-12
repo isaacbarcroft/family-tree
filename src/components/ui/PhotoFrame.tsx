@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from "react";
 import { useState } from "react";
+import { toDisplayImageUrl } from "@/utils/imageUrl";
 
 type PhotoFrameProps = {
   src?: string | null;
@@ -28,14 +29,18 @@ export function PhotoFrame({
   const [prevSrc, setPrevSrc] = useState(src);
 
   // Reset the error flag when the caller swaps the source. Doing this during
-  // render (React 19 pattern, matching MemoryImage / ProfileAvatar) avoids
-  // the cascading re-render a useEffect would cause.
+  // render (React 19 pattern, matching ProfileAvatar) avoids the cascading
+  // re-render a useEffect would cause.
   if (src !== prevSrc) {
     setPrevSrc(src);
     setFailed(false);
   }
 
-  const showImg = Boolean(src) && !failed;
+  // Route Supabase HEIC URLs through the image-transform endpoint so iPhone
+  // uploads render in browsers that don't decode HEIC natively. Pass-through
+  // for everything else (blob: previews, non-Supabase URLs).
+  const displayUrl = toDisplayImageUrl(src);
+  const showImg = Boolean(displayUrl) && !failed;
 
   return (
     <div
@@ -49,11 +54,13 @@ export function PhotoFrame({
         ...style,
       }}
     >
-      {showImg && src ? (
+      {showImg ? (
         <img
-          src={src}
+          src={displayUrl}
           alt={alt}
           draggable={false}
+          loading="lazy"
+          referrerPolicy="no-referrer"
           onError={() => setFailed(true)}
           className="block h-full w-full object-cover"
         />
