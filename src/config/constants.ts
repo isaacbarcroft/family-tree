@@ -41,3 +41,11 @@ export const NOMINATIM_MIN_MS_BETWEEN_CALLS = 1100
  * leave the page header + legend visible above the fold on a laptop.
  */
 export const PLACES_MAP_HEIGHT = "70vh"
+
+/**
+ * Height of the D3 genealogy-tree viewport and the dynamic-import skeleton
+ * that holds its space until the chunk lands. Kept identical to the SVG
+ * container so swapping the placeholder in for the real tree doesn't shift
+ * the page.
+ */
+export const GENEALOGY_TREE_HEIGHT = "85vh"

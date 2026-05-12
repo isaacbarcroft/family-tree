@@ -1,6 +1,6 @@
 "use client"
 
-import { memo } from "react"
+import { memo, type KeyboardEvent } from "react"
 import type { LayoutNode } from "@/utils/treeLayout"
 import { COUPLE_W, NODE_H, NODE_W } from "@/utils/treeLayout"
 import { stringToColor } from "@/utils/colors"
@@ -8,6 +8,17 @@ import { formatDate } from "@/utils/dates"
 
 const AVATAR_R = 22
 const MARRIAGE_BAR = 20
+
+// Enter and Space activate buttons per the WAI-ARIA button pattern.
+// preventDefault on Space stops the browser from scrolling the page.
+function handleKeyActivate(
+  e: KeyboardEvent<SVGGElement>,
+  activate: () => void,
+) {
+  if (e.key !== "Enter" && e.key !== " ") return
+  e.preventDefault()
+  activate()
+}
 
 // Shared <clipPath> ids defined once in GenealogyTree's <defs>. The default
 // clipPathUnits="userSpaceOnUse" resolves the clip in the referencing element's
@@ -67,6 +78,10 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
     const name2 = node.data.name.split(" & ")[1] || ""
     const photo1 = attrs.photo
     const photo2 = attrs.spousePhoto
+    const leftId = attrs.id
+    const rightId = attrs.spouseId
+    const activateLeft = leftId ? () => onNavigate(leftId) : undefined
+    const activateRight = rightId ? () => onNavigate(rightId) : undefined
 
     return (
       <g transform={`translate(${nodeX}, ${nodeY})`}>
@@ -81,7 +96,14 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
 
         {/* Left person */}
         <g
-          onClick={() => attrs.id && onNavigate(attrs.id)}
+          onClick={activateLeft}
+          onKeyDown={
+            activateLeft ? (e) => handleKeyActivate(e, activateLeft) : undefined
+          }
+          role={activateLeft ? "button" : undefined}
+          tabIndex={activateLeft ? 0 : -1}
+          aria-label={activateLeft ? `Open profile for ${name1}` : undefined}
+          className={activateLeft ? "tree-node-interactive" : undefined}
           style={{ cursor: "pointer" }}
         >
           {photo1 ? (
@@ -124,7 +146,16 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
 
         {/* Right person (spouse) */}
         <g
-          onClick={() => attrs.spouseId && onNavigate(attrs.spouseId)}
+          onClick={activateRight}
+          onKeyDown={
+            activateRight
+              ? (e) => handleKeyActivate(e, activateRight)
+              : undefined
+          }
+          role={activateRight ? "button" : undefined}
+          tabIndex={activateRight ? 0 : -1}
+          aria-label={activateRight ? `Open profile for ${name2}` : undefined}
+          className={activateRight ? "tree-node-interactive" : undefined}
           style={{ cursor: "pointer" }}
         >
           {photo2 ? (
@@ -157,15 +188,29 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
   }
 
   // Single person node
+  const personId = attrs.id
   const photo = attrs.photo
   const birthStr = attrs.birth ? formatDate(attrs.birth) : ""
   const deathStr = attrs.death ? formatDate(attrs.death) : ""
+  const activate = personId ? () => onNavigate(personId) : undefined
+  const dateLabel = (() => {
+    if (isDeceased && birthStr && deathStr) return `, ${birthStr} to ${deathStr}`
+    if (birthStr) return `, born ${birthStr}`
+    return ""
+  })()
 
   return (
     <g
       transform={`translate(${nodeX}, ${nodeY})`}
-      onClick={() => attrs.id && onNavigate(attrs.id)}
-      style={{ cursor: attrs.id ? "pointer" : "default" }}
+      onClick={activate}
+      onKeyDown={activate ? (e) => handleKeyActivate(e, activate) : undefined}
+      role={activate ? "button" : undefined}
+      tabIndex={activate ? 0 : -1}
+      aria-label={
+        activate ? `Open profile for ${node.data.name}${dateLabel}` : undefined
+      }
+      className={activate ? "tree-node-interactive" : undefined}
+      style={{ cursor: activate ? "pointer" : "default" }}
     >
       <rect
         width={NODE_W}

@@ -2,16 +2,31 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import type { Family } from "@/models/Family";
 import type { Person } from "@/models/Person";
-import FamilyTreeView from "@/components/FamilyTreeView";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { supabase } from "@/lib/supabase";
 import { formatDate } from "@/utils/dates";
 import { downloadGedcom } from "@/utils/gedcom";
 import { shareInvite } from "@/utils/share";
 import { Avatar, Button, Icon } from "@/components/ui";
+import { GENEALOGY_TREE_HEIGHT } from "@/config/constants";
+
+// D3 (`d3-zoom` + `d3-selection`, ~40 KB) only loads when this view is
+// actually rendered, keeping it out of the initial bundle for the rest of
+// the family detail page. `ssr: false` is required because the tree relies
+// on browser-only APIs (refs, ResizeObserver).
+const FamilyTreeView = dynamic(() => import("@/components/FamilyTreeView"), {
+  ssr: false,
+  loading: () => (
+    <div
+      className="w-full rounded-xl bg-gray-900/40 border border-[var(--card-border)] animate-pulse"
+      style={{ height: GENEALOGY_TREE_HEIGHT }}
+    />
+  ),
+});
 
 export default function FamilyPage() {
   const params = useParams();
