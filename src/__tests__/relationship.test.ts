@@ -135,8 +135,8 @@ describe("findRelationship", () => {
       expect(findRelationship("c2", "c1", map)?.label).toBe("Sibling")
     })
 
-    it("labels half-siblings as Sibling (documented limitation)", () => {
-      // c1 and c2 share only parent p1.
+    it("labels half-siblings when each child has two parents and shares one", () => {
+      // c1 and c2 share only parent p1; each has a distinct second parent.
       const map = makeMap(
         person({ id: "p1", childIds: ["c1", "c2"] }),
         person({ id: "p2", childIds: ["c1"] }),
@@ -144,7 +144,48 @@ describe("findRelationship", () => {
         person({ id: "c1", parentIds: ["p1", "p2"] }),
         person({ id: "c2", parentIds: ["p1", "p3"] }),
       )
+      expect(findRelationship("c1", "c2", map)?.label).toBe("Half-sibling")
+      // Symmetric.
+      expect(findRelationship("c2", "c1", map)?.label).toBe("Half-sibling")
+    })
+
+    it("keeps the Sibling label when one side has only one known parent", () => {
+      // c1 has two parents recorded, c2 has just one. We can't tell whether
+      // c2's other parent is missing data or genuinely different, so we stay
+      // conservative and label this as a full sibling.
+      const map = makeMap(
+        person({ id: "p1", childIds: ["c1", "c2"] }),
+        person({ id: "p2", childIds: ["c1"] }),
+        person({ id: "c1", parentIds: ["p1", "p2"] }),
+        person({ id: "c2", parentIds: ["p1"] }),
+      )
       expect(findRelationship("c1", "c2", map)?.label).toBe("Sibling")
+    })
+
+    it("keeps the Sibling label when both sides share only one recorded parent", () => {
+      // Both children have only p1 recorded as a parent. We have no evidence
+      // of a different second parent on either side, so we don't downgrade.
+      const map = makeMap(
+        person({ id: "p1", childIds: ["c1", "c2"] }),
+        person({ id: "c1", parentIds: ["p1"] }),
+        person({ id: "c2", parentIds: ["p1"] }),
+      )
+      expect(findRelationship("c1", "c2", map)?.label).toBe("Sibling")
+    })
+
+    it("returns the shared parent as the common ancestor for half-siblings", () => {
+      const map = makeMap(
+        person({ id: "p1", childIds: ["c1", "c2"] }),
+        person({ id: "p2", childIds: ["c1"] }),
+        person({ id: "p3", childIds: ["c2"] }),
+        person({ id: "c1", parentIds: ["p1", "p2"] }),
+        person({ id: "c2", parentIds: ["p1", "p3"] }),
+      )
+      const result = findRelationship("c1", "c2", map)
+      expect(result?.kind).toBe("blood")
+      expect(result?.commonAncestorId).toBe("p1")
+      expect(result?.stepsA).toBe(1)
+      expect(result?.stepsB).toBe(1)
     })
 
     it("labels aunt/uncle and niece/nephew at one level", () => {
