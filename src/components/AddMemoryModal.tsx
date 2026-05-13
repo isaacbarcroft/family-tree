@@ -16,12 +16,20 @@ interface AddMemoryModalProps {
   onClose: () => void
   onCreated: () => void
   preTaggedPersonId?: string
+  initialTitle?: string
+  initialDescription?: string
 }
 
-export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }: AddMemoryModalProps) {
+export default function AddMemoryModal({
+  onClose,
+  onCreated,
+  preTaggedPersonId,
+  initialTitle,
+  initialDescription,
+}: AddMemoryModalProps) {
   const { user } = useAuth()
-  const [title, setTitle] = useState("")
-  const [description, setDescription] = useState("")
+  const [title, setTitle] = useState(initialTitle ?? "")
+  const [description, setDescription] = useState(initialDescription ?? "")
   const [date, setDate] = useState("")
   const [files, setFiles] = useState<File[]>([])
   const [previews, setPreviews] = useState<string[]>([])
