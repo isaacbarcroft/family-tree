@@ -8,7 +8,9 @@ import type { ReactionEmoji } from "@/constants/reactions"
 import type { Relationship } from "@/models/Relationship"
 import type { GeocodedPlace } from "@/models/GeocodedPlace"
 import type { Residence } from "@/models/Residence"
+import type { StoryPrompt } from "@/models/StoryPrompt"
 import { escapeLikePattern } from "@/utils/likeEscape"
+import { pickPromptForDay } from "@/utils/storyPrompt"
 
 function buildSearchName(firstName?: string, middleName?: string, lastName?: string) {
   return [firstName, middleName, lastName].filter(Boolean).join(" ").toLowerCase().trim()
@@ -592,6 +594,21 @@ export async function deleteComment(id: string): Promise<void> {
     .delete()
     .eq("id", id)
   if (error) throw error
+}
+
+// ---- Story prompts ----
+export async function listStoryPrompts(): Promise<StoryPrompt[]> {
+  const { data, error } = await supabase
+    .from("story_prompts")
+    .select("*")
+    .is("isActive", true)
+  if (error) throw error
+  return (data ?? []) as StoryPrompt[]
+}
+
+export async function getStoryPromptForToday(now: Date = new Date()): Promise<StoryPrompt | null> {
+  const prompts = await listStoryPrompts()
+  return pickPromptForDay(prompts, now)
 }
 
 // ---- Relationships ----

@@ -13,6 +13,7 @@ Run the SQL files in Supabase SQL Editor, in filename order:
 - `supabase/migrations/20260430_soft_delete.sql`
 - `supabase/migrations/20260501_memory_comments.sql`
 - `supabase/migrations/20260505_notification_prefs.sql`
+- `supabase/migrations/20260513_story_prompts.sql`
 
 The initial migration creates:
 
