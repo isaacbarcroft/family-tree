@@ -16,9 +16,17 @@ interface AddMemoryModalProps {
   onClose: () => void
   onCreated: () => void
   preTaggedPersonId?: string
+  promptId?: string
+  promptQuestion?: string
 }
 
-export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }: AddMemoryModalProps) {
+export default function AddMemoryModal({
+  onClose,
+  onCreated,
+  preTaggedPersonId,
+  promptId,
+  promptQuestion,
+}: AddMemoryModalProps) {
   const { user } = useAuth()
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
@@ -284,6 +292,7 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
         peopleIds: taggedPeople.map((p) => p.id),
         createdBy: user.id,
         createdAt: new Date().toISOString(),
+        promptId: promptId ?? null,
       })
 
       onCreated()
@@ -303,6 +312,18 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
       panelClassName="bg-gray-900 border border-gray-700 rounded-lg p-6 w-full max-w-lg text-gray-100 shadow-lg max-h-[90vh] overflow-y-auto outline-none"
     >
       <h3 id={titleId} className="text-lg font-semibold mb-4 text-white">Add Memory</h3>
+
+      {promptQuestion ? (
+        <div
+          data-testid="story-prompt-banner"
+          className="mb-4 rounded-lg border border-gray-700 bg-gray-800 p-3 text-base text-gray-200"
+        >
+          <p className="text-xs uppercase tracking-wider text-gray-400 mb-1">
+            Answering today&rsquo;s question
+          </p>
+          <p className="italic">{promptQuestion}</p>
+        </div>
+      ) : null}
 
       {error && <p className="text-red-400 text-sm mb-3">{error}</p>}
 

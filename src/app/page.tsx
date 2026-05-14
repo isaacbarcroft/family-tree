@@ -9,6 +9,7 @@ import type { Event } from "@/models/Event";
 import type { Memory } from "@/models/Memory";
 import type { Person } from "@/models/Person";
 import WelcomeModal from "@/components/WelcomeModal";
+import StoryPromptCard from "@/components/StoryPromptCard";
 import { SkeletonCard, SkeletonLine } from "@/components/SkeletonLoader";
 import { Avatar, Button, Chip, Icon, PhotoFrame } from "@/components/ui";
 import { formatDate, getAge, getNextBirthday } from "@/utils/dates";
@@ -343,6 +344,11 @@ function HomeAuthenticated({ user, people, memories, events, myPerson }: HomePro
           })}
         </p>
       </header>
+
+      {/* Guided story prompt — daily question to spark a memory */}
+      <div className="mb-14">
+        <StoryPromptCard userId={user.id} />
+      </div>
 
       {/* Hero spread: featured memory + today */}
       <section className="mb-14 grid grid-cols-1 gap-10 lg:grid-cols-[1.5fr_1fr] lg:gap-12">
