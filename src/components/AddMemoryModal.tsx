@@ -16,11 +16,22 @@ interface AddMemoryModalProps {
   onClose: () => void
   onCreated: () => void
   preTaggedPersonId?: string
+  prompt?: {
+    id: string
+    body: string
+  }
+  preferredAnswerType?: "text" | "voice"
 }
 
-export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }: AddMemoryModalProps) {
+export default function AddMemoryModal({
+  onClose,
+  onCreated,
+  preTaggedPersonId,
+  prompt,
+  preferredAnswerType = "text",
+}: AddMemoryModalProps) {
   const { user } = useAuth()
-  const [title, setTitle] = useState("")
+  const [title, setTitle] = useState(prompt?.body ?? "")
   const [description, setDescription] = useState("")
   const [date, setDate] = useState("")
   const [files, setFiles] = useState<File[]>([])
@@ -32,6 +43,8 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const titleId = useId()
+  const descriptionRef = useRef<HTMLTextAreaElement | null>(null)
+  const recordButtonRef = useRef<HTMLButtonElement | null>(null)
 
   type RecordingState = "idle" | "recording" | "ready"
   const [recordingState, setRecordingState] = useState<RecordingState>("idle")
@@ -126,6 +139,15 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
   useEffect(() => {
     audioUrlRef.current = audioUrl
   }, [audioUrl])
+
+  useEffect(() => {
+    if (!prompt) return
+    if (preferredAnswerType === "voice") {
+      recordButtonRef.current?.focus()
+      return
+    }
+    descriptionRef.current?.focus()
+  }, [preferredAnswerType, prompt])
 
   const stopRecordingTimer = () => {
     if (recordingTimerRef.current !== null) {
@@ -281,6 +303,7 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
         imageUrls,
         audioUrl: uploadedAudioUrl,
         durationSeconds: uploadedDuration,
+        promptId: prompt?.id,
         peopleIds: taggedPeople.map((p) => p.id),
         createdBy: user.id,
         createdAt: new Date().toISOString(),
@@ -302,11 +325,25 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
       labelledBy={titleId}
       panelClassName="bg-gray-900 border border-gray-700 rounded-lg p-6 w-full max-w-lg text-gray-100 shadow-lg max-h-[90vh] overflow-y-auto outline-none"
     >
-      <h3 id={titleId} className="text-lg font-semibold mb-4 text-white">Add Memory</h3>
+      <h3 id={titleId} className="text-lg font-semibold mb-4 text-white">
+        {prompt ? "Answer this prompt" : "Add Memory"}
+      </h3>
 
       {error && <p className="text-red-400 text-sm mb-3">{error}</p>}
 
       <div className="space-y-4">
+        {prompt ? (
+          <div
+            data-testid="prompt-context"
+            className="rounded-lg border border-[var(--accent)]/40 bg-[var(--accent)]/10 p-4"
+          >
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--accent)]">
+              Today&apos;s prompt
+            </p>
+            <p className="text-sm leading-6 text-gray-100">{prompt.body}</p>
+          </div>
+        ) : null}
+
         <div>
           <label className="block text-base text-gray-300 mb-1">Title *</label>
           <input
@@ -329,12 +366,19 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
         </div>
 
         <div>
-          <label className="block text-base text-gray-300 mb-1">Description</label>
+          <label className="block text-base text-gray-300 mb-1">
+            {prompt ? "Your answer" : "Description"}
+          </label>
           <textarea
+            ref={descriptionRef}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
-            placeholder="Tell the story behind this memory..."
+            placeholder={
+              prompt
+                ? "Write what you remember, what happened, and why it matters..."
+                : "Tell the story behind this memory..."
+            }
             className="border border-gray-700 bg-gray-800 text-gray-100 p-3 text-base rounded-lg w-full"
           />
         </div>
@@ -380,11 +424,12 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
           )}
           {recordingState === "idle" && !audioUrl && (
             <button
+              ref={recordButtonRef}
               type="button"
               onClick={startRecording}
               className="bg-gray-700 hover:bg-gray-600 text-white text-base px-5 py-2.5 rounded-lg font-medium min-h-[44px]"
             >
-              Record audio
+              {preferredAnswerType === "voice" ? "Start recording your answer" : "Record audio"}
             </button>
           )}
           {recordingState === "recording" && (

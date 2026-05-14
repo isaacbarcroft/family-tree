@@ -6,6 +6,7 @@ export interface Memory {
   imageUrls?: string[]
   audioUrl?: string
   durationSeconds?: number
+  promptId?: string | null
   peopleIds: string[]
   createdBy: string
   createdAt: string
