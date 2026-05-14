@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
 import { buildNewUserNotificationHtml } from "@/lib/emails/new-user-notification"
+import { escapePgrstString } from "@/utils/pgrstEscape"
 
 export const dynamic = "force-dynamic"
 
@@ -50,13 +51,17 @@ export async function POST(request: NextRequest) {
     payload.record.raw_user_meta_data?.first_name || "Someone"
   const lastName = payload.record.raw_user_meta_data?.last_name || ""
 
-  // Query all people with emails, excluding the new user
-  const params = new URLSearchParams({
-    select: "email",
-    "email": `not.is.null`,
-  })
-  // Add filter to exclude new user's email
-  params.append("email", `neq.${newUserEmail}`)
+  // Query all people with emails, excluding the new user. The two predicates
+  // are combined with an explicit PostgREST `and=(...)` clause; relying on
+  // repeated `email=` params would also AND but is fragile (PostgREST treats
+  // the relationship between dupes as an implementation detail, not a contract).
+  // The email is wrapped in quotes and escaped so a value containing reserved
+  // characters (`,`, `.`, `(`, `)`, `"`) can't break out of the filter.
+  const params = new URLSearchParams({ select: "email" })
+  params.append(
+    "and",
+    `(email.not.is.null,email.neq."${escapePgrstString(newUserEmail)}")`
+  )
 
   const res = await fetch(`${supabaseUrl}/rest/v1/people?${params}`, {
     headers: {
