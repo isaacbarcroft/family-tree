@@ -263,4 +263,77 @@ describe("POST /api/webhooks/new-user", () => {
     })
     errSpy.mockRestore()
   })
+
+  // These pin the shape of the URL we send to PostgREST. The previous version
+  // of this route relied on appending the `email` query param twice — once for
+  // `not.is.null` and once for `neq.<new-user-email>` — which only worked
+  // because PostgREST happens to AND duplicate keys. We've moved to a single
+  // explicit `and=(...)` clause; these tests fail if anyone reintroduces the
+  // dupe-param shape or drops the quoting that guards against reserved chars
+  // in the email value.
+  describe("PostgREST recipient query URL", () => {
+    function parseRecipientUrl(url: string): URL {
+      return new URL(url)
+    }
+
+    it("uses a single `and=(...)` clause instead of duplicate `email` params", async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }))
+      const { POST } = await loadRoute()
+      await POST(
+        makeRequest({
+          secret: "whsec",
+          body: {
+            type: "INSERT",
+            record: {
+              id: "u1",
+              email: "new@example.com",
+              raw_user_meta_data: { first_name: "Alex" },
+              created_at: "2026-01-01",
+            },
+            old_record: null,
+          },
+        })
+      )
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+      const url = parseRecipientUrl(fetchSpy.mock.calls[0][0] as string)
+      expect(url.pathname).toBe("/rest/v1/people")
+      expect(url.searchParams.get("select")).toBe("email")
+      expect(url.searchParams.getAll("email")).toEqual([])
+      expect(url.searchParams.getAll("and")).toEqual([
+        '(email.not.is.null,email.neq."new@example.com")',
+      ])
+    })
+
+    it("quotes the new user's email so reserved characters can't break out of the filter", async () => {
+      // A backslash and an embedded double quote are the two characters that
+      // would actually escape the quoted value. PostgREST permits both via
+      // backslash-escaping inside the surrounding quotes; the test pins that
+      // escaping is happening so a future refactor that drops it fails here.
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }))
+      const { POST } = await loadRoute()
+      await POST(
+        makeRequest({
+          secret: "whsec",
+          body: {
+            type: "INSERT",
+            record: {
+              id: "u1",
+              email: 'weird"\\@example.com',
+              raw_user_meta_data: { first_name: "Alex" },
+              created_at: "2026-01-01",
+            },
+            old_record: null,
+          },
+        })
+      )
+      const url = parseRecipientUrl(fetchSpy.mock.calls[0][0] as string)
+      expect(url.searchParams.getAll("and")).toEqual([
+        '(email.not.is.null,email.neq."weird\\"\\\\@example.com")',
+      ])
+    })
+  })
 })
