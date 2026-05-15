@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
 import { buildNewUserNotificationHtml } from "@/lib/emails/new-user-notification"
+import { escapePgrstString } from "@/utils/pgrstEscape"
 
 export const dynamic = "force-dynamic"
 
@@ -50,13 +51,13 @@ export async function POST(request: NextRequest) {
     payload.record.raw_user_meta_data?.first_name || "Someone"
   const lastName = payload.record.raw_user_meta_data?.last_name || ""
 
-  // Query all people with emails, excluding the new user
+  // Both filters go into a single PostgREST `and()` clause so the AND join
+  // is explicit; the email is escaped + double-quoted so reserved characters
+  // (`,`, `()`, `\`, `"`) never break the surrounding filter syntax.
   const params = new URLSearchParams({
     select: "email",
-    "email": `not.is.null`,
+    and: `(email.not.is.null,email.neq."${escapePgrstString(newUserEmail)}")`,
   })
-  // Add filter to exclude new user's email
-  params.append("email", `neq.${newUserEmail}`)
 
   const res = await fetch(`${supabaseUrl}/rest/v1/people?${params}`, {
     headers: {

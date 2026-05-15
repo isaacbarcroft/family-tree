@@ -233,6 +233,73 @@ describe("POST /api/webhooks/new-user", () => {
     errSpy.mockRestore()
   })
 
+  it("queries Supabase with a single and() filter joining not-null + neq", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify([]), { status: 200 })
+    )
+    const { POST } = await loadRoute()
+    await POST(
+      makeRequest({
+        secret: "whsec",
+        body: {
+          type: "INSERT",
+          record: {
+            id: "u1",
+            email: "new@example.com",
+            raw_user_meta_data: { first_name: "Alex" },
+            created_at: "2026-01-01",
+          },
+          old_record: null,
+        },
+      })
+    )
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    const calledUrl = fetchSpy.mock.calls[0][0] as string
+    const parsed = new URL(calledUrl)
+    expect(parsed.origin + parsed.pathname).toBe(
+      "https://example.supabase.co/rest/v1/people"
+    )
+    // Single email-targeted filter: the `and()` clause. Reject the legacy
+    // duplicate-`email`-param shape that worked by relying on PostgREST's
+    // implicit AND of repeated query keys.
+    expect(parsed.searchParams.getAll("email")).toEqual([])
+    expect(parsed.searchParams.get("select")).toBe("email")
+    expect(parsed.searchParams.get("and")).toBe(
+      '(email.not.is.null,email.neq."new@example.com")'
+    )
+  })
+
+  it("escapes reserved PostgREST characters in the new-user email", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify([]), { status: 200 })
+    )
+    const { POST } = await loadRoute()
+    // A backslash or double-quote in the email would otherwise break out of
+    // the surrounding double-quoted PostgREST literal. Real emails almost
+    // never contain these, but the route must not be exploitable if user
+    // metadata is ever corrupted.
+    await POST(
+      makeRequest({
+        secret: "whsec",
+        body: {
+          type: "INSERT",
+          record: {
+            id: "u1",
+            email: 'weird"\\@example.com',
+            raw_user_meta_data: { first_name: "Alex" },
+            created_at: "2026-01-01",
+          },
+          old_record: null,
+        },
+      })
+    )
+    const calledUrl = fetchSpy.mock.calls[0][0] as string
+    const parsed = new URL(calledUrl)
+    expect(parsed.searchParams.get("and")).toBe(
+      '(email.not.is.null,email.neq."weird\\"\\\\@example.com")'
+    )
+  })
+
   it("returns 500 when Resend throws while sending", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify([{ email: "a@example.com" }]), {
