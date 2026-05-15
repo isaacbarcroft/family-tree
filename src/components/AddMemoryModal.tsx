@@ -6,6 +6,7 @@ import { audioExtensionFor, uploadMemoryAudio, uploadMemoryPhoto } from "@/lib/s
 import { useAuth } from "@/components/AuthProvider"
 import { supabase } from "@/lib/supabase"
 import type { Person } from "@/models/Person"
+import type { StoryPrompt } from "@/models/StoryPrompt"
 import { convertHeicToJpeg, isHeicFile, isHeicFileByMagic } from "@/utils/heic"
 import { formatDuration } from "@/utils/duration"
 import { getErrorMessage } from "@/utils/errorMessage"
@@ -16,11 +17,17 @@ interface AddMemoryModalProps {
   onClose: () => void
   onCreated: () => void
   preTaggedPersonId?: string
+  prompt?: StoryPrompt | null
 }
 
-export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }: AddMemoryModalProps) {
+export default function AddMemoryModal({
+  onClose,
+  onCreated,
+  preTaggedPersonId,
+  prompt,
+}: AddMemoryModalProps) {
   const { user } = useAuth()
-  const [title, setTitle] = useState("")
+  const [title, setTitle] = useState(prompt?.text ?? "")
   const [description, setDescription] = useState("")
   const [date, setDate] = useState("")
   const [files, setFiles] = useState<File[]>([])
@@ -281,6 +288,7 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
         imageUrls,
         audioUrl: uploadedAudioUrl,
         durationSeconds: uploadedDuration,
+        promptId: prompt?.id ?? undefined,
         peopleIds: taggedPeople.map((p) => p.id),
         createdBy: user.id,
         createdAt: new Date().toISOString(),
@@ -302,7 +310,19 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
       labelledBy={titleId}
       panelClassName="bg-gray-900 border border-gray-700 rounded-lg p-6 w-full max-w-lg text-gray-100 shadow-lg max-h-[90vh] overflow-y-auto outline-none"
     >
-      <h3 id={titleId} className="text-lg font-semibold mb-4 text-white">Add Memory</h3>
+      <h3 id={titleId} className="text-lg font-semibold mb-4 text-white">
+        {prompt ? "Answer a prompt" : "Add Memory"}
+      </h3>
+
+      {prompt ? (
+        <div
+          className="mb-4 rounded-lg border border-gray-700 bg-gray-800 p-3 text-sm"
+          aria-label="Story prompt"
+        >
+          <p className="mb-1 text-xs uppercase tracking-wide text-gray-400">A question for you</p>
+          <p className="italic text-gray-100">{prompt.text}</p>
+        </div>
+      ) : null}
 
       {error && <p className="text-red-400 text-sm mb-3">{error}</p>}
 

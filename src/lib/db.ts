@@ -8,6 +8,7 @@ import type { ReactionEmoji } from "@/constants/reactions"
 import type { Relationship } from "@/models/Relationship"
 import type { GeocodedPlace } from "@/models/GeocodedPlace"
 import type { Residence } from "@/models/Residence"
+import type { StoryPrompt } from "@/models/StoryPrompt"
 import { escapeLikePattern } from "@/utils/likeEscape"
 
 function buildSearchName(firstName?: string, middleName?: string, lastName?: string) {
@@ -592,6 +593,27 @@ export async function deleteComment(id: string): Promise<void> {
     .delete()
     .eq("id", id)
   if (error) throw error
+}
+
+// ---- Story prompts ----
+export async function listStoryPrompts(): Promise<StoryPrompt[]> {
+  const { data, error } = await supabase
+    .from("story_prompts")
+    .select("*")
+    .is("deletedAt", null)
+  if (error) throw error
+  return (data ?? []) as StoryPrompt[]
+}
+
+export async function getStoryPromptById(id: string): Promise<StoryPrompt | null> {
+  const { data, error } = await supabase
+    .from("story_prompts")
+    .select("*")
+    .eq("id", id)
+    .is("deletedAt", null)
+    .maybeSingle()
+  if (error) throw error
+  return (data as StoryPrompt | null) ?? null
 }
 
 // ---- Relationships ----

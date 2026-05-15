@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
-import { deleteMemory, listMemories, updateMemory } from "@/lib/db";
+import { deleteMemory, getStoryPromptById, listMemories, updateMemory } from "@/lib/db";
 import type { Memory } from "@/models/Memory";
 import type { Person } from "@/models/Person";
+import type { StoryPrompt } from "@/models/StoryPrompt";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AddMemoryModal from "@/components/AddMemoryModal";
 import AudioPlayer from "@/components/AudioPlayer";
@@ -19,7 +21,17 @@ import { toDisplayImageUrl } from "@/utils/imageUrl";
 import { PAGE_SIZE } from "@/config/constants";
 
 export default function MemoriesPage() {
+  return (
+    <Suspense fallback={null}>
+      <MemoriesPageContent />
+    </Suspense>
+  );
+}
+
+function MemoriesPageContent() {
   const { user } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [memories, setMemories] = useState<Memory[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -32,6 +44,38 @@ export default function MemoriesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Memory>>({});
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [activePrompt, setActivePrompt] = useState<StoryPrompt | null>(null);
+
+  const promptIdParam = searchParams.get("prompt");
+
+  useEffect(() => {
+    if (!promptIdParam) {
+      setActivePrompt(null);
+      return;
+    }
+    let cancelled = false;
+    getStoryPromptById(promptIdParam)
+      .then((p) => {
+        if (cancelled) return;
+        setActivePrompt(p);
+        if (p) setShowAddModal(true);
+      })
+      .catch((err) => {
+        console.error(err);
+        if (!cancelled) setActivePrompt(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [promptIdParam]);
+
+  const closeAddModal = useCallback(() => {
+    setShowAddModal(false);
+    if (promptIdParam) {
+      router.replace("/memories");
+      setActivePrompt(null);
+    }
+  }, [promptIdParam, router]);
 
   const fetchPeopleForMemories = useCallback(async (memData: Memory[]) => {
     const allPeopleIds = Array.from(new Set(memData.flatMap((m) => m.peopleIds)));
@@ -238,8 +282,9 @@ export default function MemoriesPage() {
 
         {showAddModal ? (
           <AddMemoryModal
-            onClose={() => setShowAddModal(false)}
+            onClose={closeAddModal}
             onCreated={fetchMemories}
+            prompt={activePrompt}
           />
         ) : null}
       </div>
