@@ -3,17 +3,20 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
-import { listEvents, listMemories, listPeople } from "@/lib/db";
+import { listEvents, listMemories, listPeople, listStoryPrompts } from "@/lib/db";
 import type { AppUser } from "@/lib/supabase";
 import type { Event } from "@/models/Event";
 import type { Memory } from "@/models/Memory";
 import type { Person } from "@/models/Person";
+import type { StoryPrompt } from "@/models/StoryPrompt";
 import WelcomeModal from "@/components/WelcomeModal";
+import StoryPromptCard from "@/components/StoryPromptCard";
 import { SkeletonCard, SkeletonLine } from "@/components/SkeletonLoader";
 import { Avatar, Button, Chip, Icon, PhotoFrame } from "@/components/ui";
 import { formatDate, getAge, getNextBirthday } from "@/utils/dates";
 import { toDisplayImageUrl } from "@/utils/imageUrl";
 import { shareInvite } from "@/utils/share";
+import { dateKey, pickDailyPrompt } from "@/utils/storyPrompt";
 import { HOME_RECENT } from "@/config/constants";
 
 export default function Home() {
@@ -21,6 +24,7 @@ export default function Home() {
   const [people, setPeople] = useState<Person[]>([]);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
+  const [prompts, setPrompts] = useState<StoryPrompt[]>([]);
   const [loading, setLoading] = useState(true);
   const [myPerson, setMyPerson] = useState<Person | null>(null);
 
@@ -31,12 +35,18 @@ export default function Home() {
     }
     const fetchAll = async () => {
       try {
-        const [p, m, e] = await Promise.all([listPeople(), listMemories(), listEvents()]);
+        const [p, m, e, sp] = await Promise.all([
+          listPeople(),
+          listMemories(),
+          listEvents(),
+          listStoryPrompts().catch(() => [] as StoryPrompt[]),
+        ]);
         setPeople(p);
         setMemories(
           m.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
         );
         setEvents(e.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+        setPrompts(sp);
         const me = p.find((person) => person.userId === user.id);
         if (me) setMyPerson(me);
       } catch (err) {
@@ -70,6 +80,7 @@ export default function Home() {
       people={people}
       memories={memories}
       events={events}
+      prompts={prompts}
       myPerson={myPerson}
     />
   );
@@ -197,10 +208,11 @@ type HomeProps = {
   people: Person[];
   memories: Memory[];
   events: Event[];
+  prompts: StoryPrompt[];
   myPerson: Person | null;
 };
 
-function HomeAuthenticated({ user, people, memories, events, myPerson }: HomeProps) {
+function HomeAuthenticated({ user, people, memories, events, prompts, myPerson }: HomeProps) {
   const upcomingBirthdays = people
     .filter((p) => p.birthDate && !p.deathDate)
     .map((p) => ({ person: p, ...getNextBirthday(p.birthDate!) }))
@@ -210,6 +222,7 @@ function HomeAuthenticated({ user, people, memories, events, myPerson }: HomePro
 
   const featuredMemory = memories.find((m) => m.imageUrls && m.imageUrls.length > 0) ?? memories[0] ?? null;
   const recentMemories = memories.slice(0, HOME_RECENT.MEMORIES);
+  const todaysPrompt = pickDailyPrompt(prompts, dateKey(new Date()), user.id);
 
   const greeting = resolveFirstName(myPerson, user);
 
@@ -353,6 +366,8 @@ function HomeAuthenticated({ user, people, memories, events, myPerson }: HomePro
           familyTreeReady={Boolean(myPerson?.familyIds?.[0])}
         />
       </section>
+
+      {todaysPrompt ? <StoryPromptCard prompt={todaysPrompt} /> : null}
 
       {/* Lower grid: in-memory, recent additions, your branch */}
       {(inMemory || recentMemories.length > 0 || (myPerson && people.length > 1)) ? (
