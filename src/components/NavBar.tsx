@@ -87,7 +87,7 @@ export default function NavBar() {
 
   // Clear or reset state during render — rather than from inside effects that
   // would cascade an extra render — when an upstream value changes. Matches
-  // the React 19 pattern used in MemoryImage / ProfileAvatar.
+  // the React 19 pattern used in ProfileAvatar / PhotoFrame.
   const [prevSearchTrim, setPrevSearchTrim] = useState("");
   const trimmedSearch = search.trim();
   if (trimmedSearch !== prevSearchTrim) {
