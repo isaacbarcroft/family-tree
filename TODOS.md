@@ -12,14 +12,13 @@
 
 **Quick wins first — under 1h total:**
 
-1. **T-13** — wrap `GenealogyTree` in `next/dynamic`, ~30 min. Leaflet is already done in `places/page.tsx`.
+1. **T-14** — fix the duplicate PostgREST filter param in `/api/webhooks/new-user`, ~10 min.
 
 **Then in priority order:**
 
-2. **1.6 Accessibility** — start with `TreeNode.tsx` keyboard support. Highest-impact remaining gap; older relatives are the target audience.
+2. **1.6 Accessibility** — continue beyond the shipped `TreeNode.tsx` keyboard support, starting with modal focus traps and image alt text. Highest-impact remaining Phase 1 gap; older relatives are the target audience.
 3. **T-15** — `middleware.ts` for route-level auth. Defense-in-depth on top of RLS.
-4. **1.4** — guided story prompts. Last unshipped Phase 1 engagement feature.
-5. **T-3** — extend `next/image` adoption beyond `ProfileAvatar`.
+4. **T-3** — extend `next/image` adoption beyond `ProfileAvatar`.
 
 ---
 
@@ -60,7 +59,7 @@ You've built a lot more than the original plan called for. Current stack is **Ne
 - ~~Reactions/comments on memories — shipped 2026-04-29 → 2026-05-01~~
 - ~~"On this day" / birthday reminder emails — shipped 2026-05-06~~
 - ~~Relationship calculator — shipped 2026-04-28~~
-- Structured oral-history prompts (1.4)
+- ~~Structured oral-history prompts (1.4)~~
 - Document/artifact archive (separate from photo memories) (2.1)
 - Health/medical history tracking (2.3)
 - Migration map / "where the family lived over time" (2.4)
@@ -112,17 +111,11 @@ See Completed log. **Open follow-ups:**
 - **1.3.a Per-family local send time.** The route runs on whatever schedule the deploy target triggers; if you want "7am local" per user or per family branch, you'll need timezone storage plus schedule fan-out. +2h.
 - **1.3.b Remembrance birthdays for deceased relatives.** Deceased people are currently excluded from the birthday section entirely. "Would have turned 87 today" remembrance copy is a separate UX decision. +1h.
 
-### 1.4. Guided story prompts ("Ask Grandma" mode)
+### ~~1.4. Guided story prompts ("Ask Grandma" mode)~~ — Done 2026-05-16 (PR #61)
 
-**Why:** Blank-textbox syndrome is real. Nobody opens a "Write a memory" form cold. Prompts like _"Tell me about your first car"_ unlock content.
-**Scope:**
+See Completed log. **Open follow-ups:**
 
-- Seed 50–100 prompts in a `story_prompts` table with categories (childhood, career, love, faith, travel, holidays, pets)
-- Home page widget: "A question for you today: {prompt}" with an "Answer with text" / "Answer with voice" CTA
-- When answered, it becomes a memory tagged with the prompt
-- Optional: AI-generated follow-up prompts based on their answer (Claude API call)
-  **Effort:** 4h prompts + UI, +4h for AI follow-ups
-  **Source inspiration:** [StoryWorth](https://welcome.storyworth.com/) (paid competitor; ~$99/yr, does exactly this)
+- **1.4.a AI-generated follow-up prompts.** After a user answers a seeded question, offer 1 to 3 follow-up prompts grounded in that answer before they leave the flow. Keep it review-first so nothing is auto-saved. +4h.
 
 ### ~~1.5. Relationship calculator~~ — Done 2026-04-28
 
@@ -438,6 +431,7 @@ This TODO list is long-form, strategy-heavy, and opinionated. **Worth comparing 
 
 ## Completed
 
+- 2026-05-16 — **1.4 Guided story prompts ("Ask Grandma" mode).** Added `supabase/migrations/20260514_story_prompts.sql` plus rollback to create `public.story_prompts`, seed 56 prompts across childhood/career/love/faith/travel/holidays/pets/general, enable allowlist-gated reads, and attach a nullable `memories.promptId` back-reference (`on delete set null`). Added `src/models/StoryPrompt.ts`, `listStoryPrompts()`, `listAnsweredPromptIdsForUser()`, and deterministic daily-prompt helpers in `src/utils/storyPromptPick.ts`. The home page now renders `src/components/StoryPromptWidget.tsx`, which picks one unanswered prompt per user per local day, supports "Answer with text", "Answer with voice", and "Another question", and refreshes after save so answered prompts rotate out. `src/components/AddMemoryModal.tsx` now accepts prompt context, pre-fills the title from the prompt, focuses the correct input for text-vs-voice answers, and forwards `promptId` into `addMemory()`. Coverage: 48 new Vitest cases across `src/__tests__/storyPromptPick.test.ts`, `storyPromptWidget.test.tsx`, `storyPromptsDb.test.ts`, `storyPromptsMigration.test.ts`, and `addMemoryModalPrompt.test.tsx`. Validation on 2026-05-16: `yarn lint`, `yarn test`, and `yarn build`, all passing. Files: `src/app/page.tsx`, `src/components/StoryPromptWidget.tsx`, `src/components/AddMemoryModal.tsx`, `src/lib/db.ts`, `src/models/Memory.ts`, `src/models/StoryPrompt.ts`, `src/utils/storyPromptPick.ts`, `supabase/migrations/20260514_story_prompts.sql`, `supabase/migrations/20260514_story_prompts_rollback.sql`, `TODOS.md`. Branch: `routine/todos-2026-05-16-guided-story-prompts`. PR: #61. Older draft PR #50 remains open with an earlier implementation and should not be treated as the active review surface.
 - 2026-05-10 — **T-17 Webhook-secret guard spot-check (no-op close).** Audited `src/app/api/webhooks/new-user/route.ts`. The header check is already in place: lines 26 and 29 require `SUPABASE_WEBHOOK_SECRET` to be set (500 on missing env), and lines 37 to 40 reject any request whose `x-webhook-secret` header does not match (401 on missing or wrong secret). Test coverage in `src/__tests__/webhookNewUser.test.ts` already pins all three failure modes: missing env vars (case at lines 53 to 59), wrong secret (lines 61 to 66), and missing header (lines 68 to 72), plus the full happy path with a valid secret. No code change required; T-17 closes as confirmed-secure. The unrelated duplicate `email` query param continues to be tracked under T-14. Files: `TODOS.md`.
 - 2026-05-10 — **1.6 (highest-impact gap) — `TreeNode.tsx` keyboard + screen-reader support.** The three interactive `<g>` branches in `src/components/TreeNode.tsx` (single person, couple-left, couple-right) were mouse-only after the T-12 extraction — no `tabIndex`, `role`, `onKeyDown`, or `aria-label`. Now each branch carries `role="button"`, `tabIndex={0}` (`-1` when no person id), an `aria-label` derived from `node.data.name` (with `, born {birth}` or `, {birth} to {death}` appended for single-person nodes when dates are known), and an `onKeyDown` handler that routes `Enter` and `Space` through a shared `handleKeyActivate` helper to `onNavigate` (with `preventDefault` on `Space` so the page does not scroll). Visual focus is painted via a stroke-change rule in `src/app/globals.css` (`.tree-node-interactive:focus-visible > rect, .tree-node-interactive:focus-visible > circle { stroke: var(--sage-deep); stroke-width: 3 }`) — outline on SVG groups renders inconsistently across browsers (offset/border-radius are ignored), so a stroke change on the group's primary visible child is the more reliable focus indicator. The synthetic family-root label remains non-interactive (no role/tabindex/aria-label). Coverage: 9 new Vitest cases in `src/__tests__/treeNode.test.tsx` (single-person button role/tabindex/aria-label, dates baked into the label, Enter/Space activation, other keys ignored, Space `preventDefault`, family-root label non-focusable, couple-half per-side button roles + labels, per-side activation, `tree-node-interactive` class on every focusable group). 522 tests pass / 5 skipped (was 513/5; +9); `yarn lint` clean (0/0); `yarn build` green. Files: `src/components/TreeNode.tsx`, `src/app/globals.css`, `src/__tests__/treeNode.test.tsx`, `TODOS.md`. Branch: `claude/vigilant-cannon-hbeef`.
 - 2026-05-09 — **T-16 Lint regression cleanup — restore 0/0 baseline.** UI refresh (PR #28) re-introduced `react-hooks/set-state-in-effect` warnings in three files plus two unused-import warnings; total 5 warnings, 0 errors. (TODO entry described it as "5 warnings in PhotoFrame.tsx" — actual breakdown was 3 set-state-in-effect across `src/components/ui/PhotoFrame.tsx`, `src/components/ui/Avatar.tsx`, and `src/components/NavBar.tsx`, plus unused `EmptyState` import in `src/app/family-tree/page.tsx` and unused `Icon` import in `src/app/timeline/page.tsx`.) Fixes: (1) `PhotoFrame` and `Avatar` now reset `failed` state via the render-time `prev*` pattern (matching `MemoryImage` / `ProfileAvatar`) instead of `useEffect(() => setFailed(false), [src])`. (2) `NavBar` switched to `useSyncExternalStore<Theme>(subscribeTheme, readTheme, () => "light")` with a module-level `themeListeners` `Set` pub/sub and an `applyTheme()` writer that updates the `<html>` class, persists to `localStorage`, and notifies listeners — replacing the `setTheme(readInitialTheme())` mount effect. The toggle button is gated behind `user`, which is null on SSR, so the `"light"` server snapshot is never user-visible. (3) Dropped the two unused imports. New tests: 2 cases (one each in `src/__tests__/ui/PhotoFrame.test.tsx` and `src/__tests__/ui/Avatar.test.tsx`) pin the regression — after a previous `src` errored, swapping in a new `src` re-renders the `<img>` (failed state must reset across the boundary). 513 tests pass / 5 skipped (was 511/5; added one regression-pin case to each of `PhotoFrame.test.tsx` and `Avatar.test.tsx`); `yarn lint` clean (0/0); `yarn build` green. Files: `src/components/ui/PhotoFrame.tsx`, `src/components/ui/Avatar.tsx`, `src/components/NavBar.tsx`, `src/app/family-tree/page.tsx`, `src/app/timeline/page.tsx`, `src/__tests__/ui/PhotoFrame.test.tsx`, `src/__tests__/ui/Avatar.test.tsx`, `TODOS.md`.
