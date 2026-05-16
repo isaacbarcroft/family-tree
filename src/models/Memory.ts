@@ -10,4 +10,5 @@ export interface Memory {
   createdBy: string
   createdAt: string
   deletedAt?: string | null
+  promptId?: string | null
 }

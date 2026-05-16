@@ -12,15 +12,28 @@ import { getErrorMessage } from "@/utils/errorMessage"
 import { escapeLikePattern } from "@/utils/likeEscape"
 import Modal from "@/components/Modal"
 
+interface PromptInput {
+  id: string
+  text: string
+}
+
 interface AddMemoryModalProps {
   onClose: () => void
   onCreated: () => void
   preTaggedPersonId?: string
+  prompt?: PromptInput
+  autoStartRecording?: boolean
 }
 
-export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }: AddMemoryModalProps) {
+export default function AddMemoryModal({
+  onClose,
+  onCreated,
+  preTaggedPersonId,
+  prompt,
+  autoStartRecording,
+}: AddMemoryModalProps) {
   const { user } = useAuth()
-  const [title, setTitle] = useState("")
+  const [title, setTitle] = useState(prompt?.text ?? "")
   const [description, setDescription] = useState("")
   const [date, setDate] = useState("")
   const [files, setFiles] = useState<File[]>([])
@@ -234,6 +247,19 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
     recorder.stop()
   }
 
+  const startRecordingRef = useRef(startRecording)
+  useEffect(() => {
+    startRecordingRef.current = startRecording
+  })
+
+  const autoStartedRef = useRef(false)
+  useEffect(() => {
+    if (!autoStartRecording) return
+    if (autoStartedRef.current) return
+    autoStartedRef.current = true
+    startRecordingRef.current()
+  }, [autoStartRecording])
+
   useEffect(() => {
     return () => {
       stopRecordingTimer()
@@ -284,6 +310,7 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
         peopleIds: taggedPeople.map((p) => p.id),
         createdBy: user.id,
         createdAt: new Date().toISOString(),
+        promptId: prompt?.id,
       })
 
       onCreated()
@@ -302,9 +329,20 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
       labelledBy={titleId}
       panelClassName="bg-gray-900 border border-gray-700 rounded-lg p-6 w-full max-w-lg text-gray-100 shadow-lg max-h-[90vh] overflow-y-auto outline-none"
     >
-      <h3 id={titleId} className="text-lg font-semibold mb-4 text-white">Add Memory</h3>
+      <h3 id={titleId} className="text-lg font-semibold mb-4 text-white">
+        {prompt ? "Answer the question" : "Add Memory"}
+      </h3>
 
       {error && <p className="text-red-400 text-sm mb-3">{error}</p>}
+
+      {prompt && (
+        <div className="mb-4 rounded-lg border border-[var(--sage-soft)] bg-[var(--sage-tint)]/30 p-3 text-sm">
+          <p className="mb-1 text-xs uppercase tracking-wide text-[var(--sage-deep)]">
+            Today&rsquo;s question
+          </p>
+          <p className="display-italic text-base text-gray-100">{prompt.text}</p>
+        </div>
+      )}
 
       <div className="space-y-4">
         <div>
