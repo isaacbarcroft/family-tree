@@ -33,7 +33,7 @@ export function ProfileAvatar({
 
   // Reset the error flag when the caller swaps the source (e.g. after photo
   // upload). Doing this during render — the same React 19 pattern used by
-  // MemoryImage — avoids the cascading re-render a useEffect would cause.
+  // PhotoFrame — avoids the cascading re-render a useEffect would cause.
   if (src !== prevSrc) {
     setPrevSrc(src)
     setError(false)
