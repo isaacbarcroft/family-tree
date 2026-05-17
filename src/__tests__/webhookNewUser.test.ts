@@ -206,6 +206,71 @@ describe("POST /api/webhooks/new-user", () => {
     expect(sent[0].subject).toBe("Someone just joined the family tree!")
   })
 
+  it("queries people via a single PostgREST and() filter (no duplicate email param)", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        new Response(JSON.stringify([{ email: "a@example.com" }]), {
+          status: 200,
+        })
+      )
+    const { POST } = await loadRoute()
+    await POST(
+      makeRequest({
+        secret: "whsec",
+        body: {
+          type: "INSERT",
+          record: {
+            id: "u1",
+            email: "new@example.com",
+            raw_user_meta_data: { first_name: "Alex" },
+            created_at: "2026-01-01",
+          },
+          old_record: null,
+        },
+      })
+    )
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    const url = new URL(fetchSpy.mock.calls[0][0] as string)
+    expect(url.pathname).toBe("/rest/v1/people")
+    // No duplicate `email` param — both filters live in a single `and(...)`.
+    expect(url.searchParams.getAll("email")).toEqual([])
+    expect(url.searchParams.get("select")).toBe("email")
+    expect(url.searchParams.get("and")).toBe(
+      `(email.not.is.null,email.neq."new@example.com")`
+    )
+  })
+
+  it("escapes reserved PostgREST chars in the new user's email", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }))
+    const { POST } = await loadRoute()
+    await POST(
+      makeRequest({
+        secret: "whsec",
+        body: {
+          type: "INSERT",
+          record: {
+            id: "u1",
+            // Backslash + double-quote would close the and() token mid-value
+            // without escaping. Not a valid RFC email, but the route must not
+            // assume the upstream payload is well-formed.
+            email: 'weird"\\@example.com',
+            raw_user_meta_data: {},
+            created_at: "2026-01-01",
+          },
+          old_record: null,
+        },
+      })
+    )
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    const url = new URL(fetchSpy.mock.calls[0][0] as string)
+    expect(url.searchParams.get("and")).toBe(
+      `(email.not.is.null,email.neq."weird\\"\\\\@example.com")`
+    )
+  })
+
   it("returns 500 when the Supabase recipient query fails", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response("boom", { status: 500 })
