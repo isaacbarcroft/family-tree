@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useId, useRef, useState } from "react"
-import { addMemory } from "@/lib/db"
+import { addMemory, addStoryPromptResponse } from "@/lib/db"
 import { audioExtensionFor, uploadMemoryAudio, uploadMemoryPhoto } from "@/lib/storage"
 import { useAuth } from "@/components/AuthProvider"
 import { supabase } from "@/lib/supabase"
@@ -12,15 +12,26 @@ import { getErrorMessage } from "@/utils/errorMessage"
 import { escapeLikePattern } from "@/utils/likeEscape"
 import Modal from "@/components/Modal"
 
+export interface PromptContext {
+  id: string
+  body: string
+}
+
 interface AddMemoryModalProps {
   onClose: () => void
   onCreated: () => void
   preTaggedPersonId?: string
+  prompt?: PromptContext
 }
 
-export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }: AddMemoryModalProps) {
+export default function AddMemoryModal({
+  onClose,
+  onCreated,
+  preTaggedPersonId,
+  prompt,
+}: AddMemoryModalProps) {
   const { user } = useAuth()
-  const [title, setTitle] = useState("")
+  const [title, setTitle] = useState(prompt?.body ?? "")
   const [description, setDescription] = useState("")
   const [date, setDate] = useState("")
   const [files, setFiles] = useState<File[]>([])
@@ -251,6 +262,7 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
     }
   }, [])
 
+
   const handleSubmit = async () => {
     if (!title.trim() || !user) return
     setSubmitting(true)
@@ -274,7 +286,7 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
         uploadedDuration = audioDuration > 0 ? audioDuration : undefined
       }
 
-      await addMemory({
+      const created = await addMemory({
         title: title.trim(),
         description: description.trim() || undefined,
         date: date || new Date().toISOString().split("T")[0],
@@ -285,6 +297,20 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
         createdBy: user.id,
         createdAt: new Date().toISOString(),
       })
+
+      if (prompt) {
+        try {
+          await addStoryPromptResponse({
+            promptId: prompt.id,
+            userId: user.id,
+            memoryId: created.id,
+          })
+        } catch (responseErr) {
+          // Non-blocking: the memory was saved. A stale prompt link is
+          // not worth failing the whole flow over.
+          console.error("Failed to record story prompt response", responseErr)
+        }
+      }
 
       onCreated()
       onClose()
@@ -302,7 +328,19 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
       labelledBy={titleId}
       panelClassName="bg-gray-900 border border-gray-700 rounded-lg p-6 w-full max-w-lg text-gray-100 shadow-lg max-h-[90vh] overflow-y-auto outline-none"
     >
-      <h3 id={titleId} className="text-lg font-semibold mb-4 text-white">Add Memory</h3>
+      <h3 id={titleId} className="text-lg font-semibold mb-4 text-white">
+        {prompt ? "Answer the prompt" : "Add Memory"}
+      </h3>
+
+      {prompt && (
+        <div
+          className="mb-4 rounded-lg border border-gray-700 bg-gray-800 p-3 text-sm text-gray-200"
+          data-testid="prompt-banner"
+        >
+          <span className="block text-xs uppercase tracking-wide text-gray-400">A question for you</span>
+          <span className="mt-1 block italic">{prompt.body}</span>
+        </div>
+      )}
 
       {error && <p className="text-red-400 text-sm mb-3">{error}</p>}
 
