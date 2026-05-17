@@ -9,6 +9,7 @@ import type { Event } from "@/models/Event";
 import type { Memory } from "@/models/Memory";
 import type { Person } from "@/models/Person";
 import WelcomeModal from "@/components/WelcomeModal";
+import StoryPromptCard from "@/components/StoryPromptCard";
 import { SkeletonCard, SkeletonLine } from "@/components/SkeletonLoader";
 import { Avatar, Button, Chip, Icon, PhotoFrame } from "@/components/ui";
 import { formatDate, getAge, getNextBirthday } from "@/utils/dates";
@@ -370,6 +371,13 @@ function HomeAuthenticated({ user, people, memories, events, myPerson }: HomePro
             steps={gettingStarted}
             completedSteps={completedSteps}
           />
+        </section>
+      ) : null}
+
+      {/* Guided story prompt — "a question for you today" */}
+      {!isNewUser ? (
+        <section className="mb-14">
+          <StoryPromptCard userId={user.id} />
         </section>
       ) : null}
 

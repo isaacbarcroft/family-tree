@@ -8,6 +8,8 @@ import type { ReactionEmoji } from "@/constants/reactions"
 import type { Relationship } from "@/models/Relationship"
 import type { GeocodedPlace } from "@/models/GeocodedPlace"
 import type { Residence } from "@/models/Residence"
+import type { StoryPrompt } from "@/models/StoryPrompt"
+import type { StoryPromptResponse } from "@/models/StoryPromptResponse"
 import { escapeLikePattern } from "@/utils/likeEscape"
 
 function buildSearchName(firstName?: string, middleName?: string, lastName?: string) {
@@ -592,6 +594,46 @@ export async function deleteComment(id: string): Promise<void> {
     .delete()
     .eq("id", id)
   if (error) throw error
+}
+
+// ---- Story prompts ----
+export async function listStoryPrompts(): Promise<StoryPrompt[]> {
+  const { data, error } = await supabase
+    .from("story_prompts")
+    .select("*")
+    .is("isActive", true)
+    .order("sortOrder", { ascending: true })
+  if (error) throw error
+  return (data ?? []) as StoryPrompt[]
+}
+
+export async function listStoryPromptResponsesForUser(
+  userId: string
+): Promise<StoryPromptResponse[]> {
+  const { data, error } = await supabase
+    .from("story_prompt_responses")
+    .select("*")
+    .eq("userId", userId)
+  if (error) throw error
+  return (data ?? []) as StoryPromptResponse[]
+}
+
+export async function addStoryPromptResponse(input: {
+  promptId: string
+  userId: string
+  memoryId: string
+}): Promise<StoryPromptResponse> {
+  const { data, error } = await supabase
+    .from("story_prompt_responses")
+    .insert({
+      promptId: input.promptId,
+      userId: input.userId,
+      memoryId: input.memoryId,
+    })
+    .select("*")
+    .single()
+  if (error) throw error
+  return data as StoryPromptResponse
 }
 
 // ---- Relationships ----
