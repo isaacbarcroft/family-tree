@@ -150,7 +150,7 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
           each clip in the referencing element's local coordinate system, so
           one definition per variant covers every node.
         */}
-        <defs>
+        <defs aria-hidden="true">
           <clipPath id={CLIP_ID_SINGLE}>
             <circle cx={SINGLE_AVATAR_CX} cy={AVATAR_CY} r={AVATAR_R} />
           </clipPath>
@@ -161,8 +161,12 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
             <circle cx={COUPLE_RIGHT_CX} cy={AVATAR_CY} r={AVATAR_R} />
           </clipPath>
         </defs>
-        <g ref={gRef}>
-          {/* Edges */}
+        <g
+          ref={gRef}
+          role="group"
+          aria-label="Family tree. Press Tab to move between people, then Enter or Space to open a profile."
+        >
+          {/* Edges — purely decorative connecting lines, hidden from assistive tech. */}
           {edges.map((e, i) => (
             <path
               key={i}
@@ -171,6 +175,7 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
               stroke="var(--card-border)"
               strokeWidth={2}
               opacity={0.6}
+              aria-hidden="true"
             />
           ))}
 
