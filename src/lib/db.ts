@@ -5,6 +5,7 @@ import type { Memory } from "@/models/Memory"
 import type { MemoryReaction } from "@/models/MemoryReaction"
 import type { MemoryComment } from "@/models/MemoryComment"
 import type { ReactionEmoji } from "@/constants/reactions"
+import type { StoryPrompt } from "@/models/StoryPrompt"
 import type { Relationship } from "@/models/Relationship"
 import type { GeocodedPlace } from "@/models/GeocodedPlace"
 import type { Residence } from "@/models/Residence"
@@ -418,6 +419,36 @@ export async function deleteMemory(id: string) {
     .update({ deletedAt: new Date().toISOString() })
     .eq("id", id)
   if (error) throw error
+}
+
+export async function listStoryPrompts(): Promise<StoryPrompt[]> {
+  const { data, error } = await supabase
+    .from("story_prompts")
+    .select("*")
+    .is("deletedAt", null)
+    .order("createdAt", { ascending: true })
+
+  if (error) throw error
+  return (data ?? []) as StoryPrompt[]
+}
+
+export async function listAnsweredPromptIdsForUser(userId: string): Promise<string[]> {
+  if (!userId.trim()) return []
+
+  const { data, error } = await supabase
+    .from("memories")
+    .select("promptId")
+    .eq("createdBy", userId)
+    .is("deletedAt", null)
+
+  if (error) throw error
+
+  const rows = (data ?? []) as Array<{ promptId?: string | null }>
+  const promptIds = rows
+    .map((row) => row.promptId ?? null)
+    .filter((promptId): promptId is string => Boolean(promptId))
+
+  return [...new Set(promptIds)]
 }
 
 export async function deleteFamily(id: string) {
