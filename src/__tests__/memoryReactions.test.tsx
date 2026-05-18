@@ -163,4 +163,48 @@ describe("MemoryReactions", () => {
     render(<MemoryReactions memoryId="mem-1" initialReactions={[]} />)
     expect(listReactionsForMemoryMock).not.toHaveBeenCalled()
   })
+
+  // -------------------------------------------------------------------------
+  // Design-system migration regression pins (paper theme, not dark gray).
+  // -------------------------------------------------------------------------
+
+  it("renders reaction buttons with the paper-theme resting tokens (not legacy gray)", () => {
+    render(<MemoryReactions memoryId="mem-1" initialReactions={[]} />)
+    const love = screen.getByRole("button", { name: /Love reaction \(0\)/ })
+    const inline = love.getAttribute("style") ?? ""
+    expect(inline).toContain("var(--paper-2)")
+    expect(inline).toContain("var(--hairline)")
+    expect(inline).toContain("var(--ink-2)")
+    expect(love.className).not.toMatch(/bg-gray-/)
+    expect(love.className).not.toMatch(/border-gray-/)
+    expect(love.className).not.toMatch(/text-gray-/)
+  })
+
+  it("renders the pressed reaction with sage-tint background and sage-deep border/color", () => {
+    const initial = [reaction({ id: "r1", emoji: "❤️", userId: "user-1" })]
+    render(<MemoryReactions memoryId="mem-1" initialReactions={initial} />)
+    const pressed = screen.getByRole("button", {
+      name: /Love reaction \(1\), you reacted/,
+    })
+    const inline = pressed.getAttribute("style") ?? ""
+    expect(inline).toContain("var(--sage-tint)")
+    expect(inline).toContain("var(--sage-deep)")
+    expect(pressed.className).not.toMatch(/text-white/)
+  })
+
+  it("renders the error alert in clay-deep (not legacy red)", async () => {
+    addReactionMock.mockRejectedValue(new Error("boom"))
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+    render(<MemoryReactions memoryId="mem-1" initialReactions={[]} />)
+
+    fireEvent.click(screen.getByRole("button", { name: /Wow reaction \(0\)/ }))
+
+    await waitFor(() => {
+      const alert = screen.getByRole("alert")
+      expect(alert.getAttribute("style") ?? "").toContain("var(--clay-deep)")
+      expect(alert.className).not.toMatch(/text-red-/)
+    })
+
+    errorSpy.mockRestore()
+  })
 })

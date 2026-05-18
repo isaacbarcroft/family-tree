@@ -119,6 +119,16 @@ export default function MemoryReactions({
           const isPending = pendingEmoji === emoji
           const label = REACTION_LABELS[emoji]
           const ariaLabel = `${label} reaction (${count})${userHasReacted ? ", you reacted" : ""}`
+          const pressedStyle = {
+            background: "var(--sage-tint)",
+            borderColor: "var(--sage-deep)",
+            color: "var(--sage-deep)",
+          }
+          const restingStyle = {
+            background: "var(--paper-2)",
+            borderColor: "var(--hairline)",
+            color: "var(--ink-2)",
+          }
           return (
             <button
               key={emoji}
@@ -131,11 +141,13 @@ export default function MemoryReactions({
               aria-pressed={userHasReacted}
               aria-label={ariaLabel}
               title={label}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-sm border transition min-h-[32px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] ${
-                userHasReacted
-                  ? "bg-[var(--accent)]/20 border-[var(--accent)] text-white"
-                  : "bg-gray-700 border-gray-600 text-gray-100 hover:bg-gray-600"
-              } ${disabled || isPending ? "opacity-50 cursor-not-allowed" : ""}`}
+              className={`memory-reaction-button flex items-center gap-1 px-2.5 py-1 rounded-full text-sm border transition min-h-[32px] ${
+                disabled || isPending ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+              }`}
+              style={{
+                fontFamily: "var(--font-body)",
+                ...(userHasReacted ? pressedStyle : restingStyle),
+              }}
             >
               <span aria-hidden="true">{emoji}</span>
               <span className="tabular-nums">{count}</span>
@@ -144,7 +156,11 @@ export default function MemoryReactions({
         })}
       </div>
       {error && (
-        <p role="alert" className="mt-1 text-sm text-red-400">
+        <p
+          role="alert"
+          className="mt-1"
+          style={{ color: "var(--clay-deep)", fontSize: 13 }}
+        >
           {error}
         </p>
       )}
