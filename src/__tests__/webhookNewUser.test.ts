@@ -233,6 +233,67 @@ describe("POST /api/webhooks/new-user", () => {
     errSpy.mockRestore()
   })
 
+  it("queries Supabase with a single PostgREST and() filter that excludes nulls and the new user", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify([]), { status: 200 })
+    )
+    const { POST } = await loadRoute()
+    await POST(
+      makeRequest({
+        secret: "whsec",
+        body: {
+          type: "INSERT",
+          record: {
+            id: "u1",
+            email: "new@example.com",
+            raw_user_meta_data: { first_name: "Alex" },
+            created_at: "2026-01-01",
+          },
+          old_record: null,
+        },
+      })
+    )
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    const url = new URL(fetchSpy.mock.calls[0][0] as string)
+    expect(url.pathname).toBe("/rest/v1/people")
+    expect(url.searchParams.get("select")).toBe("email")
+    // Only one `and` filter, combining both predicates. No duplicate `email`
+    // keys (the previous implementation appended `email` twice, which worked
+    // but was fragile to `params.set` regressions).
+    expect(url.searchParams.getAll("and")).toEqual([
+      `(email.not.is.null,email.neq."new@example.com")`,
+    ])
+    expect(url.searchParams.getAll("email")).toEqual([])
+  })
+
+  it("escapes PostgREST-reserved characters in the new user's email", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify([]), { status: 200 })
+    )
+    const { POST } = await loadRoute()
+    // RFC 5321 permits `"` inside the local part of a quoted address; we
+    // shouldn't let a value like this break the surrounding filter syntax.
+    await POST(
+      makeRequest({
+        secret: "whsec",
+        body: {
+          type: "INSERT",
+          record: {
+            id: "u1",
+            email: `weird"name@example.com`,
+            raw_user_meta_data: {},
+            created_at: "2026-01-01",
+          },
+          old_record: null,
+        },
+      })
+    )
+    const url = new URL(fetchSpy.mock.calls[0][0] as string)
+    expect(url.searchParams.getAll("and")).toEqual([
+      `(email.not.is.null,email.neq."weird\\"name@example.com")`,
+    ])
+  })
+
   it("returns 500 when Resend throws while sending", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify([{ email: "a@example.com" }]), {
