@@ -11,6 +11,7 @@ import {
 import { supabase } from "@/lib/supabase"
 import type { MemoryComment } from "@/models/MemoryComment"
 import type { Person } from "@/models/Person"
+import { Button } from "@/components/ui"
 
 interface MemoryCommentsProps {
   memoryId: string
@@ -24,6 +25,25 @@ interface AuthorInfo {
 }
 
 const MAX_BODY_LENGTH = 4000
+
+const textareaStyle = {
+  background: "var(--paper)",
+  color: "var(--ink)",
+  border: "1px solid var(--hairline)",
+  fontFamily: "var(--font-body)",
+  fontSize: 15,
+  lineHeight: 1.5,
+} as const
+
+const inlineActionStyle = {
+  background: "transparent",
+  border: "none",
+  cursor: "pointer",
+  padding: 0,
+  fontFamily: "var(--font-body)",
+  fontSize: 13,
+  color: "var(--ink-2)",
+} as const
 
 function formatTimestamp(iso: string): string {
   const d = new Date(iso)
@@ -222,12 +242,24 @@ export default function MemoryComments({
     return (
       <article
         key={c.id}
-        className={`rounded-lg border border-gray-700 bg-gray-800/60 p-3 ${isReply ? "ml-6 mt-2" : ""}`}
+        className={`rounded-md p-3 ${isReply ? "ml-6 mt-2" : ""}`}
+        style={{
+          background: "var(--paper-2)",
+          border: "1px solid var(--hairline)",
+        }}
         aria-label={`Comment by ${authorName}`}
       >
-        <header className="flex items-center justify-between gap-2 text-sm">
-          <span className="font-medium text-white">{authorName}</span>
-          <span className="text-gray-400 tabular-nums">
+        <header className="flex items-center justify-between gap-2">
+          <span
+            className="font-medium"
+            style={{ color: "var(--ink)", fontSize: 14 }}
+          >
+            {authorName}
+          </span>
+          <span
+            className="tabular-nums"
+            style={{ color: "var(--ink-3)", fontSize: 12 }}
+          >
             {formatTimestamp(c.createdAt)}
             {isEdited(c) && <span className="ml-1 italic">(edited)</span>}
           </span>
@@ -243,36 +275,40 @@ export default function MemoryComments({
               onChange={(e) => setEditDraft(e.target.value)}
               maxLength={MAX_BODY_LENGTH}
               rows={3}
-              className="w-full rounded-lg border border-gray-700 bg-gray-900 p-2 text-base text-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)]"
+              className="w-full rounded-md p-2.5"
+              style={textareaStyle}
             />
             <div className="flex gap-2">
-              <button
-                type="button"
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={() => handleSaveEdit(c.id)}
                 disabled={submitting || !editDraft.trim()}
-                className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white px-3 py-1.5 rounded-lg text-sm font-medium disabled:opacity-50"
               >
                 Save
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   setEditingId(null)
                   setEditDraft("")
                 }}
-                className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium"
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         ) : (
-          <p className="mt-1 whitespace-pre-line break-words text-base text-gray-100">
+          <p
+            className="mt-1 whitespace-pre-line break-words"
+            style={{ color: "var(--ink-2)", fontSize: 15, lineHeight: 1.5 }}
+          >
             {c.body}
           </p>
         )}
         {!isEditing && (
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+          <div className="mt-2 flex flex-wrap items-center gap-3">
             {!isReply && userId && (
               <button
                 type="button"
@@ -280,7 +316,7 @@ export default function MemoryComments({
                   setReplyParentId(replyParentId === c.id ? null : c.id)
                   setReplyDraft("")
                 }}
-                className="text-gray-300 hover:text-white"
+                style={inlineActionStyle}
               >
                 {showReplyForm ? "Cancel reply" : "Reply"}
               </button>
@@ -292,7 +328,7 @@ export default function MemoryComments({
                   setEditingId(c.id)
                   setEditDraft(c.body)
                 }}
-                className="text-gray-300 hover:text-white"
+                style={inlineActionStyle}
               >
                 Edit
               </button>
@@ -301,25 +337,30 @@ export default function MemoryComments({
               <button
                 type="button"
                 onClick={() => setConfirmDeleteId(c.id)}
-                className="text-gray-300 hover:text-red-400"
+                style={inlineActionStyle}
               >
                 Delete
               </button>
             )}
             {isOwner && isConfirmingDelete && (
-              <span className="flex gap-2">
+              <span className="flex gap-3">
                 <button
                   type="button"
                   onClick={() => handleDelete(c.id)}
                   disabled={submitting}
-                  className="text-red-400 hover:text-red-300 disabled:opacity-50"
+                  style={{
+                    ...inlineActionStyle,
+                    color: "var(--clay-deep)",
+                    fontWeight: 500,
+                    opacity: submitting ? 0.5 : 1,
+                  }}
                 >
                   Confirm delete
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfirmDeleteId(null)}
-                  className="text-gray-300 hover:text-white"
+                  style={inlineActionStyle}
                 >
                   Cancel
                 </button>
@@ -345,16 +386,18 @@ export default function MemoryComments({
               maxLength={MAX_BODY_LENGTH}
               rows={2}
               placeholder={`Reply to ${authorName}…`}
-              className="w-full rounded-lg border border-gray-700 bg-gray-900 p-2 text-base text-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)]"
+              className="w-full rounded-md p-2.5"
+              style={textareaStyle}
             />
             <div className="flex gap-2">
-              <button
+              <Button
+                variant="primary"
+                size="sm"
                 type="submit"
                 disabled={submitting || !replyDraft.trim()}
-                className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white px-3 py-1.5 rounded-lg text-sm font-medium disabled:opacity-50"
               >
                 Post reply
-              </button>
+              </Button>
             </div>
           </form>
         )}
@@ -372,23 +415,31 @@ export default function MemoryComments({
       aria-label="Comments"
       className={`space-y-3 ${className}`}
     >
-      <h4 className="text-sm font-semibold text-gray-200">
+      <h4
+        className="font-semibold"
+        style={{ color: "var(--ink)", fontSize: 14 }}
+      >
         Comments
         {!loading && comments.length > 0 && (
-          <span className="ml-1 text-gray-400">({comments.length})</span>
+          <span className="ml-1" style={{ color: "var(--ink-3)" }}>
+            ({comments.length})
+          </span>
         )}
       </h4>
       {error && (
-        <p role="alert" className="text-sm text-red-400">
+        <p
+          role="alert"
+          style={{ color: "var(--clay-deep)", fontSize: 13 }}
+        >
           {error}
         </p>
       )}
       {loading ? (
-        <p className="text-sm text-gray-400">Loading comments…</p>
+        <p style={{ color: "var(--ink-3)", fontSize: 13 }}>Loading comments…</p>
       ) : (
         <div className="space-y-2">
           {topLevel.length === 0 && (
-            <p className="text-sm text-gray-400">No comments yet.</p>
+            <p style={{ color: "var(--ink-3)", fontSize: 13 }}>No comments yet.</p>
           )}
           {topLevel.map((c) => renderComment(c, false))}
         </div>
@@ -405,20 +456,22 @@ export default function MemoryComments({
             maxLength={MAX_BODY_LENGTH}
             rows={2}
             placeholder="Add a comment…"
-            className="w-full rounded-lg border border-gray-700 bg-gray-900 p-2 text-base text-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)]"
+            className="w-full rounded-md p-2.5"
+            style={textareaStyle}
           />
           <div className="flex justify-end">
-            <button
+            <Button
+              variant="primary"
+              size="sm"
               type="submit"
               disabled={submitting || !draft.trim()}
-              className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white px-4 py-1.5 rounded-lg text-sm font-medium disabled:opacity-50"
             >
               Post comment
-            </button>
+            </Button>
           </div>
         </form>
       ) : (
-        <p className="text-sm text-gray-400">Sign in to comment.</p>
+        <p style={{ color: "var(--ink-3)", fontSize: 13 }}>Sign in to comment.</p>
       )}
     </section>
   )

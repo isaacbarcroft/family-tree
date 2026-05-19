@@ -267,4 +267,64 @@ describe("MemoryComments", () => {
     render(<MemoryComments memoryId="mem-1" initialComments={[]} />)
     expect(listCommentsForMemoryMock).not.toHaveBeenCalled()
   })
+
+  // -------------------------------------------------------------------------
+  // Design-system migration regression pins (paper theme, not dark gray).
+  // -------------------------------------------------------------------------
+
+  it("renders comment cards with paper tokens (no legacy bg-gray-* / text-gray-* / text-white)", () => {
+    const initial = [comment({ id: "c1", body: "hi", userId: "user-2" })]
+    const { container } = render(
+      <MemoryComments memoryId="mem-1" initialComments={initial} />
+    )
+
+    const card = screen.getByLabelText(/Comment by/)
+    const inline = card.getAttribute("style") ?? ""
+    expect(inline).toContain("var(--paper-2)")
+    expect(inline).toContain("var(--hairline)")
+
+    // No legacy dark-theme Tailwind classes should appear anywhere in the
+    // rendered subtree — these were the pre-migration drift markers.
+    const html = container.innerHTML
+    expect(html).not.toMatch(/\bbg-gray-/)
+    expect(html).not.toMatch(/\bborder-gray-/)
+    expect(html).not.toMatch(/\btext-gray-/)
+    expect(html).not.toMatch(/\btext-white\b/)
+    expect(html).not.toMatch(/\btext-red-/)
+  })
+
+  it("renders the textarea with paper-token inline style (not the legacy bg-gray-900)", () => {
+    render(<MemoryComments memoryId="mem-1" initialComments={[]} />)
+    const textarea = screen.getByPlaceholderText(/Add a comment/)
+    const inline = textarea.getAttribute("style") ?? ""
+    expect(inline).toContain("var(--paper)")
+    expect(inline).toContain("var(--hairline)")
+    expect(inline).toContain("var(--ink)")
+  })
+
+  it("uses the shared ui Button for Post comment (rounded pill, not legacy bg-[var(--accent)] string)", () => {
+    render(<MemoryComments memoryId="mem-1" initialComments={[]} />)
+    const post = screen.getByRole("button", { name: /Post comment/ })
+    expect(post.className).toContain("ui-btn")
+    expect(post.getAttribute("data-variant")).toBe("primary")
+  })
+
+  it("renders the error alert in clay-deep (not legacy red)", async () => {
+    addCommentMock.mockRejectedValue(new Error("nope"))
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+    render(<MemoryComments memoryId="mem-1" initialComments={[]} />)
+
+    fireEvent.change(screen.getByPlaceholderText(/Add a comment/), {
+      target: { value: "Hi" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: /Post comment/ }))
+
+    await waitFor(() => {
+      const alert = screen.getByRole("alert")
+      expect(alert.getAttribute("style") ?? "").toContain("var(--clay-deep)")
+      expect(alert.className).not.toMatch(/text-red-/)
+    })
+
+    errorSpy.mockRestore()
+  })
 })
