@@ -372,13 +372,16 @@ See Completed log. Deferred sub-items (T-12.a real-device frame-rate measurement
 
 See Completed log. Deferred sub-item (T-13.a real bundle-size measurement via `@next/bundle-analyzer`) tracked but not blocking.
 
-### T-14. Webhook new-user route: duplicate PostgREST filter param
+### ~~T-14. Webhook new-user route: duplicate PostgREST filter param~~ ✅ Done 2026-05-19
 
-**Found:** 2026-05-01 audit
-**File:** `src/app/api/webhooks/new-user/route.ts` lines 54-59
-**Problem:** The code appends the `email` query parameter twice — once for `not.is.null` and once for `neq.${newUserEmail}`. PostgREST treats duplicate params as AND so it happens to work correctly, but this is fragile and non-obvious. If PostgREST changes behavior or the params are reordered, it could silently break.
-**Fix:** Use a single `and` filter: `params.set("email", "not.is.null")` + `params.append("and", "(email.neq.${newUserEmail})")` or combine into one PostgREST `and()` expression.
-**Effort:** 10 min
+Replaced the two duplicate `email=…` query params with a single PostgREST
+`and()` filter (`and=(email.not.is.null,email.neq."<email>")`) and routed the
+new user's email through `escapePgrstString` so a `,`, `)`, or `"` in the
+value can't break the surrounding filter syntax. Added two regression tests
+in `src/__tests__/webhookNewUser.test.ts` — one asserts the new filter shape
+and that no `email` keys remain on the query string; the other feeds in an
+RFC 5321 quoted-local-part email (`weird"name@example.com`) and checks the
+embedded quote is escaped.
 
 ### T-15. Add Next.js middleware for route protection
 
