@@ -1,6 +1,13 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, useCallback } from "react"
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+  type KeyboardEvent,
+} from "react"
 import { zoom as d3Zoom, zoomIdentity, type ZoomBehavior } from "d3-zoom"
 import { select } from "d3-selection"
 import type { TreeNode as TreeNodeData } from "@/utils/treeBuilder"
@@ -12,6 +19,11 @@ import {
   flattenNodes,
   layoutTree,
 } from "@/utils/treeLayout"
+import {
+  buildTreeitemIndex,
+  nextTreeitemId,
+  type TreeNavigationKey,
+} from "@/utils/treeNavigation"
 import {
   AVATAR_CY,
   CLIP_ID_COUPLE_LEFT,
@@ -27,6 +39,19 @@ import { useRouter } from "next/navigation"
 const AVATAR_R = 22
 const FIT_PADDING = 80
 const FIT_TOP_OFFSET = 40
+
+const NAVIGATION_KEYS: ReadonlySet<TreeNavigationKey> = new Set<TreeNavigationKey>([
+  "ArrowDown",
+  "ArrowUp",
+  "ArrowRight",
+  "ArrowLeft",
+  "Home",
+  "End",
+])
+
+function isNavigationKey(key: string): key is TreeNavigationKey {
+  return NAVIGATION_KEYS.has(key as TreeNavigationKey)
+}
 
 interface GenealogyTreeProps {
   treeData: TreeNodeData
@@ -45,6 +70,23 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
   const nodes = useMemo(() => flattenNodes(layout), [layout])
   const edges = useMemo(() => collectEdges(layout), [layout])
   const bounds = useMemo(() => computeBounds(nodes), [nodes])
+  const treeitemIndex = useMemo(() => buildTreeitemIndex(layout), [layout])
+
+  const [activeId, setActiveId] = useState<string | null>(
+    () => treeitemIndex.firstId,
+  )
+  const [prevTreeitemIndex, setPrevTreeitemIndex] = useState(treeitemIndex)
+
+  // Reset activeId when the tree changes and the previous active person is no
+  // longer present. Render-time prev-tracking pattern matches the rest of the
+  // codebase (MemoryImage, ProfileAvatar) and avoids the React 19
+  // set-state-in-effect lint warning.
+  if (prevTreeitemIndex !== treeitemIndex) {
+    setPrevTreeitemIndex(treeitemIndex)
+    if (activeId === null || !treeitemIndex.byId.has(activeId)) {
+      setActiveId(treeitemIndex.firstId)
+    }
+  }
 
   // Reset the initial-fit flag whenever the tree data changes so the new tree gets centered.
   useEffect(() => {
@@ -130,6 +172,31 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
     [router]
   )
 
+  const focusTreeitem = useCallback((id: string) => {
+    const root = gRef.current
+    if (!root) return
+    const target = root.querySelector<SVGGElement>(
+      `[data-treeitem-id="${CSS.escape(id)}"]`,
+    )
+    target?.focus()
+  }, [])
+
+  const handleTreeKeyDown = useCallback(
+    (e: KeyboardEvent<SVGGElement>) => {
+      if (!isNavigationKey(e.key)) return
+      const targetId = nextTreeitemId(treeitemIndex, activeId, e.key)
+      if (targetId === null) return
+      e.preventDefault()
+      setActiveId(targetId)
+      focusTreeitem(targetId)
+    },
+    [activeId, focusTreeitem, treeitemIndex],
+  )
+
+  const handleTreeitemFocus = useCallback((id: string) => {
+    setActiveId(id)
+  }, [])
+
   return (
     <div
       ref={containerRef}
@@ -163,8 +230,9 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
         </defs>
         <g
           ref={gRef}
-          role="group"
-          aria-label="Family tree. Press Tab to move between people, then Enter or Space to open a profile."
+          role="tree"
+          aria-label="Family tree. Use arrow keys to move between people; Enter or Space opens a profile."
+          onKeyDown={handleTreeKeyDown}
         >
           {/* Edges — purely decorative connecting lines, hidden from assistive tech. */}
           {edges.map((e, i) => (
@@ -181,7 +249,14 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
 
           {/* Nodes */}
           {nodes.map((node, i) => (
-            <TreeNode key={i} node={node} onNavigate={navigateToProfile} />
+            <TreeNode
+              key={i}
+              node={node}
+              onNavigate={navigateToProfile}
+              treeitemIndex={treeitemIndex}
+              activeId={activeId}
+              onTreeitemFocus={handleTreeitemFocus}
+            />
           ))}
         </g>
       </svg>

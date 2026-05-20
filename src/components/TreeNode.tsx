@@ -3,13 +3,14 @@
 import { memo, type KeyboardEvent } from "react"
 import type { LayoutNode } from "@/utils/treeLayout"
 import { COUPLE_W, NODE_H, NODE_W } from "@/utils/treeLayout"
+import type { Treeitem, TreeitemIndex } from "@/utils/treeNavigation"
 import { stringToColor } from "@/utils/colors"
 import { formatDate } from "@/utils/dates"
 
 const AVATAR_R = 22
 const MARRIAGE_BAR = 20
 
-// Enter and Space activate buttons per the WAI-ARIA button pattern.
+// Enter and Space activate treeitems per the WAI-ARIA tree pattern.
 // preventDefault on Space stops the browser from scrolling the page.
 function handleKeyActivate(
   e: KeyboardEvent<SVGGElement>,
@@ -45,9 +46,51 @@ function getInitials(name: string): string {
 interface TreeNodeProps {
   node: LayoutNode
   onNavigate: (personId: string) => void
+  treeitemIndex: TreeitemIndex
+  activeId: string | null
+  onTreeitemFocus: (id: string) => void
 }
 
-function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
+interface TreeitemAttrs {
+  role: "treeitem"
+  tabIndex: 0 | -1
+  "aria-label": string
+  "aria-level": number
+  "aria-setsize": number
+  "aria-posinset": number
+  "aria-expanded"?: true
+  "data-treeitem-id": string
+  className: string
+}
+
+function treeitemAttrs(
+  item: Treeitem,
+  label: string,
+  activeId: string | null,
+): TreeitemAttrs {
+  const attrs: TreeitemAttrs = {
+    role: "treeitem",
+    tabIndex: activeId === item.id ? 0 : -1,
+    "aria-label": label,
+    "aria-level": item.level,
+    "aria-setsize": item.setSize,
+    "aria-posinset": item.posInSet,
+    "data-treeitem-id": item.id,
+    className: "tree-node-interactive",
+  }
+  if (item.hasChildren) {
+    attrs["aria-expanded"] = true
+  }
+  return attrs
+}
+
+function TreeNodeComponent({
+  node,
+  onNavigate,
+  treeitemIndex,
+  activeId,
+  onTreeitemFocus,
+}: TreeNodeProps) {
   const attrs = node.data.attributes ?? {}
   const isCouple = !!attrs.spouseId
   const isRoot = !attrs.id && !attrs.spouseId
@@ -80,8 +123,16 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
     const photo2 = attrs.spousePhoto
     const leftId = attrs.id
     const rightId = attrs.spouseId
+    const leftItem = leftId ? treeitemIndex.byId.get(leftId) : undefined
+    const rightItem = rightId ? treeitemIndex.byId.get(rightId) : undefined
     const activateLeft = leftId ? () => onNavigate(leftId) : undefined
     const activateRight = rightId ? () => onNavigate(rightId) : undefined
+    const leftAttrs = leftItem
+      ? treeitemAttrs(leftItem, `Open profile for ${name1}`, activeId)
+      : null
+    const rightAttrs = rightItem
+      ? treeitemAttrs(rightItem, `Open profile for ${name2}`, activeId)
+      : null
 
     return (
       <g transform={`translate(${nodeX}, ${nodeY})`}>
@@ -100,10 +151,8 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
           onKeyDown={
             activateLeft ? (e) => handleKeyActivate(e, activateLeft) : undefined
           }
-          role={activateLeft ? "button" : undefined}
-          tabIndex={activateLeft ? 0 : -1}
-          aria-label={activateLeft ? `Open profile for ${name1}` : undefined}
-          className={activateLeft ? "tree-node-interactive" : undefined}
+          onFocus={leftItem ? () => onTreeitemFocus(leftItem.id) : undefined}
+          {...(leftAttrs ?? {})}
           style={{ cursor: "pointer" }}
         >
           {photo1 ? (
@@ -152,10 +201,8 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
               ? (e) => handleKeyActivate(e, activateRight)
               : undefined
           }
-          role={activateRight ? "button" : undefined}
-          tabIndex={activateRight ? 0 : -1}
-          aria-label={activateRight ? `Open profile for ${name2}` : undefined}
-          className={activateRight ? "tree-node-interactive" : undefined}
+          onFocus={rightItem ? () => onTreeitemFocus(rightItem.id) : undefined}
+          {...(rightAttrs ?? {})}
           style={{ cursor: "pointer" }}
         >
           {photo2 ? (
@@ -192,24 +239,28 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
   const photo = attrs.photo
   const birthStr = attrs.birth ? formatDate(attrs.birth) : ""
   const deathStr = attrs.death ? formatDate(attrs.death) : ""
+  const item = personId ? treeitemIndex.byId.get(personId) : undefined
   const activate = personId ? () => onNavigate(personId) : undefined
   const dateLabel = (() => {
     if (isDeceased && birthStr && deathStr) return `, ${birthStr} to ${deathStr}`
     if (birthStr) return `, born ${birthStr}`
     return ""
   })()
+  const singleAttrs = item
+    ? treeitemAttrs(
+        item,
+        `Open profile for ${node.data.name}${dateLabel}`,
+        activeId,
+      )
+    : null
 
   return (
     <g
       transform={`translate(${nodeX}, ${nodeY})`}
       onClick={activate}
       onKeyDown={activate ? (e) => handleKeyActivate(e, activate) : undefined}
-      role={activate ? "button" : undefined}
-      tabIndex={activate ? 0 : -1}
-      aria-label={
-        activate ? `Open profile for ${node.data.name}${dateLabel}` : undefined
-      }
-      className={activate ? "tree-node-interactive" : undefined}
+      onFocus={item ? () => onTreeitemFocus(item.id) : undefined}
+      {...(singleAttrs ?? {})}
       style={{ cursor: activate ? "pointer" : "default" }}
     >
       <rect
