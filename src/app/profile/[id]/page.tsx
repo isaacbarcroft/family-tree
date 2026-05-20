@@ -36,6 +36,7 @@ import { formatDate } from "@/utils/dates";
 import { getErrorMessage } from "@/utils/errorMessage";
 import { findRelationship } from "@/utils/relationship";
 import { shareInvite } from "@/utils/share";
+import { useFocusOnIdChange } from "@/hooks/useFocusOnIdChange";
 
 function ensureProtocol(url: string): string {
   if (/^https?:\/\//i.test(url)) return url;
@@ -111,6 +112,12 @@ function ProfileContent() {
   const [showDeceased, setShowDeceased] = useState(false);
   const [relationships, setRelationships] = useState<Relationship[]>([]);
   const [allPeople, setAllPeople] = useState<Person[]>([]);
+
+  // Move keyboard focus to the profile heading after the person resolves so
+  // arrivals from the family tree (and direct URL loads) don't strand
+  // screen-reader / keyboard users back at the top of the page.
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useFocusOnIdChange(headingRef, person?.id);
 
   useEffect(() => {
     if (searchParams.get("edit") === "true") setEditing(true);
@@ -426,6 +433,7 @@ function ProfileContent() {
               onCopyClaim={handleCopyClaim}
               claimCopied={claimCopied}
               canClaim={!person.userId && !person.deathDate}
+              headingRef={headingRef}
             />
 
             {relationshipToViewer ? (
@@ -501,6 +509,7 @@ type HeroProps = {
   onCopyClaim: () => void;
   claimCopied: boolean;
   canClaim: boolean;
+  headingRef?: React.RefObject<HTMLHeadingElement | null>;
 };
 
 function Hero({
@@ -514,6 +523,7 @@ function Hero({
   onCopyClaim,
   claimCopied,
   canClaim,
+  headingRef,
 }: HeroProps) {
   const facts: string[] = [];
   if (lifespan) facts.push(lifespan);
@@ -530,6 +540,8 @@ function Hero({
           {person.roleType}
         </p>
         <h1
+          ref={headingRef}
+          tabIndex={-1}
           className="display"
           style={{
             fontSize: "clamp(56px, 9vw, 108px)",
