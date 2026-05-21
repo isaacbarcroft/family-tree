@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
 import {
+  AUTH_INDICATOR_COOKIE,
   GENEALOGY_TREE_HEIGHT,
   HOME_RECENT,
   NOMINATIM_MIN_MS_BETWEEN_CALLS,
@@ -53,5 +54,16 @@ describe("config/constants GENEALOGY_TREE_HEIGHT", () => {
   it("is a non-empty CSS length string", () => {
     expect(typeof GENEALOGY_TREE_HEIGHT).toBe("string")
     expect(GENEALOGY_TREE_HEIGHT).toMatch(/^\d+(?:\.\d+)?(?:px|vh|rem|em|%)$/)
+  })
+})
+
+describe("config/constants AUTH_INDICATOR_COOKIE", () => {
+  it("is a safe cookie name (no whitespace, separators, or control chars)", () => {
+    // RFC 6265 token characters only. Cookie names containing `;`, `=`,
+    // spaces, etc. are silently dropped or split by browsers; a regression
+    // here would break the edge auth gate without throwing.
+    expect(typeof AUTH_INDICATOR_COOKIE).toBe("string")
+    expect(AUTH_INDICATOR_COOKIE.length).toBeGreaterThan(0)
+    expect(AUTH_INDICATOR_COOKIE).toMatch(/^[A-Za-z0-9_-]+$/)
   })
 })

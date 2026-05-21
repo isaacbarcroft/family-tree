@@ -49,3 +49,17 @@ export const PLACES_MAP_HEIGHT = "70vh"
  * the page.
  */
 export const GENEALOGY_TREE_HEIGHT = "85vh"
+
+/**
+ * Name of the non-httpOnly presence cookie written alongside the localStorage
+ * session token. The Next.js proxy (`src/proxy.ts`, formerly the
+ * `middleware.ts` file convention; renamed in Next 16) reads it to gate page
+ * navigation before any client JS runs; the cookie is set to "1" while a
+ * session exists and cleared on sign-out.
+ *
+ * Important: this is a *presence indicator only*, not a security token. RLS
+ * remains the source of truth for data access — a forged cookie can let a
+ * caller render an empty page shell, but the database will still refuse to
+ * return rows they aren't entitled to.
+ */
+export const AUTH_INDICATOR_COOKIE = "family_tree_auth"

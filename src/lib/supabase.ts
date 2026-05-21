@@ -1,3 +1,4 @@
+import { AUTH_INDICATOR_COOKIE } from "@/config/constants"
 import { escapePgrstString } from "@/utils/pgrstEscape"
 
 export interface AppUser {
@@ -38,15 +39,31 @@ function getStoredSession(): AppSession | null {
   }
 }
 
+function writeAuthCookie(present: boolean) {
+  if (typeof document === "undefined") return
+  // Mark `Secure` only over HTTPS — Secure cookies are rejected on plain
+  // `http://localhost` during development, which would silently break the
+  // proxy gate locally.
+  const secure =
+    typeof location !== "undefined" && location.protocol === "https:" ? "; Secure" : ""
+  if (!present) {
+    document.cookie = `${AUTH_INDICATOR_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax${secure}`
+    return
+  }
+  document.cookie = `${AUTH_INDICATOR_COOKIE}=1; Path=/; SameSite=Lax${secure}`
+}
+
 function setStoredSession(session: AppSession | null) {
   if (typeof window === "undefined") return
 
   if (!session) {
     window.localStorage.removeItem(SESSION_STORAGE_KEY)
+    writeAuthCookie(false)
     return
   }
 
   window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session))
+  writeAuthCookie(true)
 }
 
 const listeners = new Set<AuthListener>()
@@ -583,4 +600,16 @@ export const supabase = {
       }
     },
   },
+}
+
+// Migration for installs that signed in before the AUTH_INDICATOR_COOKIE
+// existed (T-15). Without this, every existing user would be redirected to
+// /login on their next navigation even though their localStorage session is
+// still valid. We re-sync the cookie at module load from whatever the
+// localStorage source-of-truth says — idempotent, and gated by token
+// expiry so we don't paper over a stale session.
+if (typeof window !== "undefined") {
+  const existing = getStoredSession()
+  const hasValidSession = existing !== null && !isTokenExpired(existing.access_token)
+  writeAuthCookie(hasValidSession)
 }
