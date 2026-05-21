@@ -1,6 +1,13 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, useCallback } from "react"
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react"
 import { zoom as d3Zoom, zoomIdentity, type ZoomBehavior } from "d3-zoom"
 import { select } from "d3-selection"
 import type { TreeNode as TreeNodeData } from "@/utils/treeBuilder"
@@ -11,6 +18,7 @@ import {
   edgePath,
   flattenNodes,
   layoutTree,
+  type LayoutNode,
 } from "@/utils/treeLayout"
 import {
   AVATAR_CY,
@@ -32,19 +40,96 @@ interface GenealogyTreeProps {
   treeData: TreeNodeData
 }
 
+type TreeItemSlot = "single" | "couple-left" | "couple-right"
+
+interface TreeItem {
+  id: string
+  level: number
+  slot: TreeItemSlot
+  x: number
+}
+
+function isFamilyRootNode(node: LayoutNode): boolean {
+  const attrs = node.data.attributes ?? {}
+  return !attrs.id && !attrs.spouseId
+}
+
+function collectTreeItems(node: LayoutNode, level: number): TreeItem[] {
+  if (isFamilyRootNode(node)) {
+    return node.children.flatMap((child) => collectTreeItems(child, level))
+  }
+
+  const attrs = node.data.attributes ?? {}
+  const items: TreeItem[] = []
+
+  if (attrs.id && !attrs.spouseId) {
+    items.push({
+      id: `single:${attrs.id}`,
+      level,
+      slot: "single",
+      x: node.x,
+    })
+  }
+
+  if (attrs.id && attrs.spouseId) {
+    const nodeLeft = node.x - node.w / 2
+
+    items.push({
+      id: `couple-left:${attrs.id}`,
+      level,
+      slot: "couple-left",
+      x: nodeLeft + COUPLE_LEFT_CX,
+    })
+    items.push({
+      id: `couple-right:${attrs.spouseId}`,
+      level,
+      slot: "couple-right",
+      x: nodeLeft + COUPLE_RIGHT_CX,
+    })
+  }
+
+  return [...items, ...node.children.flatMap((child) => collectTreeItems(child, level + 1))]
+}
+
 export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const gRef = useRef<SVGGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const itemRefs = useRef<Map<string, SVGGElement>>(new Map())
   const zoomBehaviorRef = useRef<ZoomBehavior<SVGSVGElement, unknown> | null>(null)
   const initialFitDoneRef = useRef(false)
   const [dims, setDims] = useState({ width: 0, height: 0 })
+  const [activeItemId, setActiveItemId] = useState<string | null>(null)
   const router = useRouter()
 
   const layout = useMemo(() => layoutTree(treeData), [treeData])
   const nodes = useMemo(() => flattenNodes(layout), [layout])
   const edges = useMemo(() => collectEdges(layout), [layout])
   const bounds = useMemo(() => computeBounds(nodes), [nodes])
+  const treeItems = useMemo(() => collectTreeItems(layout, 1), [layout])
+  const treeItemsById = useMemo(() => {
+    return new Map(treeItems.map((item) => [item.id, item]))
+  }, [treeItems])
+  const treeItemsByLevel = useMemo(() => {
+    const grouped = new Map<number, TreeItem[]>()
+
+    for (const item of treeItems) {
+      const levelItems = grouped.get(item.level) ?? []
+      levelItems.push(item)
+      grouped.set(item.level, levelItems)
+    }
+
+    for (const [level, levelItems] of grouped.entries()) {
+      grouped.set(level, [...levelItems].sort((a, b) => a.x - b.x))
+    }
+
+    return grouped
+  }, [treeItems])
+  const resolvedActiveItemId = useMemo(() => {
+    if (treeItems.length === 0) return null
+    if (activeItemId && treeItemsById.has(activeItemId)) return activeItemId
+    return treeItems[0].id
+  }, [activeItemId, treeItems, treeItemsById])
 
   // Reset the initial-fit flag whenever the tree data changes so the new tree gets centered.
   useEffect(() => {
@@ -130,6 +215,109 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
     [router]
   )
 
+  const focusTreeItem = useCallback((itemId: string) => {
+    const itemElement = itemRefs.current.get(itemId)
+    if (!itemElement) return
+    itemElement.focus()
+  }, [])
+
+  const registerTreeItemRef = useCallback((itemId: string, element: SVGGElement | null) => {
+    if (element) {
+      itemRefs.current.set(itemId, element)
+      return
+    }
+
+    itemRefs.current.delete(itemId)
+  }, [])
+
+  const handleTreeItemFocus = useCallback((itemId: string) => {
+    setActiveItemId(itemId)
+  }, [])
+
+  const handleTreeItemKeyDown = useCallback((itemId: string, event: KeyboardEvent<SVGGElement>) => {
+    const item = treeItemsById.get(itemId)
+    if (!item) return
+
+    const levelItems = treeItemsByLevel.get(item.level) ?? []
+    const levelIndex = levelItems.findIndex((entry) => entry.id === itemId)
+
+    if (event.key === "Home") {
+      const firstItem = treeItems[0]
+      if (!firstItem) return
+      event.preventDefault()
+      setActiveItemId(firstItem.id)
+      focusTreeItem(firstItem.id)
+      return
+    }
+
+    if (event.key === "End") {
+      const lastItem = treeItems[treeItems.length - 1]
+      if (!lastItem) return
+      event.preventDefault()
+      setActiveItemId(lastItem.id)
+      focusTreeItem(lastItem.id)
+      return
+    }
+
+    if (event.key === "ArrowLeft") {
+      const target = levelItems[levelIndex - 1]
+      if (!target) return
+      event.preventDefault()
+      setActiveItemId(target.id)
+      focusTreeItem(target.id)
+      return
+    }
+
+    if (event.key === "ArrowRight") {
+      const target = levelItems[levelIndex + 1]
+      if (!target) return
+      event.preventDefault()
+      setActiveItemId(target.id)
+      focusTreeItem(target.id)
+      return
+    }
+
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return
+
+    const targetLevel = event.key === "ArrowUp" ? item.level - 1 : item.level + 1
+    const adjacentLevelItems = treeItemsByLevel.get(targetLevel) ?? []
+    if (adjacentLevelItems.length === 0) return
+
+    let closestItem = adjacentLevelItems[0]
+
+    for (const candidate of adjacentLevelItems.slice(1)) {
+      const isCloser =
+        Math.abs(candidate.x - item.x) < Math.abs(closestItem.x - item.x)
+
+      if (isCloser) {
+        closestItem = candidate
+      }
+    }
+
+    event.preventDefault()
+    setActiveItemId(closestItem.id)
+    focusTreeItem(closestItem.id)
+  }, [focusTreeItem, treeItems, treeItemsById, treeItemsByLevel])
+
+  const getTreeItemProps = useCallback((itemId: string) => {
+    const item = treeItemsById.get(itemId)
+    if (!item) return undefined
+
+    const levelItems = treeItemsByLevel.get(item.level) ?? []
+    const itemIndex = levelItems.findIndex((entry) => entry.id === itemId)
+    if (itemIndex === -1) return undefined
+
+    return {
+      ariaLevel: item.level,
+      ariaPosInSet: itemIndex + 1,
+      ariaSetSize: levelItems.length,
+      itemRef: (element: SVGGElement | null) => registerTreeItemRef(itemId, element),
+      onFocus: () => handleTreeItemFocus(itemId),
+      onKeyDown: (event: KeyboardEvent<SVGGElement>) => handleTreeItemKeyDown(itemId, event),
+      tabIndex: resolvedActiveItemId === itemId ? 0 : -1,
+    }
+  }, [handleTreeItemFocus, handleTreeItemKeyDown, registerTreeItemRef, resolvedActiveItemId, treeItemsById, treeItemsByLevel])
+
   return (
     <div
       ref={containerRef}
@@ -163,10 +351,10 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
         </defs>
         <g
           ref={gRef}
-          role="group"
-          aria-label="Family tree. Press Tab to move between people, then Enter or Space to open a profile."
+          role="tree"
+          aria-label="Family tree. Press Tab to enter the tree, use the arrow keys to move between people, then Enter or Space to open a profile."
         >
-          {/* Edges — purely decorative connecting lines, hidden from assistive tech. */}
+          {/* Edges, purely decorative connecting lines, hidden from assistive tech. */}
           {edges.map((e, i) => (
             <path
               key={i}
@@ -180,9 +368,31 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
           ))}
 
           {/* Nodes */}
-          {nodes.map((node, i) => (
-            <TreeNode key={i} node={node} onNavigate={navigateToProfile} />
-          ))}
+          {nodes.map((node, i) => {
+            const attrs = node.data.attributes ?? {}
+            const singleTreeItemProps =
+              attrs.id && !attrs.spouseId
+                ? getTreeItemProps(`single:${attrs.id}`)
+                : undefined
+            const coupleLeftTreeItemProps =
+              attrs.id && attrs.spouseId
+                ? getTreeItemProps(`couple-left:${attrs.id}`)
+                : undefined
+            const coupleRightTreeItemProps = attrs.spouseId
+              ? getTreeItemProps(`couple-right:${attrs.spouseId}`)
+              : undefined
+
+            return (
+              <TreeNode
+                key={i}
+                node={node}
+                onNavigate={navigateToProfile}
+                singleTreeItemProps={singleTreeItemProps}
+                coupleLeftTreeItemProps={coupleLeftTreeItemProps}
+                coupleRightTreeItemProps={coupleRightTreeItemProps}
+              />
+            )
+          })}
         </g>
       </svg>
     </div>
