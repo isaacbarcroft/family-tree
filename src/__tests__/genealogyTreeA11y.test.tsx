@@ -1,10 +1,12 @@
-import { describe, expect, it, vi, beforeEach } from "vitest"
-import { render } from "@testing-library/react"
+import { beforeEach, describe, expect, it, vi } from "vitest"
+import { fireEvent, render } from "@testing-library/react"
 import GenealogyTree from "@/components/GenealogyTree"
 import type { TreeNode as TreeNodeData } from "@/utils/treeBuilder"
 
+const pushMock = vi.fn()
+
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: pushMock }),
 }))
 
 // d3-zoom and d3-selection touch the DOM in ways jsdom does not fully support
@@ -31,8 +33,7 @@ vi.mock("d3-selection", () => ({
   }),
 }))
 
-function tree(): TreeNodeData {
-  // A 3-node parent → child layout so the layout helper emits at least one edge.
+function parentChildTree(): TreeNodeData {
   return {
     name: "Smith Family",
     attributes: {},
@@ -48,10 +49,25 @@ function tree(): TreeNodeData {
   }
 }
 
+function coupleTree(): TreeNodeData {
+  return {
+    name: "Smith Family",
+    attributes: {},
+    children: [
+      {
+        name: "Alice & Bob Smith",
+        attributes: { id: "p1", spouseId: "p2" },
+      },
+    ],
+  }
+}
+
 describe("GenealogyTree accessibility", () => {
   beforeEach(() => {
+    pushMock.mockReset()
+
     // jsdom does not implement getBoundingClientRect for SVG-hosted containers
-    // in a useful way; stub it so the component's measure step has finite dims.
+    // in a useful way, stub it so the component's measure step has finite dims.
     Element.prototype.getBoundingClientRect = function () {
       return {
         x: 0,
@@ -67,19 +83,19 @@ describe("GenealogyTree accessibility", () => {
     }
   })
 
-  it("labels the inner tree group with role and a usage hint", () => {
-    const { container } = render(<GenealogyTree treeData={tree()} />)
+  it("labels the inner tree group with tree semantics and an arrow-key hint", () => {
+    const { container } = render(<GenealogyTree treeData={parentChildTree()} />)
 
-    const labelled = container.querySelector('g[role="group"]')
+    const labelled = container.querySelector('g[role="tree"]')
     expect(labelled).not.toBeNull()
     const label = labelled?.getAttribute("aria-label") ?? ""
     expect(label).toContain("Family tree")
-    expect(label).toContain("Tab")
+    expect(label).toContain("arrow keys")
     expect(label).toMatch(/Enter|Space/)
   })
 
   it("hides the shared <defs> block from assistive tech", () => {
-    const { container } = render(<GenealogyTree treeData={tree()} />)
+    const { container } = render(<GenealogyTree treeData={parentChildTree()} />)
 
     const defs = container.querySelector("defs")
     expect(defs).not.toBeNull()
@@ -87,7 +103,7 @@ describe("GenealogyTree accessibility", () => {
   })
 
   it("hides every decorative edge <path> from assistive tech", () => {
-    const { container } = render(<GenealogyTree treeData={tree()} />)
+    const { container } = render(<GenealogyTree treeData={parentChildTree()} />)
 
     const paths = container.querySelectorAll("path")
     expect(paths.length).toBeGreaterThan(0)
@@ -96,15 +112,55 @@ describe("GenealogyTree accessibility", () => {
     }
   })
 
-  it("keeps interactive person nodes focusable inside the labelled group", () => {
-    const { container } = render(<GenealogyTree treeData={tree()} />)
+  it("exposes people as treeitems with roving tabindex", () => {
+    const { container } = render(<GenealogyTree treeData={parentChildTree()} />)
 
-    const group = container.querySelector('g[role="group"]')
-    expect(group).not.toBeNull()
-    const buttons = group?.querySelectorAll('g[role="button"]')
-    expect(buttons?.length ?? 0).toBeGreaterThan(0)
-    for (const btn of Array.from(buttons ?? [])) {
-      expect(btn.getAttribute("tabindex")).toBe("0")
-    }
+    const items = container.querySelectorAll('g[role="treeitem"]')
+    expect(items.length).toBe(2)
+    expect(items[0].getAttribute("tabindex")).toBe("0")
+    expect(items[1].getAttribute("tabindex")).toBe("-1")
+    expect(items[0].getAttribute("aria-level")).toBe("1")
+    expect(items[1].getAttribute("aria-level")).toBe("2")
+  })
+
+  it("moves roving focus downward to the closest child with ArrowDown", () => {
+    const { container } = render(<GenealogyTree treeData={parentChildTree()} />)
+
+    const parent = container.querySelector('[aria-label="Open profile for Alice Smith"]')
+    const child = container.querySelector('[aria-label="Open profile for Bob Smith"]')
+    expect(parent).not.toBeNull()
+    expect(child).not.toBeNull()
+
+    fireEvent.focus(parent!)
+    fireEvent.keyDown(parent!, { key: "ArrowDown" })
+
+    expect(parent?.getAttribute("tabindex")).toBe("-1")
+    expect(child?.getAttribute("tabindex")).toBe("0")
+  })
+
+  it("moves horizontally between spouses with ArrowRight", () => {
+    const { container } = render(<GenealogyTree treeData={coupleTree()} />)
+
+    const left = container.querySelector('[aria-label="Open profile for Alice"]')
+    const right = container.querySelector('[aria-label="Open profile for Bob Smith"]')
+    expect(left).not.toBeNull()
+    expect(right).not.toBeNull()
+
+    fireEvent.focus(left!)
+    fireEvent.keyDown(left!, { key: "ArrowRight" })
+
+    expect(left?.getAttribute("tabindex")).toBe("-1")
+    expect(right?.getAttribute("tabindex")).toBe("0")
+  })
+
+  it("keeps Enter activation wired to profile navigation", () => {
+    const { container } = render(<GenealogyTree treeData={parentChildTree()} />)
+
+    const parent = container.querySelector('[aria-label="Open profile for Alice Smith"]')
+    expect(parent).not.toBeNull()
+
+    fireEvent.keyDown(parent!, { key: "Enter" })
+
+    expect(pushMock).toHaveBeenCalledWith("/profile/p1")
   })
 })

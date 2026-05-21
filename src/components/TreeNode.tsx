@@ -45,9 +45,28 @@ function getInitials(name: string): string {
 interface TreeNodeProps {
   node: LayoutNode
   onNavigate: (personId: string) => void
+  singleTreeItemProps?: TreeItemProps
+  coupleLeftTreeItemProps?: TreeItemProps
+  coupleRightTreeItemProps?: TreeItemProps
 }
 
-function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
+interface TreeItemProps {
+  ariaLevel: number
+  ariaPosInSet: number
+  ariaSetSize: number
+  itemRef: (element: SVGGElement | null) => void
+  onFocus: () => void
+  onKeyDown: (event: KeyboardEvent<SVGGElement>) => void
+  tabIndex: number
+}
+
+function TreeNodeComponent({
+  node,
+  onNavigate,
+  singleTreeItemProps,
+  coupleLeftTreeItemProps,
+  coupleRightTreeItemProps,
+}: TreeNodeProps) {
   const attrs = node.data.attributes ?? {}
   const isCouple = !!attrs.spouseId
   const isRoot = !attrs.id && !attrs.spouseId
@@ -82,6 +101,8 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
     const rightId = attrs.spouseId
     const activateLeft = leftId ? () => onNavigate(leftId) : undefined
     const activateRight = rightId ? () => onNavigate(rightId) : undefined
+    const leftRole = coupleLeftTreeItemProps ? "treeitem" : "button"
+    const rightRole = coupleRightTreeItemProps ? "treeitem" : "button"
 
     return (
       <g transform={`translate(${nodeX}, ${nodeY})`}>
@@ -97,14 +118,21 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
         {/* Left person */}
         <g
           onClick={activateLeft}
-          onKeyDown={
-            activateLeft ? (e) => handleKeyActivate(e, activateLeft) : undefined
-          }
-          role={activateLeft ? "button" : undefined}
-          tabIndex={activateLeft ? 0 : -1}
+          onKeyDown={activateLeft ? (e) => {
+            coupleLeftTreeItemProps?.onKeyDown(e)
+            if (e.defaultPrevented) return
+            handleKeyActivate(e, activateLeft)
+          } : undefined}
+          onFocus={coupleLeftTreeItemProps?.onFocus}
+          ref={coupleLeftTreeItemProps?.itemRef}
+          role={activateLeft ? leftRole : undefined}
+          tabIndex={activateLeft ? (coupleLeftTreeItemProps?.tabIndex ?? 0) : -1}
           aria-label={activateLeft ? `Open profile for ${name1}` : undefined}
+          aria-level={coupleLeftTreeItemProps?.ariaLevel}
+          aria-posinset={coupleLeftTreeItemProps?.ariaPosInSet}
+          aria-setsize={coupleLeftTreeItemProps?.ariaSetSize}
           className={activateLeft ? "tree-node-interactive" : undefined}
-          style={{ cursor: "pointer" }}
+          style={{ cursor: activateLeft ? "pointer" : "default" }}
         >
           {photo1 ? (
             <>
@@ -147,16 +175,21 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
         {/* Right person (spouse) */}
         <g
           onClick={activateRight}
-          onKeyDown={
-            activateRight
-              ? (e) => handleKeyActivate(e, activateRight)
-              : undefined
-          }
-          role={activateRight ? "button" : undefined}
-          tabIndex={activateRight ? 0 : -1}
+          onKeyDown={activateRight ? (e) => {
+            coupleRightTreeItemProps?.onKeyDown(e)
+            if (e.defaultPrevented) return
+            handleKeyActivate(e, activateRight)
+          } : undefined}
+          onFocus={coupleRightTreeItemProps?.onFocus}
+          ref={coupleRightTreeItemProps?.itemRef}
+          role={activateRight ? rightRole : undefined}
+          tabIndex={activateRight ? (coupleRightTreeItemProps?.tabIndex ?? 0) : -1}
           aria-label={activateRight ? `Open profile for ${name2}` : undefined}
+          aria-level={coupleRightTreeItemProps?.ariaLevel}
+          aria-posinset={coupleRightTreeItemProps?.ariaPosInSet}
+          aria-setsize={coupleRightTreeItemProps?.ariaSetSize}
           className={activateRight ? "tree-node-interactive" : undefined}
-          style={{ cursor: "pointer" }}
+          style={{ cursor: activateRight ? "pointer" : "default" }}
         >
           {photo2 ? (
             <>
@@ -203,12 +236,21 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
     <g
       transform={`translate(${nodeX}, ${nodeY})`}
       onClick={activate}
-      onKeyDown={activate ? (e) => handleKeyActivate(e, activate) : undefined}
-      role={activate ? "button" : undefined}
-      tabIndex={activate ? 0 : -1}
+      onKeyDown={activate ? (e) => {
+        singleTreeItemProps?.onKeyDown(e)
+        if (e.defaultPrevented) return
+        handleKeyActivate(e, activate)
+      } : undefined}
+      onFocus={singleTreeItemProps?.onFocus}
+      ref={singleTreeItemProps?.itemRef}
+      role={activate ? (singleTreeItemProps ? "treeitem" : "button") : undefined}
+      tabIndex={activate ? (singleTreeItemProps?.tabIndex ?? 0) : -1}
       aria-label={
         activate ? `Open profile for ${node.data.name}${dateLabel}` : undefined
       }
+      aria-level={singleTreeItemProps?.ariaLevel}
+      aria-posinset={singleTreeItemProps?.ariaPosInSet}
+      aria-setsize={singleTreeItemProps?.ariaSetSize}
       className={activate ? "tree-node-interactive" : undefined}
       style={{ cursor: activate ? "pointer" : "default" }}
     >
