@@ -11,6 +11,7 @@ import {
   edgePath,
   flattenNodes,
   layoutTree,
+  type LayoutNode,
 } from "@/utils/treeLayout"
 import {
   AVATAR_CY,
@@ -22,6 +23,11 @@ import {
   SINGLE_AVATAR_CX,
   TreeNode,
 } from "@/components/TreeNode"
+import {
+  buildTreeNavigation,
+  resolveArrowTarget,
+  type ArrowDirection,
+} from "@/utils/treeNavigation"
 import { useRouter } from "next/navigation"
 
 const AVATAR_R = 22
@@ -45,6 +51,40 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
   const nodes = useMemo(() => flattenNodes(layout), [layout])
   const edges = useMemo(() => collectEdges(layout), [layout])
   const bounds = useMemo(() => computeBounds(nodes), [nodes])
+  const navigation = useMemo(() => buildTreeNavigation(layout), [layout])
+
+  // Roving-tabindex active id. Falls back to the first focusable person when
+  // the navigation changes and the previous focus is no longer in the tree.
+  // The render-time prev* pattern avoids the cascading re-render that the
+  // equivalent useEffect would cause (React 19 set-state-in-effect rule).
+  const [focusedId, setFocusedId] = useState<string | null>(navigation.firstId)
+  const [prevNavigation, setPrevNavigation] = useState(navigation)
+  if (navigation !== prevNavigation) {
+    setPrevNavigation(navigation)
+    if (!focusedId || !navigation.meta.has(focusedId)) {
+      setFocusedId(navigation.firstId)
+    }
+  }
+
+  const nodeRefs = useRef(new Map<string, SVGGElement>())
+  const registerRef = useCallback((personId: string, el: SVGGElement | null) => {
+    if (el) {
+      nodeRefs.current.set(personId, el)
+      return
+    }
+    nodeRefs.current.delete(personId)
+  }, [])
+
+  const handleArrowKey = useCallback(
+    (currentId: string, direction: ArrowDirection) => {
+      const target = resolveArrowTarget(navigation, currentId, direction)
+      if (!target) return
+      setFocusedId(target)
+      const el = nodeRefs.current.get(target)
+      el?.focus()
+    },
+    [navigation],
+  )
 
   // Reset the initial-fit flag whenever the tree data changes so the new tree gets centered.
   useEffect(() => {
@@ -130,6 +170,17 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
     [router]
   )
 
+  const focusedForNode = useCallback(
+    (n: LayoutNode): string | null => {
+      if (!focusedId) return null
+      const attrs = n.data.attributes ?? {}
+      if (attrs.id === focusedId) return focusedId
+      if (attrs.spouseId === focusedId) return focusedId
+      return null
+    },
+    [focusedId],
+  )
+
   return (
     <div
       ref={containerRef}
@@ -163,8 +214,8 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
         </defs>
         <g
           ref={gRef}
-          role="group"
-          aria-label="Family tree. Press Tab to move between people, then Enter or Space to open a profile."
+          role="tree"
+          aria-label="Family tree. Use Tab to enter, then arrow keys to move between people, and Enter or Space to open a profile."
         >
           {/* Edges — purely decorative connecting lines, hidden from assistive tech. */}
           {edges.map((e, i) => (
@@ -181,7 +232,15 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
 
           {/* Nodes */}
           {nodes.map((node, i) => (
-            <TreeNode key={i} node={node} onNavigate={navigateToProfile} />
+            <TreeNode
+              key={i}
+              node={node}
+              onNavigate={navigateToProfile}
+              focusedId={focusedForNode(node)}
+              navMeta={navigation.meta}
+              onArrowKey={handleArrowKey}
+              registerRef={registerRef}
+            />
           ))}
         </g>
       </svg>
