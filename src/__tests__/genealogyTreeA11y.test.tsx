@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest"
-import { render } from "@testing-library/react"
+import { fireEvent, render } from "@testing-library/react"
 import GenealogyTree from "@/components/GenealogyTree"
 import type { TreeNode as TreeNodeData } from "@/utils/treeBuilder"
 
@@ -48,6 +48,22 @@ function tree(): TreeNodeData {
   }
 }
 
+function coupleTree(): TreeNodeData {
+  return {
+    name: "Smith Family",
+    attributes: {},
+    children: [
+      {
+        name: "Alice & Carol Smith",
+        attributes: { id: "p1", spouseId: "p3" },
+        children: [
+          { name: "Bob Smith", attributes: { id: "p2" } },
+        ],
+      },
+    ],
+  }
+}
+
 describe("GenealogyTree accessibility", () => {
   beforeEach(() => {
     // jsdom does not implement getBoundingClientRect for SVG-hosted containers
@@ -67,14 +83,15 @@ describe("GenealogyTree accessibility", () => {
     }
   })
 
-  it("labels the inner tree group with role and a usage hint", () => {
+  it("labels the inner tree group with role=tree and a usage hint", () => {
     const { container } = render(<GenealogyTree treeData={tree()} />)
 
-    const labelled = container.querySelector('g[role="group"]')
+    const labelled = container.querySelector('g[role="tree"]')
     expect(labelled).not.toBeNull()
     const label = labelled?.getAttribute("aria-label") ?? ""
     expect(label).toContain("Family tree")
     expect(label).toContain("Tab")
+    expect(label).toMatch(/arrow/i)
     expect(label).toMatch(/Enter|Space/)
   })
 
@@ -96,15 +113,83 @@ describe("GenealogyTree accessibility", () => {
     }
   })
 
-  it("keeps interactive person nodes focusable inside the labelled group", () => {
+  it("renders interactive person nodes as treeitems inside the tree group", () => {
     const { container } = render(<GenealogyTree treeData={tree()} />)
 
-    const group = container.querySelector('g[role="group"]')
+    const group = container.querySelector('g[role="tree"]')
     expect(group).not.toBeNull()
-    const buttons = group?.querySelectorAll('g[role="button"]')
-    expect(buttons?.length ?? 0).toBeGreaterThan(0)
-    for (const btn of Array.from(buttons ?? [])) {
-      expect(btn.getAttribute("tabindex")).toBe("0")
-    }
+    const items = group?.querySelectorAll('g[role="treeitem"]')
+    expect(items?.length ?? 0).toBeGreaterThan(0)
+  })
+
+  it("uses roving tabindex: exactly one treeitem has tabindex=0 on initial render", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+
+    const items = Array.from(
+      container.querySelectorAll('g[role="treeitem"]'),
+    )
+    const focused = items.filter((g) => g.getAttribute("tabindex") === "0")
+    expect(focused.length).toBe(1)
+  })
+
+  it("moves the roving tabindex on ArrowDown to a child treeitem", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+
+    const initial = container.querySelector('g[role="treeitem"][tabindex="0"]')
+    expect(initial).not.toBeNull()
+    expect(initial?.getAttribute("aria-label")).toMatch(/Alice/)
+
+    fireEvent.keyDown(initial!, { key: "ArrowDown" })
+
+    const next = container.querySelector('g[role="treeitem"][tabindex="0"]')
+    expect(next?.getAttribute("aria-label")).toMatch(/Bob/)
+    const others = Array.from(
+      container.querySelectorAll('g[role="treeitem"]'),
+    ).filter((g) => g.getAttribute("tabindex") === "0")
+    expect(others.length).toBe(1)
+  })
+
+  it("moves the roving tabindex on ArrowUp from a child back to its parent", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+
+    // Step into the child first.
+    fireEvent.keyDown(
+      container.querySelector('g[role="treeitem"][tabindex="0"]')!,
+      { key: "ArrowDown" },
+    )
+    const child = container.querySelector('g[role="treeitem"][tabindex="0"]')
+    expect(child?.getAttribute("aria-label")).toMatch(/Bob/)
+
+    fireEvent.keyDown(child!, { key: "ArrowUp" })
+    const back = container.querySelector('g[role="treeitem"][tabindex="0"]')
+    expect(back?.getAttribute("aria-label")).toMatch(/Alice/)
+  })
+
+  it("moves the roving tabindex between couple halves on ArrowRight / ArrowLeft", () => {
+    const { container } = render(<GenealogyTree treeData={coupleTree()} />)
+
+    const initial = container.querySelector('g[role="treeitem"][tabindex="0"]')
+    expect(initial?.getAttribute("aria-label")).toMatch(/Alice/)
+
+    fireEvent.keyDown(initial!, { key: "ArrowRight" })
+    const right = container.querySelector('g[role="treeitem"][tabindex="0"]')
+    expect(right?.getAttribute("aria-label")).toMatch(/Carol/)
+
+    fireEvent.keyDown(right!, { key: "ArrowLeft" })
+    const back = container.querySelector('g[role="treeitem"][tabindex="0"]')
+    expect(back?.getAttribute("aria-label")).toMatch(/Alice/)
+  })
+
+  it("jumps to the first focusable id on Home and the last on End", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+
+    const start = container.querySelector('g[role="treeitem"][tabindex="0"]')
+    fireEvent.keyDown(start!, { key: "End" })
+    const last = container.querySelector('g[role="treeitem"][tabindex="0"]')
+    expect(last?.getAttribute("aria-label")).toMatch(/Bob/)
+
+    fireEvent.keyDown(last!, { key: "Home" })
+    const first = container.querySelector('g[role="treeitem"][tabindex="0"]')
+    expect(first?.getAttribute("aria-label")).toMatch(/Alice/)
   })
 })

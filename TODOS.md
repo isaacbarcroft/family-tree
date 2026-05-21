@@ -10,15 +10,16 @@
 
 ## Next up
 
-**In priority order (refreshed 2026-05-18):**
+**In priority order (refreshed 2026-05-21):**
 
-1. **1.6.a Arrow-key navigation on the D3 tree.** Upgrade the tree to W3C tree-widget semantics (`role="tree"` / `role="treeitem"` with arrow-key roving tabindex). Largest remaining 1.6 sub-piece.
-2. **1.6.c Focus management after tree node click.** After `router.push(/profile/[id])`, move focus to the new page's main heading so keyboard users do not start back at the top of the page.
-3. **1.6.b Per-section `<section>` / `<article>` landmarks inside page bodies.** Page shells already get `<main>` and `<nav>` via layout; this is the inner-content landmark pass.
-4. **1.6.d Run [axe DevTools](https://www.deque.com/axe/devtools/)** and fix all critical / serious issues. Best done after 1.6.a to 1.6.c so the tree and landmark changes are reflected in the report.
-5. **T-15** — `middleware.ts` for route-level auth. Defense-in-depth on top of RLS.
-6. **1.4** — guided story prompts. Last unshipped Phase 1 engagement feature.
-7. **T-3** — extend `next/image` adoption beyond `ProfileAvatar`.
+1. **1.6.c Focus management after tree node click.** After `router.push(/profile/[id])`, move focus to the new page's main heading so keyboard users do not start back at the top of the page.
+2. **1.6.b Per-section `<section>` / `<article>` landmarks inside page bodies.** Page shells already get `<main>` and `<nav>` via layout; this is the inner-content landmark pass.
+3. **1.6.d Run [axe DevTools](https://www.deque.com/axe/devtools/)** and fix all critical / serious issues. Best done after 1.6.b to 1.6.c so the tree and landmark changes are reflected in the report.
+4. **T-15** — `middleware.ts` for route-level auth. Defense-in-depth on top of RLS.
+5. **1.4** — guided story prompts. Last unshipped Phase 1 engagement feature.
+6. **T-3** — extend `next/image` adoption beyond `ProfileAvatar`.
+
+Done 2026-05-21 (this PR): **1.6.a Arrow-key navigation on the D3 tree.**
 
 ---
 
@@ -151,7 +152,7 @@ See Completed log. **Open follow-ups:**
 
 **Remaining scope:**
 
-- **1.6.a Keyboard navigation on the D3 tree (arrow keys to move between nodes, beyond Enter / Space).** Would also upgrade the tree to W3C tree-widget semantics (`role="tree"` / `role="treeitem"` instead of `role="group"` / `role="button"`), since the tree role expects arrow-key roving tabindex.
+- ~~**1.6.a Keyboard navigation on the D3 tree (arrow keys to move between nodes, beyond Enter / Space).**~~ Done 2026-05-21. The outer `<g>` in `GenealogyTree.tsx` is now `role="tree"` (was `role="group"`); every focusable person `<g>` in `TreeNode.tsx` is `role="treeitem"` (was `role="button"`) with `aria-level` / `aria-setsize` / `aria-posinset`. Roving tabindex: the tree owns a `focusedId` state, and at any time exactly one treeitem has `tabindex={0}` while the rest carry `tabindex={-1}`. New pure `src/utils/treeNavigation.ts` (`buildTreeNavigation` + `resolveArrowTarget`) computes `up` / `down` / `left` / `right` neighbors per id; couples expose both halves as adjacent treeitems with ArrowLeft / ArrowRight stepping between the partner and the sibling boundary appropriately. ArrowUp / ArrowDown move between generations (parent ↔ first child). Home / End jump to the first / last focusable id in DFS order. Enter / Space still activate. Focus is moved programmatically via a ref map after each navigation key. All six keys (ArrowUp / ArrowDown / ArrowLeft / ArrowRight / Home / End) call `preventDefault` so the page does not scroll. Coverage: 14 new cases in `src/__tests__/treeNavigation.test.ts` for the pure nav util (lone root, couples, synthetic-root collapse, posInSet / setSize, Home / End resolution, unknown-id null), 7 new cases in `src/__tests__/treeNode.test.tsx` (treeitem role, ARIA level / setsize / posinset, arrow-key + Home / End dispatch, arrow-key preventDefault, registerRef mount + unmount, roving-tabindex `-1` for unfocused), and 5 new cases in `src/__tests__/genealogyTreeA11y.test.tsx` (`role="tree"` with usage hint mentioning arrow keys, exactly-one-tabindex-0 roving invariant, ArrowDown moves to child, ArrowUp returns to parent, ArrowRight / ArrowLeft step between couple halves, Home / End jumps). Existing tests updated for the role rename. 562 tests pass / 5 skipped (was 535/5; +27 across new + replaced cases); `yarn lint` clean (0 / 0); `yarn build` green. Files: `src/utils/treeNavigation.ts` (new), `src/components/TreeNode.tsx`, `src/components/GenealogyTree.tsx`, `src/__tests__/treeNavigation.test.ts` (new), `src/__tests__/treeNode.test.tsx`, `src/__tests__/genealogyTreeA11y.test.tsx`, `TODOS.md`.
 - **1.6.b Per-section `<section>` / `<article>` landmarks inside page bodies.** Page shells get `<main>` and `<nav>` via layout already; this is the inner-page-content landmark pass.
 - **1.6.c Focus management after tree node click.** After `router.push(/profile/[id])` lands, the new page should move focus to the main heading so keyboard users do not start back at the top of the page.
 - **1.6.d Run [axe DevTools](https://www.deque.com/axe/devtools/) and fix all critical / serious issues.**
