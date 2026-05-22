@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest"
-import { render } from "@testing-library/react"
+import { fireEvent, render } from "@testing-library/react"
 import GenealogyTree from "@/components/GenealogyTree"
 import type { TreeNode as TreeNodeData } from "@/utils/treeBuilder"
 
@@ -67,14 +67,14 @@ describe("GenealogyTree accessibility", () => {
     }
   })
 
-  it("labels the inner tree group with role and a usage hint", () => {
+  it("labels the inner tree group with role='tree' and a usage hint", () => {
     const { container } = render(<GenealogyTree treeData={tree()} />)
 
-    const labelled = container.querySelector('g[role="group"]')
+    const labelled = container.querySelector('g[role="tree"]')
     expect(labelled).not.toBeNull()
     const label = labelled?.getAttribute("aria-label") ?? ""
     expect(label).toContain("Family tree")
-    expect(label).toContain("Tab")
+    expect(label).toContain("arrow keys")
     expect(label).toMatch(/Enter|Space/)
   })
 
@@ -96,15 +96,86 @@ describe("GenealogyTree accessibility", () => {
     }
   })
 
-  it("keeps interactive person nodes focusable inside the labelled group", () => {
+  it("keeps interactive person nodes focusable as treeitems inside the tree group", () => {
     const { container } = render(<GenealogyTree treeData={tree()} />)
 
-    const group = container.querySelector('g[role="group"]')
+    const group = container.querySelector('g[role="tree"]')
     expect(group).not.toBeNull()
-    const buttons = group?.querySelectorAll('g[role="button"]')
-    expect(buttons?.length ?? 0).toBeGreaterThan(0)
-    for (const btn of Array.from(buttons ?? [])) {
-      expect(btn.getAttribute("tabindex")).toBe("0")
+    const items = group?.querySelectorAll('g[role="treeitem"]')
+    expect(items?.length ?? 0).toBeGreaterThan(0)
+    for (const item of Array.from(items ?? [])) {
+      expect(item.getAttribute("data-tree-item-id")).not.toBeNull()
     }
+  })
+
+  it("applies roving tabindex so exactly one treeitem has tabindex=0", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+
+    const items = container.querySelectorAll('g[role="treeitem"]')
+    expect(items.length).toBeGreaterThan(1)
+    const tabZero = Array.from(items).filter(
+      (el) => el.getAttribute("tabindex") === "0",
+    )
+    expect(tabZero.length).toBe(1)
+    // It should be the first focusable item in document order.
+    expect(tabZero[0]).toBe(items[0])
+  })
+
+  it("sets aria-level / aria-posinset / aria-setsize on every treeitem", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+
+    const items = container.querySelectorAll('g[role="treeitem"]')
+    for (const item of Array.from(items)) {
+      expect(item.getAttribute("aria-level")).toMatch(/^\d+$/)
+      expect(item.getAttribute("aria-posinset")).toMatch(/^\d+$/)
+      expect(item.getAttribute("aria-setsize")).toMatch(/^\d+$/)
+    }
+  })
+
+  it("moves the tabindex=0 owner when ArrowDown is pressed", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+
+    const items = container.querySelectorAll('g[role="treeitem"]')
+    // tree() builds: synthetic family root → Alice (p1) → Bob (p2)
+    // So the first focusable item is Alice (p1), then ArrowDown should move
+    // the roving tabindex to Bob (p2).
+    const treeContainer = container.querySelector('g[role="tree"]')
+    expect(treeContainer).not.toBeNull()
+    fireEvent.keyDown(treeContainer!, { key: "ArrowDown" })
+
+    const tabZero = Array.from(items).filter(
+      (el) => el.getAttribute("tabindex") === "0",
+    )
+    expect(tabZero.length).toBe(1)
+    expect(tabZero[0].getAttribute("data-tree-item-id")).toBe("p2")
+  })
+
+  it("calls preventDefault on recognized tree-nav keys to suppress page scroll", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+
+    const treeContainer = container.querySelector('g[role="tree"]')
+    expect(treeContainer).not.toBeNull()
+    const ev = new KeyboardEvent("keydown", {
+      key: "ArrowDown",
+      bubbles: true,
+      cancelable: true,
+    })
+    treeContainer!.dispatchEvent(ev)
+    expect(ev.defaultPrevented).toBe(true)
+  })
+
+  it("ignores keys it does not handle (e.g. plain letters)", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+
+    const items = container.querySelectorAll('g[role="treeitem"]')
+    const before = items[0].getAttribute("data-tree-item-id")
+    const treeContainer = container.querySelector('g[role="tree"]')
+    fireEvent.keyDown(treeContainer!, { key: "a" })
+
+    const tabZero = Array.from(items).filter(
+      (el) => el.getAttribute("tabindex") === "0",
+    )
+    expect(tabZero.length).toBe(1)
+    expect(tabZero[0].getAttribute("data-tree-item-id")).toBe(before)
   })
 })

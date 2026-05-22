@@ -42,12 +42,32 @@ function getInitials(name: string): string {
     .toUpperCase()
 }
 
+export interface TreeItemAria {
+  level: number
+  posInSet: number
+  setSize: number
+}
+
 interface TreeNodeProps {
   node: LayoutNode
   onNavigate: (personId: string) => void
+  // The single id that currently owns tabIndex=0 (roving tabindex). The
+  // matching half of this node gets tabIndex=0; every other half gets -1.
+  // Pass null to disable focusable nodes entirely (e.g. empty tree).
+  activeId?: string | null
+  // aria-level / aria-posinset / aria-setsize for the left or single half.
+  leftAria?: TreeItemAria
+  // Same set for the right half of a couple.
+  rightAria?: TreeItemAria
 }
 
-function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
+function TreeNodeComponent({
+  node,
+  onNavigate,
+  activeId = null,
+  leftAria,
+  rightAria,
+}: TreeNodeProps) {
   const attrs = node.data.attributes ?? {}
   const isCouple = !!attrs.spouseId
   const isRoot = !attrs.id && !attrs.spouseId
@@ -100,9 +120,17 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
           onKeyDown={
             activateLeft ? (e) => handleKeyActivate(e, activateLeft) : undefined
           }
-          role={activateLeft ? "button" : undefined}
-          tabIndex={activateLeft ? 0 : -1}
+          role={activateLeft ? "treeitem" : undefined}
+          tabIndex={activateLeft ? (leftId === activeId ? 0 : -1) : -1}
           aria-label={activateLeft ? `Open profile for ${name1}` : undefined}
+          aria-level={activateLeft && leftAria ? leftAria.level : undefined}
+          aria-posinset={
+            activateLeft && leftAria ? leftAria.posInSet : undefined
+          }
+          aria-setsize={
+            activateLeft && leftAria ? leftAria.setSize : undefined
+          }
+          data-tree-item-id={activateLeft ? leftId : undefined}
           className={activateLeft ? "tree-node-interactive" : undefined}
           style={{ cursor: "pointer" }}
         >
@@ -152,9 +180,19 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
               ? (e) => handleKeyActivate(e, activateRight)
               : undefined
           }
-          role={activateRight ? "button" : undefined}
-          tabIndex={activateRight ? 0 : -1}
+          role={activateRight ? "treeitem" : undefined}
+          tabIndex={activateRight ? (rightId === activeId ? 0 : -1) : -1}
           aria-label={activateRight ? `Open profile for ${name2}` : undefined}
+          aria-level={
+            activateRight && rightAria ? rightAria.level : undefined
+          }
+          aria-posinset={
+            activateRight && rightAria ? rightAria.posInSet : undefined
+          }
+          aria-setsize={
+            activateRight && rightAria ? rightAria.setSize : undefined
+          }
+          data-tree-item-id={activateRight ? rightId : undefined}
           className={activateRight ? "tree-node-interactive" : undefined}
           style={{ cursor: "pointer" }}
         >
@@ -204,11 +242,17 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
       transform={`translate(${nodeX}, ${nodeY})`}
       onClick={activate}
       onKeyDown={activate ? (e) => handleKeyActivate(e, activate) : undefined}
-      role={activate ? "button" : undefined}
-      tabIndex={activate ? 0 : -1}
+      role={activate ? "treeitem" : undefined}
+      tabIndex={activate ? (personId === activeId ? 0 : -1) : -1}
       aria-label={
         activate ? `Open profile for ${node.data.name}${dateLabel}` : undefined
       }
+      aria-level={activate && leftAria ? leftAria.level : undefined}
+      aria-posinset={
+        activate && leftAria ? leftAria.posInSet : undefined
+      }
+      aria-setsize={activate && leftAria ? leftAria.setSize : undefined}
+      data-tree-item-id={activate ? personId : undefined}
       className={activate ? "tree-node-interactive" : undefined}
       style={{ cursor: activate ? "pointer" : "default" }}
     >

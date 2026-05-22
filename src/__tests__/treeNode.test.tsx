@@ -204,19 +204,32 @@ describe("TreeNode", () => {
     expect(TreeNode.displayName).toBe("TreeNode")
   })
 
-  it("exposes a single-person node as a focusable button to assistive tech", () => {
+  it("exposes a single-person node as a focusable treeitem to assistive tech", () => {
     const layout = singleLayoutNode({ id: "p1" }, "Alice Smith")
 
     const { container } = renderInSvg(
-      <TreeNode node={layout} onNavigate={() => {}} />,
+      <TreeNode node={layout} onNavigate={() => {}} activeId="p1" />,
     )
 
     const group = container.querySelector("g[transform]")
-    expect(group?.getAttribute("role")).toBe("button")
+    expect(group?.getAttribute("role")).toBe("treeitem")
     expect(group?.getAttribute("tabindex")).toBe("0")
     expect(group?.getAttribute("aria-label")).toBe(
       "Open profile for Alice Smith",
     )
+    expect(group?.getAttribute("data-tree-item-id")).toBe("p1")
+  })
+
+  it("uses tabindex=-1 on the single-person node when activeId is different", () => {
+    const layout = singleLayoutNode({ id: "p1" }, "Alice Smith")
+
+    const { container } = renderInSvg(
+      <TreeNode node={layout} onNavigate={() => {}} activeId="other" />,
+    )
+
+    const group = container.querySelector("g[transform]")
+    expect(group?.getAttribute("role")).toBe("treeitem")
+    expect(group?.getAttribute("tabindex")).toBe("-1")
   })
 
   it("includes birth and death dates in the single-person aria-label", () => {
@@ -299,24 +312,27 @@ describe("TreeNode", () => {
     expect(group?.getAttribute("aria-label")).toBeNull()
   })
 
-  it("exposes both halves of a couple as focusable buttons with per-half labels", () => {
+  it("exposes both halves of a couple as focusable treeitems with per-half labels", () => {
     const layout = coupleLayoutNode(
       { id: "p1", spouseId: "p2" },
       "Alice & Bob Smith",
     )
 
     const { container } = renderInSvg(
-      <TreeNode node={layout} onNavigate={() => {}} />,
+      <TreeNode node={layout} onNavigate={() => {}} activeId="p1" />,
     )
 
     const halves = Array.from(container.querySelectorAll("g")).filter(
-      (g) => g.getAttribute("role") === "button",
+      (g) => g.getAttribute("role") === "treeitem",
     )
     expect(halves.length).toBe(2)
+    // Roving tabindex: only the active half is in the tab sequence.
     expect(halves[0].getAttribute("tabindex")).toBe("0")
-    expect(halves[1].getAttribute("tabindex")).toBe("0")
+    expect(halves[1].getAttribute("tabindex")).toBe("-1")
     expect(halves[0].getAttribute("aria-label")).toBe("Open profile for Alice")
     expect(halves[1].getAttribute("aria-label")).toBe("Open profile for Bob Smith")
+    expect(halves[0].getAttribute("data-tree-item-id")).toBe("p1")
+    expect(halves[1].getAttribute("data-tree-item-id")).toBe("p2")
   })
 
   it("activates each couple half independently on Enter", () => {
@@ -327,11 +343,11 @@ describe("TreeNode", () => {
     )
 
     const { container } = renderInSvg(
-      <TreeNode node={layout} onNavigate={onNavigate} />,
+      <TreeNode node={layout} onNavigate={onNavigate} activeId="p1" />,
     )
 
     const halves = Array.from(container.querySelectorAll("g")).filter(
-      (g) => g.getAttribute("role") === "button",
+      (g) => g.getAttribute("role") === "treeitem",
     )
     fireEvent.keyDown(halves[0], { key: "Enter" })
     fireEvent.keyDown(halves[1], { key: "Enter" })
@@ -348,17 +364,17 @@ describe("TreeNode", () => {
     )
 
     const { container: c1 } = renderInSvg(
-      <TreeNode node={single} onNavigate={onNavigate} />,
+      <TreeNode node={single} onNavigate={onNavigate} activeId="p1" />,
     )
     const { container: c2 } = renderInSvg(
-      <TreeNode node={couple} onNavigate={onNavigate} />,
+      <TreeNode node={couple} onNavigate={onNavigate} activeId="p1" />,
     )
 
     expect(
-      c1.querySelector("g.tree-node-interactive[role='button']"),
+      c1.querySelector("g.tree-node-interactive[role='treeitem']"),
     ).not.toBeNull()
     expect(
-      c2.querySelectorAll("g.tree-node-interactive[role='button']").length,
+      c2.querySelectorAll("g.tree-node-interactive[role='treeitem']").length,
     ).toBe(2)
   })
 })
