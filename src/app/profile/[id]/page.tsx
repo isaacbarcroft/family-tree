@@ -111,10 +111,20 @@ function ProfileContent() {
   const [showDeceased, setShowDeceased] = useState(false);
   const [relationships, setRelationships] = useState<Relationship[]>([]);
   const [allPeople, setAllPeople] = useState<Person[]>([]);
+  const headingRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
     if (searchParams.get("edit") === "true") setEditing(true);
   }, [searchParams]);
+
+  // After the person loads, move focus to the page's main heading so
+  // keyboard / screen-reader users do not restart at <body> on every SPA nav.
+  useEffect(() => {
+    if (loading) return;
+    if (editing) return;
+    if (!person) return;
+    headingRef.current?.focus({ preventScroll: true });
+  }, [loading, editing, person]);
 
   const refreshMemories = useCallback(async () => {
     const mems = await listMemoriesForPerson(personId);
@@ -426,6 +436,7 @@ function ProfileContent() {
               onCopyClaim={handleCopyClaim}
               claimCopied={claimCopied}
               canClaim={!person.userId && !person.deathDate}
+              headingRef={headingRef}
             />
 
             {relationshipToViewer ? (
@@ -501,6 +512,7 @@ type HeroProps = {
   onCopyClaim: () => void;
   claimCopied: boolean;
   canClaim: boolean;
+  headingRef: React.RefObject<HTMLHeadingElement | null>;
 };
 
 function Hero({
@@ -514,6 +526,7 @@ function Hero({
   onCopyClaim,
   claimCopied,
   canClaim,
+  headingRef,
 }: HeroProps) {
   const facts: string[] = [];
   if (lifespan) facts.push(lifespan);
@@ -530,6 +543,8 @@ function Hero({
           {person.roleType}
         </p>
         <h1
+          ref={headingRef}
+          tabIndex={-1}
           className="display"
           style={{
             fontSize: "clamp(56px, 9vw, 108px)",
