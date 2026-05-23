@@ -1,6 +1,6 @@
 "use client"
 
-import { memo, type KeyboardEvent } from "react"
+import { memo, useEffect, useRef, type KeyboardEvent } from "react"
 import type { LayoutNode } from "@/utils/treeLayout"
 import { COUPLE_W, NODE_H, NODE_W } from "@/utils/treeLayout"
 import { stringToColor } from "@/utils/colors"
@@ -9,7 +9,7 @@ import { formatDate } from "@/utils/dates"
 const AVATAR_R = 22
 const MARRIAGE_BAR = 20
 
-// Enter and Space activate buttons per the WAI-ARIA button pattern.
+// Enter and Space activate treeitems per the WAI-ARIA tree-widget pattern.
 // preventDefault on Space stops the browser from scrolling the page.
 function handleKeyActivate(
   e: KeyboardEvent<SVGGElement>,
@@ -18,6 +18,31 @@ function handleKeyActivate(
   if (e.key !== "Enter" && e.key !== " ") return
   e.preventDefault()
   activate()
+}
+
+// Roving-tabindex helper. The currently selected treeitem has tabIndex=0 so
+// it is the single Tab stop into the tree; every other interactive node has
+// tabIndex=-1 so screen readers and keyboard users navigate via the arrow
+// keys instead of cycling through every person with Tab.
+function rovingTabIndex(personId: string, focusedId: string | null) {
+  if (focusedId === null) return 0
+  return personId === focusedId ? 0 : -1
+}
+
+// Apply DOM focus to the SVG group when this person becomes the selected
+// treeitem and the focus originated from arrow-key navigation. Without this
+// the React state and the browser's focus ring would drift apart.
+function useImperativeFocus(
+  ref: React.RefObject<SVGGElement | null>,
+  shouldFocus: boolean,
+) {
+  useEffect(() => {
+    if (!shouldFocus) return
+    const el = ref.current
+    if (!el) return
+    if (document.activeElement === el) return
+    el.focus()
+  }, [shouldFocus, ref])
 }
 
 // Shared <clipPath> ids defined once in GenealogyTree's <defs>. The default
@@ -45,13 +70,45 @@ function getInitials(name: string): string {
 interface TreeNodeProps {
   node: LayoutNode
   onNavigate: (personId: string) => void
+  // The person id of the currently selected treeitem in the parent
+  // GenealogyTree. Used to drive the roving tabindex and to imperatively
+  // focus the DOM element when keyboard navigation moves the selection
+  // onto this person. `shouldFocus` is set when the parent wants the
+  // newly-selected node to receive DOM focus (i.e. after an arrow key
+  // press, but not on initial mount).
+  focusedPersonId?: string | null
+  shouldFocus?: boolean
+  onFocusChange?: (personId: string) => void
 }
 
-function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
+function TreeNodeComponent({
+  node,
+  onNavigate,
+  focusedPersonId = null,
+  shouldFocus = false,
+  onFocusChange,
+}: TreeNodeProps) {
   const attrs = node.data.attributes ?? {}
   const isCouple = !!attrs.spouseId
   const isRoot = !attrs.id && !attrs.spouseId
   const isDeceased = !!attrs.death
+  const singleRef = useRef<SVGGElement>(null)
+  const coupleLeftRef = useRef<SVGGElement>(null)
+  const coupleRightRef = useRef<SVGGElement>(null)
+  const leftId = attrs.id
+  const rightId = attrs.spouseId
+  useImperativeFocus(
+    singleRef,
+    shouldFocus && !isCouple && !!leftId && focusedPersonId === leftId,
+  )
+  useImperativeFocus(
+    coupleLeftRef,
+    shouldFocus && isCouple && !!leftId && focusedPersonId === leftId,
+  )
+  useImperativeFocus(
+    coupleRightRef,
+    shouldFocus && isCouple && !!rightId && focusedPersonId === rightId,
+  )
 
   if (isRoot && !isCouple) {
     return (
@@ -78,10 +135,14 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
     const name2 = node.data.name.split(" & ")[1] || ""
     const photo1 = attrs.photo
     const photo2 = attrs.spousePhoto
-    const leftId = attrs.id
-    const rightId = attrs.spouseId
     const activateLeft = leftId ? () => onNavigate(leftId) : undefined
     const activateRight = rightId ? () => onNavigate(rightId) : undefined
+    const onFocusLeft = leftId && onFocusChange
+      ? () => onFocusChange(leftId)
+      : undefined
+    const onFocusRight = rightId && onFocusChange
+      ? () => onFocusChange(rightId)
+      : undefined
 
     return (
       <g transform={`translate(${nodeX}, ${nodeY})`}>
@@ -96,12 +157,19 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
 
         {/* Left person */}
         <g
+          ref={coupleLeftRef}
           onClick={activateLeft}
           onKeyDown={
             activateLeft ? (e) => handleKeyActivate(e, activateLeft) : undefined
           }
-          role={activateLeft ? "button" : undefined}
-          tabIndex={activateLeft ? 0 : -1}
+          onFocus={onFocusLeft}
+          role={activateLeft ? "treeitem" : undefined}
+          tabIndex={
+            activateLeft && leftId ? rovingTabIndex(leftId, focusedPersonId) : -1
+          }
+          aria-selected={
+            activateLeft && leftId ? focusedPersonId === leftId : undefined
+          }
           aria-label={activateLeft ? `Open profile for ${name1}` : undefined}
           className={activateLeft ? "tree-node-interactive" : undefined}
           style={{ cursor: "pointer" }}
@@ -146,14 +214,23 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
 
         {/* Right person (spouse) */}
         <g
+          ref={coupleRightRef}
           onClick={activateRight}
           onKeyDown={
             activateRight
               ? (e) => handleKeyActivate(e, activateRight)
               : undefined
           }
-          role={activateRight ? "button" : undefined}
-          tabIndex={activateRight ? 0 : -1}
+          onFocus={onFocusRight}
+          role={activateRight ? "treeitem" : undefined}
+          tabIndex={
+            activateRight && rightId
+              ? rovingTabIndex(rightId, focusedPersonId)
+              : -1
+          }
+          aria-selected={
+            activateRight && rightId ? focusedPersonId === rightId : undefined
+          }
           aria-label={activateRight ? `Open profile for ${name2}` : undefined}
           className={activateRight ? "tree-node-interactive" : undefined}
           style={{ cursor: "pointer" }}
@@ -193,6 +270,9 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
   const birthStr = attrs.birth ? formatDate(attrs.birth) : ""
   const deathStr = attrs.death ? formatDate(attrs.death) : ""
   const activate = personId ? () => onNavigate(personId) : undefined
+  const onFocusSingle = personId && onFocusChange
+    ? () => onFocusChange(personId)
+    : undefined
   const dateLabel = (() => {
     if (isDeceased && birthStr && deathStr) return `, ${birthStr} to ${deathStr}`
     if (birthStr) return `, born ${birthStr}`
@@ -201,11 +281,18 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
 
   return (
     <g
+      ref={singleRef}
       transform={`translate(${nodeX}, ${nodeY})`}
       onClick={activate}
       onKeyDown={activate ? (e) => handleKeyActivate(e, activate) : undefined}
-      role={activate ? "button" : undefined}
-      tabIndex={activate ? 0 : -1}
+      onFocus={onFocusSingle}
+      role={activate ? "treeitem" : undefined}
+      tabIndex={
+        activate && personId ? rovingTabIndex(personId, focusedPersonId) : -1
+      }
+      aria-selected={
+        activate && personId ? focusedPersonId === personId : undefined
+      }
       aria-label={
         activate ? `Open profile for ${node.data.name}${dateLabel}` : undefined
       }
