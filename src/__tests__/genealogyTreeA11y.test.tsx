@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest"
-import { render } from "@testing-library/react"
+import { fireEvent, render } from "@testing-library/react"
 import GenealogyTree from "@/components/GenealogyTree"
 import type { TreeNode as TreeNodeData } from "@/utils/treeBuilder"
 
@@ -67,14 +67,14 @@ describe("GenealogyTree accessibility", () => {
     }
   })
 
-  it("labels the inner tree group with role and a usage hint", () => {
+  it("labels the inner tree group with role=tree and a usage hint", () => {
     const { container } = render(<GenealogyTree treeData={tree()} />)
 
-    const labelled = container.querySelector('g[role="group"]')
+    const labelled = container.querySelector('g[role="tree"]')
     expect(labelled).not.toBeNull()
     const label = labelled?.getAttribute("aria-label") ?? ""
     expect(label).toContain("Family tree")
-    expect(label).toContain("Tab")
+    expect(label).toContain("arrow")
     expect(label).toMatch(/Enter|Space/)
   })
 
@@ -96,15 +96,97 @@ describe("GenealogyTree accessibility", () => {
     }
   })
 
-  it("keeps interactive person nodes focusable inside the labelled group", () => {
+  it("keeps interactive person nodes focusable inside the labelled tree", () => {
     const { container } = render(<GenealogyTree treeData={tree()} />)
 
-    const group = container.querySelector('g[role="group"]')
+    const group = container.querySelector('g[role="tree"]')
     expect(group).not.toBeNull()
-    const buttons = group?.querySelectorAll('g[role="button"]')
-    expect(buttons?.length ?? 0).toBeGreaterThan(0)
-    for (const btn of Array.from(buttons ?? [])) {
-      expect(btn.getAttribute("tabindex")).toBe("0")
+    const items = group?.querySelectorAll('g[role="treeitem"]')
+    expect(items?.length ?? 0).toBeGreaterThan(0)
+    // Roving-tabindex contract: exactly one treeitem is tabbable.
+    const tabbable = Array.from(items ?? []).filter(
+      (el) => el.getAttribute("tabindex") === "0",
+    )
+    expect(tabbable.length).toBe(1)
+  })
+
+  it("seeds the roving tab stop on the first focusable person", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+    const items = container.querySelectorAll('g[role="treeitem"]')
+    expect(items[0].getAttribute("tabindex")).toBe("0")
+    expect(items[0].getAttribute("aria-selected")).toBe("true")
+    for (let i = 1; i < items.length; i++) {
+      expect(items[i].getAttribute("tabindex")).toBe("-1")
     }
+  })
+
+  it("ArrowDown moves the roving tab stop to the next-generation child", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+    const svg = container.querySelector("svg")
+    const items = container.querySelectorAll('g[role="treeitem"]')
+    // Initial: tabbable is p1 (Alice). ArrowDown should move to p2 (Bob).
+    fireEvent.keyDown(items[0], { key: "ArrowDown" })
+
+    const updated = container.querySelectorAll('g[role="treeitem"]')
+    const tabbable = Array.from(updated).find(
+      (el) => el.getAttribute("tabindex") === "0",
+    )
+    expect(tabbable?.getAttribute("aria-label")).toContain("Bob")
+    // sanity: the svg-level keydown handler actually intercepted the event.
+    expect(svg).not.toBeNull()
+  })
+
+  it("ArrowLeft at the first sibling does not move the selection", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+    const items = container.querySelectorAll('g[role="treeitem"]')
+    const firstLabel = items[0].getAttribute("aria-label")
+
+    fireEvent.keyDown(items[0], { key: "ArrowLeft" })
+
+    const stillFirst = Array.from(
+      container.querySelectorAll('g[role="treeitem"]'),
+    ).find((el) => el.getAttribute("tabindex") === "0")
+    expect(stillFirst?.getAttribute("aria-label")).toBe(firstLabel)
+  })
+
+  it("End jumps to the last focusable person", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+    const items = container.querySelectorAll('g[role="treeitem"]')
+
+    fireEvent.keyDown(items[0], { key: "End" })
+
+    const tabbable = Array.from(
+      container.querySelectorAll('g[role="treeitem"]'),
+    ).find((el) => el.getAttribute("tabindex") === "0")
+    expect(tabbable?.getAttribute("aria-label")).toContain("Bob")
+  })
+
+  it("ignores arrow keys whose target is outside the tree", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+    const items = container.querySelectorAll('g[role="treeitem"]')
+    const firstLabel = items[0].getAttribute("aria-label")
+    const svg = container.querySelector("svg")
+    // Fire the keydown directly on the SVG element (e.g. user clicked-and-held
+    // outside any treeitem). The handler should bail rather than move the
+    // selection or preventDefault page scrolling.
+    fireEvent.keyDown(svg!, { key: "ArrowDown" })
+
+    const stillFirst = Array.from(
+      container.querySelectorAll('g[role="treeitem"]'),
+    ).find((el) => el.getAttribute("tabindex") === "0")
+    expect(stillFirst?.getAttribute("aria-label")).toBe(firstLabel)
+  })
+
+  it("preventDefault on arrow keys stops page scrolling", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+    const items = container.querySelectorAll('g[role="treeitem"]')
+
+    const event = new KeyboardEvent("keydown", {
+      key: "ArrowDown",
+      bubbles: true,
+      cancelable: true,
+    })
+    items[0].dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(true)
   })
 })

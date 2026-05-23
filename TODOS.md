@@ -10,15 +10,27 @@
 
 ## Next up
 
-**In priority order (refreshed 2026-05-18):**
+**In priority order (refreshed 2026-05-23):**
 
-1. **1.6.a Arrow-key navigation on the D3 tree.** Upgrade the tree to W3C tree-widget semantics (`role="tree"` / `role="treeitem"` with arrow-key roving tabindex). Largest remaining 1.6 sub-piece.
-2. **1.6.c Focus management after tree node click.** After `router.push(/profile/[id])`, move focus to the new page's main heading so keyboard users do not start back at the top of the page.
-3. **1.6.b Per-section `<section>` / `<article>` landmarks inside page bodies.** Page shells already get `<main>` and `<nav>` via layout; this is the inner-content landmark pass.
-4. **1.6.d Run [axe DevTools](https://www.deque.com/axe/devtools/)** and fix all critical / serious issues. Best done after 1.6.a to 1.6.c so the tree and landmark changes are reflected in the report.
-5. **T-15** — `middleware.ts` for route-level auth. Defense-in-depth on top of RLS.
-6. **1.4** — guided story prompts. Last unshipped Phase 1 engagement feature.
-7. **T-3** — extend `next/image` adoption beyond `ProfileAvatar`.
+1. **1.6.c Focus management after tree node click.** After `router.push(/profile/[id])`, move focus to the new page's main heading so keyboard users do not start back at the top of the page.
+2. **1.6.b Per-section `<section>` / `<article>` landmarks inside page bodies.** Page shells already get `<main>` and `<nav>` via layout; this is the inner-content landmark pass.
+3. **1.6.d Run [axe DevTools](https://www.deque.com/axe/devtools/)** and fix all critical / serious issues. Best done after 1.6.c so the focus-management and landmark changes are reflected in the report.
+4. **T-15** — `middleware.ts` for route-level auth. Defense-in-depth on top of RLS.
+5. **1.4** — guided story prompts. Last unshipped Phase 1 engagement feature.
+6. **T-3** — extend `next/image` adoption beyond `ProfileAvatar`.
+
+~~**1.6.a Arrow-key navigation on the D3 tree.**~~ Done 2026-05-23. Tree
+now ships W3C tree-widget semantics (outer `<g role="tree">`, every
+interactive person `<g role="treeitem">` with `aria-selected`), a
+roving-tabindex implementation that keeps exactly one Tab stop into the
+visualization, and arrow-key navigation (Up = parent, Down = first child,
+Left/Right = previous/next sibling — with Left/Right swapping the two
+halves of a couple — plus Home/End jumping to the first/last person in DFS
+order). Movement updates both React state and DOM focus so the visible
+focus ring tracks the selection. See PR `claude/vigilant-cannon-UViZE`,
+new utility `src/utils/treeNavigation.ts`, and new tests
+`src/__tests__/treeNavigation.test.ts` (18 cases) plus extended
+`treeNode.test.tsx` and `genealogyTreeA11y.test.tsx`.
 
 ---
 
@@ -151,13 +163,13 @@ See Completed log. **Open follow-ups:**
 
 **Remaining scope:**
 
-- **1.6.a Keyboard navigation on the D3 tree (arrow keys to move between nodes, beyond Enter / Space).** Would also upgrade the tree to W3C tree-widget semantics (`role="tree"` / `role="treeitem"` instead of `role="group"` / `role="button"`), since the tree role expects arrow-key roving tabindex.
+- ~~**1.6.a Keyboard navigation on the D3 tree (arrow keys to move between nodes, beyond Enter / Space).**~~ Done 2026-05-23. `src/components/GenealogyTree.tsx` now renders the outer `<g>` as `role="tree"` (replacing `role="group"`) and every interactive person `<g>` in `src/components/TreeNode.tsx` as `role="treeitem"` (replacing `role="button"`) with `aria-selected` reflecting the roving-tabindex selection. Exactly one treeitem carries `tabIndex={0}` at a time; the others carry `tabIndex={-1}`, so Tab lands in the tree once and arrow keys move the selection from there. ArrowLeft / ArrowRight move to the previous / next sibling (and swap between the two halves of a couple), ArrowUp / ArrowDown move to the parent / first child LayoutNode, and Home / End jump to the first / last person in DFS order. Movement updates both React state and DOM focus so the visible focus ring tracks the selection; click-driven focus changes leave a `shouldFocus` flag false so mouse users do not get a focus ring. New utility `src/utils/treeNavigation.ts` with 18 unit tests in `src/__tests__/treeNavigation.test.ts`; extended `treeNode.test.tsx` (2 new cases for the roving tabindex / aria-selected contract + onFocusChange wiring) and `genealogyTreeA11y.test.tsx` (5 new cases for the seeded tab stop, ArrowDown / ArrowLeft / End movement, the bail-out when the key target is outside the tree, and preventDefault on arrow keys).
 - **1.6.b Per-section `<section>` / `<article>` landmarks inside page bodies.** Page shells get `<main>` and `<nav>` via layout already; this is the inner-page-content landmark pass.
 - **1.6.c Focus management after tree node click.** After `router.push(/profile/[id])` lands, the new page should move focus to the main heading so keyboard users do not start back at the top of the page.
 - **1.6.d Run [axe DevTools](https://www.deque.com/axe/devtools/) and fix all critical / serious issues.**
 
-**Effort:** 4 to 6h spread across components for the remaining sub-items (1.6.a is most of it).
-**Reference:** [WAI-ARIA Authoring Practices](https://www.w3.org/WAI/ARIA/apg/)
+**Effort:** ~2h remaining (1.6.b + 1.6.c).
+**Reference:** [WAI-ARIA Authoring Practices — Tree View](https://www.w3.org/WAI/ARIA/apg/patterns/treeview/)
 
 ---
 
