@@ -10,15 +10,16 @@
 
 ## Next up
 
-**In priority order (refreshed 2026-05-18):**
+**In priority order (refreshed 2026-05-23):**
 
-1. **1.6.a Arrow-key navigation on the D3 tree.** Upgrade the tree to W3C tree-widget semantics (`role="tree"` / `role="treeitem"` with arrow-key roving tabindex). Largest remaining 1.6 sub-piece.
-2. **1.6.c Focus management after tree node click.** After `router.push(/profile/[id])`, move focus to the new page's main heading so keyboard users do not start back at the top of the page.
-3. **1.6.b Per-section `<section>` / `<article>` landmarks inside page bodies.** Page shells already get `<main>` and `<nav>` via layout; this is the inner-content landmark pass.
-4. **1.6.d Run [axe DevTools](https://www.deque.com/axe/devtools/)** and fix all critical / serious issues. Best done after 1.6.a to 1.6.c so the tree and landmark changes are reflected in the report.
-5. **T-15** — `middleware.ts` for route-level auth. Defense-in-depth on top of RLS.
-6. **1.4** — guided story prompts. Last unshipped Phase 1 engagement feature.
-7. **T-3** — extend `next/image` adoption beyond `ProfileAvatar`.
+1. **1.6.c Focus management after tree node click.** After `router.push(/profile/[id])`, move focus to the new page's main heading so keyboard users do not start back at the top of the page.
+2. **1.6.b Per-section `<section>` / `<article>` landmarks inside page bodies.** Page shells already get `<main>` and `<nav>` via layout; this is the inner-content landmark pass.
+3. **1.6.d Run [axe DevTools](https://www.deque.com/axe/devtools/)** and fix all critical / serious issues. Best done after 1.6.b to 1.6.c so the tree and landmark changes are reflected in the report.
+4. **T-15** — `middleware.ts` for route-level auth. Defense-in-depth on top of RLS.
+5. **1.4** — guided story prompts. Last unshipped Phase 1 engagement feature.
+6. **T-3** — extend `next/image` adoption beyond `ProfileAvatar`.
+
+~~1.6.a Arrow-key navigation on the D3 tree~~ — Done 2026-05-23 on `claude/keen-newton-cKTc3`. Tree wrapper now carries `role="tree"`; each interactive person is a `role="treeitem"` with `aria-level`, `aria-posinset`, `aria-setsize`. Roving tabindex keeps exactly one node at `tabindex=0`; ArrowUp/Down jump by row (closest x), ArrowLeft/Right walk the current row, Home/End jump to the first/last person, and Enter/Space still navigate. Coverage: existing `treeNode.test.tsx` updated and 11 new cases in `genealogyTreeA11y.test.tsx`.
 
 ---
 
@@ -151,12 +152,12 @@ See Completed log. **Open follow-ups:**
 
 **Remaining scope:**
 
-- **1.6.a Keyboard navigation on the D3 tree (arrow keys to move between nodes, beyond Enter / Space).** Would also upgrade the tree to W3C tree-widget semantics (`role="tree"` / `role="treeitem"` instead of `role="group"` / `role="button"`), since the tree role expects arrow-key roving tabindex.
+- ~~**1.6.a Keyboard navigation on the D3 tree (arrow keys to move between nodes, beyond Enter / Space).**~~ Done 2026-05-23 on `claude/keen-newton-cKTc3`. `GenealogyTree.tsx` now exposes the inner `<g>` as `role="tree"` and routes all keydown traffic to a single parent handler. `TreeNode.tsx` renders each interactive person as `role="treeitem"` with `aria-level` / `aria-posinset` / `aria-setsize` and a roving tabindex (only one item has `tabindex=0`). Arrow keys are 2D-spatial (Up/Down jump to the nearest-x person in the previous/next row; Left/Right walk the current row); Home / End jump to the first / last person; Enter / Space still navigate. Closures are deferred via a `pendingFocusRef` so DOM focus only moves on keyboard-initiated transitions, never on initial mount. Coverage: existing `treeNode.test.tsx` updated for the new contract, 11 new cases in `genealogyTreeA11y.test.tsx` for arrow / Home / End / preventDefault / no-op edge cases.
 - **1.6.b Per-section `<section>` / `<article>` landmarks inside page bodies.** Page shells get `<main>` and `<nav>` via layout already; this is the inner-page-content landmark pass.
 - **1.6.c Focus management after tree node click.** After `router.push(/profile/[id])` lands, the new page should move focus to the main heading so keyboard users do not start back at the top of the page.
 - **1.6.d Run [axe DevTools](https://www.deque.com/axe/devtools/) and fix all critical / serious issues.**
 
-**Effort:** 4 to 6h spread across components for the remaining sub-items (1.6.a is most of it).
+**Effort:** 2 to 3h spread across components for the remaining sub-items (1.6.a was the bulk).
 **Reference:** [WAI-ARIA Authoring Practices](https://www.w3.org/WAI/ARIA/apg/)
 
 ---

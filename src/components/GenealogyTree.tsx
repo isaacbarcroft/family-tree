@@ -1,6 +1,13 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, useCallback } from "react"
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+  type KeyboardEvent,
+} from "react"
 import { zoom as d3Zoom, zoomIdentity, type ZoomBehavior } from "d3-zoom"
 import { select } from "d3-selection"
 import type { TreeNode as TreeNodeData } from "@/utils/treeBuilder"
@@ -11,6 +18,7 @@ import {
   edgePath,
   flattenNodes,
   layoutTree,
+  type LayoutNode,
 } from "@/utils/treeLayout"
 import {
   AVATAR_CY,
@@ -21,6 +29,7 @@ import {
   COUPLE_RIGHT_CX,
   SINGLE_AVATAR_CX,
   TreeNode,
+  type PersonAriaMeta,
 } from "@/components/TreeNode"
 import { useRouter } from "next/navigation"
 
@@ -28,8 +37,70 @@ const AVATAR_R = 22
 const FIT_PADDING = 80
 const FIT_TOP_OFFSET = 40
 
+type FocusableItem = {
+  id: string
+  x: number
+  y: number
+}
+
 interface GenealogyTreeProps {
   treeData: TreeNodeData
+}
+
+function collectFocusableItems(nodes: LayoutNode[]): FocusableItem[] {
+  const items: FocusableItem[] = []
+  for (const node of nodes) {
+    const attrs = node.data.attributes ?? {}
+    const isCouple = !!attrs.spouseId
+    const nodeLeftX = node.x - node.w / 2
+    if (isCouple) {
+      if (attrs.id) {
+        items.push({ id: attrs.id, x: nodeLeftX + COUPLE_LEFT_CX, y: node.y })
+      }
+      if (attrs.spouseId) {
+        items.push({
+          id: attrs.spouseId,
+          x: nodeLeftX + COUPLE_RIGHT_CX,
+          y: node.y,
+        })
+      }
+      continue
+    }
+    if (attrs.id) items.push({ id: attrs.id, x: node.x, y: node.y })
+  }
+  items.sort((a, b) => {
+    if (a.y !== b.y) return a.y - b.y
+    return a.x - b.x
+  })
+  return items
+}
+
+// aria-level / posinset / setsize for each interactive person. The synthetic
+// family-root layout node (no id, no spouseId) is treated as level 0 so the
+// first real generation lands at level 1; trees rooted on a real person start
+// that person at level 1 directly.
+function collectAriaMeta(layout: LayoutNode): Map<string, PersonAriaMeta> {
+  const map = new Map<string, PersonAriaMeta>()
+  const rootAttrs = layout.data.attributes ?? {}
+  const rootIsSynthetic = !rootAttrs.id && !rootAttrs.spouseId
+
+  function walk(
+    node: LayoutNode,
+    level: number,
+    posInSet: number,
+    setSize: number,
+  ) {
+    const attrs = node.data.attributes ?? {}
+    if (attrs.id) map.set(attrs.id, { level, posInSet, setSize })
+    if (attrs.spouseId) map.set(attrs.spouseId, { level, posInSet, setSize })
+    const children = node.children
+    for (let i = 0; i < children.length; i++) {
+      walk(children[i], level + 1, i + 1, children.length)
+    }
+  }
+
+  walk(layout, rootIsSynthetic ? 0 : 1, 1, 1)
+  return map
 }
 
 export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
@@ -38,6 +109,11 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const zoomBehaviorRef = useRef<ZoomBehavior<SVGSVGElement, unknown> | null>(null)
   const initialFitDoneRef = useRef(false)
+  const nodeElementsRef = useRef<Map<string, SVGGElement>>(new Map())
+  // Only re-focus the DOM when the focusedId change was triggered by an
+  // arrow / Home / End key. Tracking the requested id here prevents the
+  // initial mount (and any clean re-render) from stealing page focus.
+  const pendingFocusRef = useRef<string | null>(null)
   const [dims, setDims] = useState({ width: 0, height: 0 })
   const router = useRouter()
 
@@ -45,6 +121,21 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
   const nodes = useMemo(() => flattenNodes(layout), [layout])
   const edges = useMemo(() => collectEdges(layout), [layout])
   const bounds = useMemo(() => computeBounds(nodes), [nodes])
+  const focusableItems = useMemo(() => collectFocusableItems(nodes), [nodes])
+  const ariaMetaMap = useMemo(() => collectAriaMeta(layout), [layout])
+
+  const [focusedId, setFocusedId] = useState<string | null>(null)
+
+  // Roving-tabindex source of truth: when the stored id is missing from the
+  // current layout (initial mount, or tree data swap), fall back to the first
+  // focusable item. Deriving avoids a setState-in-effect cascade.
+  const effectiveFocusedId = useMemo(() => {
+    if (focusableItems.length === 0) return null
+    if (focusedId !== null && focusableItems.some((i) => i.id === focusedId)) {
+      return focusedId
+    }
+    return focusableItems[0].id
+  }, [focusableItems, focusedId])
 
   // Reset the initial-fit flag whenever the tree data changes so the new tree gets centered.
   useEffect(() => {
@@ -119,6 +210,16 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
     initialFitDoneRef.current = true
   }, [bounds, dims, fitToView])
 
+  // After a keyboard-driven focus change, move DOM focus to the new treeitem.
+  useEffect(() => {
+    const target = pendingFocusRef.current
+    if (target === null) return
+    if (target !== effectiveFocusedId) return
+    const el = nodeElementsRef.current.get(target)
+    if (el) el.focus()
+    pendingFocusRef.current = null
+  }, [effectiveFocusedId])
+
   const handleResetView = useCallback(() => {
     fitToView()
   }, [fitToView])
@@ -128,6 +229,103 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
       router.push(`/profile/${personId}`)
     },
     [router]
+  )
+
+  const registerNodeRef = useCallback(
+    (personId: string, el: SVGGElement | null) => {
+      if (!el) {
+        nodeElementsRef.current.delete(personId)
+        return
+      }
+      nodeElementsRef.current.set(personId, el)
+    },
+    [],
+  )
+
+  const ariaMetaFor = useCallback(
+    (personId: string): PersonAriaMeta => {
+      return ariaMetaMap.get(personId) ?? { level: 1, posInSet: 1, setSize: 1 }
+    },
+    [ariaMetaMap],
+  )
+
+  const moveFocus = useCallback((id: string) => {
+    pendingFocusRef.current = id
+    setFocusedId(id)
+  }, [])
+
+  // Arrow-key navigation across the 2D tree layout. Up / Down jump rows by
+  // y-coordinate (closest x); Left / Right step within the same row;
+  // Home / End jump to the first / last person in reading order.
+  const handlePersonKeyDown = useCallback(
+    (personId: string, e: KeyboardEvent<SVGGElement>) => {
+      const key = e.key
+
+      if (key === "Enter" || key === " ") {
+        e.preventDefault()
+        navigateToProfile(personId)
+        return
+      }
+
+      const isArrow =
+        key === "ArrowUp" ||
+        key === "ArrowDown" ||
+        key === "ArrowLeft" ||
+        key === "ArrowRight"
+      if (!isArrow && key !== "Home" && key !== "End") return
+
+      e.preventDefault()
+
+      if (focusableItems.length === 0) return
+      const currentIdx = focusableItems.findIndex((i) => i.id === personId)
+      if (currentIdx === -1) return
+      const current = focusableItems[currentIdx]
+
+      if (key === "Home") {
+        moveFocus(focusableItems[0].id)
+        return
+      }
+      if (key === "End") {
+        moveFocus(focusableItems[focusableItems.length - 1].id)
+        return
+      }
+
+      if (key === "ArrowRight" || key === "ArrowLeft") {
+        const sameRow = focusableItems.filter((i) => i.y === current.y)
+        const rowIdx = sameRow.findIndex((i) => i.id === personId)
+        if (rowIdx === -1) return
+        if (key === "ArrowRight" && rowIdx < sameRow.length - 1) {
+          moveFocus(sameRow[rowIdx + 1].id)
+          return
+        }
+        if (key === "ArrowLeft" && rowIdx > 0) {
+          moveFocus(sameRow[rowIdx - 1].id)
+          return
+        }
+        return
+      }
+
+      const goingDown = key === "ArrowDown"
+      const candidates = focusableItems.filter((i) =>
+        goingDown ? i.y > current.y : i.y < current.y,
+      )
+      if (candidates.length === 0) return
+
+      let targetY = candidates[0].y
+      for (const c of candidates) {
+        if (goingDown && c.y < targetY) targetY = c.y
+        if (!goingDown && c.y > targetY) targetY = c.y
+      }
+      const row = candidates.filter((c) => c.y === targetY)
+      let closest = row[0]
+      for (const c of row) {
+        if (Math.abs(c.x - current.x) < Math.abs(closest.x - current.x)) {
+          closest = c
+        }
+      }
+      moveFocus(closest.id)
+    },
+    [focusableItems, moveFocus, navigateToProfile],
   )
 
   return (
@@ -163,8 +361,8 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
         </defs>
         <g
           ref={gRef}
-          role="group"
-          aria-label="Family tree. Press Tab to move between people, then Enter or Space to open a profile."
+          role="tree"
+          aria-label="Family tree. Press Tab to enter, arrow keys to move between people, Home or End to jump to the first or last, Enter or Space to open a profile."
         >
           {/* Edges — purely decorative connecting lines, hidden from assistive tech. */}
           {edges.map((e, i) => (
@@ -181,7 +379,15 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
 
           {/* Nodes */}
           {nodes.map((node, i) => (
-            <TreeNode key={i} node={node} onNavigate={navigateToProfile} />
+            <TreeNode
+              key={i}
+              node={node}
+              onNavigate={navigateToProfile}
+              focusedId={effectiveFocusedId}
+              onPersonKeyDown={handlePersonKeyDown}
+              registerRef={registerNodeRef}
+              ariaMetaFor={ariaMetaFor}
+            />
           ))}
         </g>
       </svg>

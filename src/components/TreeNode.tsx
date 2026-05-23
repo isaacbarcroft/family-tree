@@ -9,17 +9,6 @@ import { formatDate } from "@/utils/dates"
 const AVATAR_R = 22
 const MARRIAGE_BAR = 20
 
-// Enter and Space activate buttons per the WAI-ARIA button pattern.
-// preventDefault on Space stops the browser from scrolling the page.
-function handleKeyActivate(
-  e: KeyboardEvent<SVGGElement>,
-  activate: () => void,
-) {
-  if (e.key !== "Enter" && e.key !== " ") return
-  e.preventDefault()
-  activate()
-}
-
 // Shared <clipPath> ids defined once in GenealogyTree's <defs>. The default
 // clipPathUnits="userSpaceOnUse" resolves the clip in the referencing element's
 // local coordinate system, so a single definition works for every node.
@@ -31,6 +20,12 @@ export const SINGLE_AVATAR_CX = AVATAR_R + 12
 export const COUPLE_LEFT_CX = NODE_H / 2 + 8
 export const COUPLE_RIGHT_CX = COUPLE_W - NODE_H / 2 - 8
 export const AVATAR_CY = NODE_H / 2
+
+export type PersonAriaMeta = {
+  level: number
+  posInSet: number
+  setSize: number
+}
 
 function getInitials(name: string): string {
   return name
@@ -45,9 +40,20 @@ function getInitials(name: string): string {
 interface TreeNodeProps {
   node: LayoutNode
   onNavigate: (personId: string) => void
+  focusedId: string | null
+  onPersonKeyDown: (personId: string, e: KeyboardEvent<SVGGElement>) => void
+  registerRef: (personId: string, el: SVGGElement | null) => void
+  ariaMetaFor: (personId: string) => PersonAriaMeta
 }
 
-function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
+function TreeNodeComponent({
+  node,
+  onNavigate,
+  focusedId,
+  onPersonKeyDown,
+  registerRef,
+  ariaMetaFor,
+}: TreeNodeProps) {
   const attrs = node.data.attributes ?? {}
   const isCouple = !!attrs.spouseId
   const isRoot = !attrs.id && !attrs.spouseId
@@ -80,8 +86,8 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
     const photo2 = attrs.spousePhoto
     const leftId = attrs.id
     const rightId = attrs.spouseId
-    const activateLeft = leftId ? () => onNavigate(leftId) : undefined
-    const activateRight = rightId ? () => onNavigate(rightId) : undefined
+    const leftMeta = leftId ? ariaMetaFor(leftId) : null
+    const rightMeta = rightId ? ariaMetaFor(rightId) : null
 
     return (
       <g transform={`translate(${nodeX}, ${nodeY})`}>
@@ -96,14 +102,20 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
 
         {/* Left person */}
         <g
-          onClick={activateLeft}
+          ref={(el) => {
+            if (leftId) registerRef(leftId, el)
+          }}
+          onClick={leftId ? () => onNavigate(leftId) : undefined}
           onKeyDown={
-            activateLeft ? (e) => handleKeyActivate(e, activateLeft) : undefined
+            leftId ? (e) => onPersonKeyDown(leftId, e) : undefined
           }
-          role={activateLeft ? "button" : undefined}
-          tabIndex={activateLeft ? 0 : -1}
-          aria-label={activateLeft ? `Open profile for ${name1}` : undefined}
-          className={activateLeft ? "tree-node-interactive" : undefined}
+          role={leftId ? "treeitem" : undefined}
+          tabIndex={leftId ? (focusedId === leftId ? 0 : -1) : undefined}
+          aria-label={leftId ? `Open profile for ${name1}` : undefined}
+          aria-level={leftMeta?.level}
+          aria-posinset={leftMeta?.posInSet}
+          aria-setsize={leftMeta?.setSize}
+          className={leftId ? "tree-node-interactive" : undefined}
           style={{ cursor: "pointer" }}
         >
           {photo1 ? (
@@ -146,16 +158,20 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
 
         {/* Right person (spouse) */}
         <g
-          onClick={activateRight}
+          ref={(el) => {
+            if (rightId) registerRef(rightId, el)
+          }}
+          onClick={rightId ? () => onNavigate(rightId) : undefined}
           onKeyDown={
-            activateRight
-              ? (e) => handleKeyActivate(e, activateRight)
-              : undefined
+            rightId ? (e) => onPersonKeyDown(rightId, e) : undefined
           }
-          role={activateRight ? "button" : undefined}
-          tabIndex={activateRight ? 0 : -1}
-          aria-label={activateRight ? `Open profile for ${name2}` : undefined}
-          className={activateRight ? "tree-node-interactive" : undefined}
+          role={rightId ? "treeitem" : undefined}
+          tabIndex={rightId ? (focusedId === rightId ? 0 : -1) : undefined}
+          aria-label={rightId ? `Open profile for ${name2}` : undefined}
+          aria-level={rightMeta?.level}
+          aria-posinset={rightMeta?.posInSet}
+          aria-setsize={rightMeta?.setSize}
+          className={rightId ? "tree-node-interactive" : undefined}
           style={{ cursor: "pointer" }}
         >
           {photo2 ? (
@@ -192,7 +208,7 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
   const photo = attrs.photo
   const birthStr = attrs.birth ? formatDate(attrs.birth) : ""
   const deathStr = attrs.death ? formatDate(attrs.death) : ""
-  const activate = personId ? () => onNavigate(personId) : undefined
+  const meta = personId ? ariaMetaFor(personId) : null
   const dateLabel = (() => {
     if (isDeceased && birthStr && deathStr) return `, ${birthStr} to ${deathStr}`
     if (birthStr) return `, born ${birthStr}`
@@ -201,16 +217,24 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
 
   return (
     <g
+      ref={(el) => {
+        if (personId) registerRef(personId, el)
+      }}
       transform={`translate(${nodeX}, ${nodeY})`}
-      onClick={activate}
-      onKeyDown={activate ? (e) => handleKeyActivate(e, activate) : undefined}
-      role={activate ? "button" : undefined}
-      tabIndex={activate ? 0 : -1}
-      aria-label={
-        activate ? `Open profile for ${node.data.name}${dateLabel}` : undefined
+      onClick={personId ? () => onNavigate(personId) : undefined}
+      onKeyDown={
+        personId ? (e) => onPersonKeyDown(personId, e) : undefined
       }
-      className={activate ? "tree-node-interactive" : undefined}
-      style={{ cursor: activate ? "pointer" : "default" }}
+      role={personId ? "treeitem" : undefined}
+      tabIndex={personId ? (focusedId === personId ? 0 : -1) : undefined}
+      aria-label={
+        personId ? `Open profile for ${node.data.name}${dateLabel}` : undefined
+      }
+      aria-level={meta?.level}
+      aria-posinset={meta?.posInSet}
+      aria-setsize={meta?.setSize}
+      className={personId ? "tree-node-interactive" : undefined}
+      style={{ cursor: personId ? "pointer" : "default" }}
     >
       <rect
         width={NODE_W}
