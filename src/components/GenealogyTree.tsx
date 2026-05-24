@@ -1,16 +1,18 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, useCallback } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { zoom as d3Zoom, zoomIdentity, type ZoomBehavior } from "d3-zoom"
 import { select } from "d3-selection"
 import type { TreeNode as TreeNodeData } from "@/utils/treeBuilder"
 import { GENEALOGY_TREE_HEIGHT } from "@/config/constants"
 import {
+  buildTreeNavigation,
   collectEdges,
   computeBounds,
   edgePath,
   flattenNodes,
   layoutTree,
+  type TreeNavigation,
 } from "@/utils/treeLayout"
 import {
   AVATAR_CY,
@@ -21,6 +23,7 @@ import {
   COUPLE_RIGHT_CX,
   SINGLE_AVATAR_CX,
   TreeNode,
+  type TreeArrowKey,
 } from "@/components/TreeNode"
 import { useRouter } from "next/navigation"
 
@@ -30,6 +33,21 @@ const FIT_TOP_OFFSET = 40
 
 interface GenealogyTreeProps {
   treeData: TreeNodeData
+}
+
+function resolveArrowTarget(
+  navigation: TreeNavigation,
+  currentId: string,
+  key: TreeArrowKey,
+): string | null {
+  const item = navigation.byId.get(currentId)
+  if (!item) return null
+  if (key === "ArrowUp") return item.prevInDomOrder
+  if (key === "ArrowDown") return item.nextInDomOrder
+  if (key === "ArrowLeft") return item.parentId
+  if (key === "ArrowRight") return item.firstChildId
+  if (key === "Home") return navigation.items[0]?.id ?? null
+  return navigation.items[navigation.items.length - 1]?.id ?? null
 }
 
 export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
@@ -45,6 +63,35 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
   const nodes = useMemo(() => flattenNodes(layout), [layout])
   const edges = useMemo(() => collectEdges(layout), [layout])
   const bounds = useMemo(() => computeBounds(nodes), [nodes])
+  const navigation = useMemo(() => buildTreeNavigation(layout), [layout])
+
+  // Roving tabindex: exactly one treeitem holds tabIndex=0. The focused item
+  // tracks where keyboard arrow navigation will move from next. itemRefs maps
+  // person id → the SVG <g> that should receive .focus() on programmatic moves.
+  const [focusedItemId, setFocusedItemId] = useState<string | null>(
+    () => navigation.items[0]?.id ?? null,
+  )
+  const [prevNavigation, setPrevNavigation] = useState<TreeNavigation>(navigation)
+  if (prevNavigation !== navigation) {
+    setPrevNavigation(navigation)
+    if (!focusedItemId || !navigation.byId.has(focusedItemId)) {
+      setFocusedItemId(navigation.items[0]?.id ?? null)
+    }
+  }
+
+  const itemRefs = useRef<Map<string, SVGGElement>>(new Map())
+  const pendingFocusRef = useRef<string | null>(null)
+
+  const registerItemRef = useCallback(
+    (personId: string, el: SVGGElement | null) => {
+      if (el) {
+        itemRefs.current.set(personId, el)
+        return
+      }
+      itemRefs.current.delete(personId)
+    },
+    [],
+  )
 
   // Reset the initial-fit flag whenever the tree data changes so the new tree gets centered.
   useEffect(() => {
@@ -130,6 +177,35 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
     [router]
   )
 
+  const handleArrowKey = useCallback(
+    (currentId: string, key: TreeArrowKey) => {
+      const nextId = resolveArrowTarget(navigation, currentId, key)
+      if (!nextId || nextId === currentId) return
+      pendingFocusRef.current = nextId
+      setFocusedItemId(nextId)
+    },
+    [navigation],
+  )
+
+  // After a roving-tabindex update lands in the DOM, move keyboard focus to
+  // the newly-active treeitem. Guarded so onFocus-driven focusedItemId updates
+  // (which happen after the browser already moved focus) do not re-focus.
+  useEffect(() => {
+    if (!focusedItemId) return
+    if (pendingFocusRef.current !== focusedItemId) return
+    pendingFocusRef.current = null
+    itemRefs.current.get(focusedItemId)?.focus()
+  }, [focusedItemId])
+
+  const handleItemFocus = useCallback((personId: string) => {
+    setFocusedItemId(personId)
+  }, [])
+
+  const getItemMeta = useCallback(
+    (personId: string) => navigation.byId.get(personId),
+    [navigation],
+  )
+
   return (
     <div
       ref={containerRef}
@@ -163,8 +239,8 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
         </defs>
         <g
           ref={gRef}
-          role="group"
-          aria-label="Family tree. Press Tab to move between people, then Enter or Space to open a profile."
+          role="tree"
+          aria-label="Family tree. Use arrow keys to move between people. Press Enter or Space to open a profile."
         >
           {/* Edges — purely decorative connecting lines, hidden from assistive tech. */}
           {edges.map((e, i) => (
@@ -181,7 +257,16 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
 
           {/* Nodes */}
           {nodes.map((node, i) => (
-            <TreeNode key={i} node={node} onNavigate={navigateToProfile} />
+            <TreeNode
+              key={i}
+              node={node}
+              onNavigate={navigateToProfile}
+              focusedItemId={focusedItemId}
+              onArrowKey={handleArrowKey}
+              onItemFocus={handleItemFocus}
+              registerItemRef={registerItemRef}
+              getItemMeta={getItemMeta}
+            />
           ))}
         </g>
       </svg>

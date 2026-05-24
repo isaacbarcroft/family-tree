@@ -134,3 +134,141 @@ export function edgePath(e: Edge): string {
   const midY = e.parentY + (e.childY - e.parentY) / 2
   return `M ${e.parentX} ${e.parentY} L ${e.parentX} ${midY} L ${e.childX} ${midY} L ${e.childX} ${e.childY}`
 }
+
+// Per-treeitem navigation metadata for the W3C tree-widget pattern. Captures
+// the four arrow-key targets (parent / firstChild / prev-in-DOM / next-in-DOM),
+// plus the aria-level / aria-posinset / aria-setsize attributes assistive tech
+// needs to announce position within the tree.
+export interface TreeItem {
+  id: string
+  parentId: string | null
+  firstChildId: string | null
+  prevInDomOrder: string | null
+  nextInDomOrder: string | null
+  level: number
+  posInSet: number
+  setSize: number
+}
+
+export interface TreeNavigation {
+  items: TreeItem[]
+  byId: Map<string, TreeItem>
+}
+
+function itemIdsForNode(node: LayoutNode): string[] {
+  const attrs = node.data.attributes ?? {}
+  const isCouple = !!attrs.spouseId
+  if (isCouple) {
+    const ids: string[] = []
+    if (attrs.id) ids.push(attrs.id)
+    if (attrs.spouseId) ids.push(attrs.spouseId)
+    return ids
+  }
+  return attrs.id ? [attrs.id] : []
+}
+
+// Build the roving-tabindex / arrow-navigation map for a laid-out family tree.
+// Visits LayoutNodes depth-first pre-order so items appear in DOM order, and
+// for couples emits the left-half id before the right-half id. Non-interactive
+// layout nodes (the synthetic family-root with no person id) are skipped for
+// item emission but still traversed so deeper subtrees are reached.
+export function buildTreeNavigation(root: LayoutNode): TreeNavigation {
+  type NodeMeta = { items: string[]; parent: LayoutNode | null }
+  const meta = new Map<LayoutNode, NodeMeta>()
+
+  function indexLayout(node: LayoutNode, parent: LayoutNode | null) {
+    meta.set(node, { items: itemIdsForNode(node), parent })
+    for (const c of node.children) indexLayout(c, node)
+  }
+  indexLayout(root, null)
+
+  function firstItemIdOf(node: LayoutNode): string | null {
+    const ids = meta.get(node)?.items ?? []
+    return ids[0] ?? null
+  }
+
+  function nearestAncestorFirstItem(node: LayoutNode): string | null {
+    let p = meta.get(node)?.parent ?? null
+    while (p) {
+      const id = firstItemIdOf(p)
+      if (id) return id
+      p = meta.get(p)?.parent ?? null
+    }
+    return null
+  }
+
+  function levelOf(node: LayoutNode): number {
+    let count = 1
+    let p = meta.get(node)?.parent ?? null
+    while (p) {
+      if ((meta.get(p)?.items ?? []).length > 0) count++
+      p = meta.get(p)?.parent ?? null
+    }
+    return count
+  }
+
+  // The first child-side item for any treeitem in `node`. Walks into
+  // non-interactive descendants so a synthetic-only branch still resolves.
+  function firstChildItemIdOf(node: LayoutNode): string | null {
+    for (const c of node.children) {
+      const id = firstItemIdOf(c)
+      if (id) return id
+      const deeper = firstChildItemIdOf(c)
+      if (deeper) return deeper
+    }
+    return null
+  }
+
+  const items: TreeItem[] = []
+  const byId = new Map<string, TreeItem>()
+
+  function emit(node: LayoutNode) {
+    const nodeMeta = meta.get(node)
+    if (!nodeMeta) return
+    const ids = nodeMeta.items
+    if (ids.length > 0) {
+      const parentId = nearestAncestorFirstItem(node)
+      const level = levelOf(node)
+      const firstChildId = firstChildItemIdOf(node)
+      for (const id of ids) {
+        const prev = items[items.length - 1]
+        const item: TreeItem = {
+          id,
+          parentId,
+          firstChildId,
+          prevInDomOrder: prev?.id ?? null,
+          nextInDomOrder: null,
+          level,
+          posInSet: 0,
+          setSize: 0,
+        }
+        if (prev) prev.nextInDomOrder = id
+        items.push(item)
+        byId.set(id, item)
+      }
+    }
+    for (const c of node.children) emit(c)
+  }
+  emit(root)
+
+  // Compute posInSet / setSize by grouping items that share (parentId, level)
+  // — those are the W3C-level "siblings" under the same tree parent.
+  const groups = new Map<string, TreeItem[]>()
+  for (const it of items) {
+    const key = `${it.parentId ?? "<root>"}::${it.level}`
+    const existing = groups.get(key)
+    if (existing) {
+      existing.push(it)
+      continue
+    }
+    groups.set(key, [it])
+  }
+  for (const group of groups.values()) {
+    for (let i = 0; i < group.length; i++) {
+      group[i].posInSet = i + 1
+      group[i].setSize = group.length
+    }
+  }
+
+  return { items, byId }
+}

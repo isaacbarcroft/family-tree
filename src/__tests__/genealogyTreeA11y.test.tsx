@@ -67,14 +67,14 @@ describe("GenealogyTree accessibility", () => {
     }
   })
 
-  it("labels the inner tree group with role and a usage hint", () => {
+  it("labels the inner tree group with role=tree and an arrow-key usage hint", () => {
     const { container } = render(<GenealogyTree treeData={tree()} />)
 
-    const labelled = container.querySelector('g[role="group"]')
+    const labelled = container.querySelector('g[role="tree"]')
     expect(labelled).not.toBeNull()
     const label = labelled?.getAttribute("aria-label") ?? ""
     expect(label).toContain("Family tree")
-    expect(label).toContain("Tab")
+    expect(label.toLowerCase()).toContain("arrow")
     expect(label).toMatch(/Enter|Space/)
   })
 
@@ -96,15 +96,22 @@ describe("GenealogyTree accessibility", () => {
     }
   })
 
-  it("keeps interactive person nodes focusable inside the labelled group", () => {
+  it("keeps interactive person nodes focusable inside the labelled tree", () => {
     const { container } = render(<GenealogyTree treeData={tree()} />)
 
-    const group = container.querySelector('g[role="group"]')
-    expect(group).not.toBeNull()
-    const buttons = group?.querySelectorAll('g[role="button"]')
-    expect(buttons?.length ?? 0).toBeGreaterThan(0)
-    for (const btn of Array.from(buttons ?? [])) {
-      expect(btn.getAttribute("tabindex")).toBe("0")
-    }
+    const treeGroup = container.querySelector('g[role="tree"]')
+    expect(treeGroup).not.toBeNull()
+    const items = treeGroup?.querySelectorAll('g[role="treeitem"]')
+    expect(items?.length ?? 0).toBeGreaterThan(0)
+  })
+
+  it("applies a roving tabindex with exactly one treeitem at tabIndex=0", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+
+    const items = Array.from(container.querySelectorAll('g[role="treeitem"]'))
+    const zeros = items.filter((el) => el.getAttribute("tabindex") === "0")
+    const minusOnes = items.filter((el) => el.getAttribute("tabindex") === "-1")
+    expect(zeros.length).toBe(1)
+    expect(zeros.length + minusOnes.length).toBe(items.length)
   })
 })
