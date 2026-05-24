@@ -3,7 +3,9 @@ import { Fraunces, Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/AuthProvider";
 import NavBar from "@/components/NavBar";
+import { RouteFocusManager } from "@/components/RouteFocusManager";
 import { ThemeScript } from "@/components/ThemeScript";
+import { MAIN_LANDMARK_ID } from "@/config/constants";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
@@ -42,7 +44,8 @@ export default function RootLayout({
       <body>
         <AuthProvider>
           <NavBar />
-          <main>{children}</main>
+          <RouteFocusManager />
+          <main id={MAIN_LANDMARK_ID} tabIndex={-1}>{children}</main>
         </AuthProvider>
       </body>
     </html>

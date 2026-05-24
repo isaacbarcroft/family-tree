@@ -138,6 +138,16 @@ body {
   border-radius: 4px;
 }
 
+/* The <main> landmark receives programmatic focus after route navigation
+   (see RouteFocusManager) so screen readers re-anchor at the new page's
+   content. It's not an interactive control, so suppress the visible ring —
+   keyboard users still see focus move because the next Tab starts from
+   inside <main>. */
+main:focus,
+main:focus-visible {
+  outline: none;
+}
+
 /* ---------------------------------------------------------------------------
    Typographic helpers — used directly in JSX where semantic types are needed
    --------------------------------------------------------------------------- */

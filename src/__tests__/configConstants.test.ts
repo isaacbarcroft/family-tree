@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest"
 import {
   GENEALOGY_TREE_HEIGHT,
   HOME_RECENT,
+  MAIN_LANDMARK_ID,
   NOMINATIM_MIN_MS_BETWEEN_CALLS,
   PAGE_SIZE,
   PLACES_MAP_HEIGHT,
@@ -53,5 +54,15 @@ describe("config/constants GENEALOGY_TREE_HEIGHT", () => {
   it("is a non-empty CSS length string", () => {
     expect(typeof GENEALOGY_TREE_HEIGHT).toBe("string")
     expect(GENEALOGY_TREE_HEIGHT).toMatch(/^\d+(?:\.\d+)?(?:px|vh|rem|em|%)$/)
+  })
+})
+
+describe("config/constants MAIN_LANDMARK_ID", () => {
+  it("is a non-empty, CSS-id-safe string", () => {
+    // Used as both an HTML id and the target of document.getElementById in
+    // RouteFocusManager — keep it safe across both consumers.
+    expect(typeof MAIN_LANDMARK_ID).toBe("string")
+    expect(MAIN_LANDMARK_ID.length).toBeGreaterThan(0)
+    expect(MAIN_LANDMARK_ID).toMatch(/^[a-zA-Z][\w-]*$/)
   })
 })
