@@ -49,3 +49,11 @@ export const PLACES_MAP_HEIGHT = "70vh"
  * the page.
  */
 export const GENEALOGY_TREE_HEIGHT = "85vh"
+
+/**
+ * DOM id of the top-level <main> landmark in the root layout. Used by
+ * RouteFocusManager to move focus after client-side navigation so keyboard
+ * and screen-reader users land at the start of the new page's content
+ * instead of staying on the now-replaced node (or losing focus entirely).
+ */
+export const MAIN_LANDMARK_ID = "main-content"
