@@ -7,6 +7,17 @@ interface ConfirmDialogProps {
   cancelLabel?: string
 }
 
+const baseButtonStyle = {
+  background: "transparent",
+  border: "none",
+  cursor: "pointer",
+  fontFamily: "var(--font-body)",
+  fontSize: 13,
+  padding: "4px 10px",
+  borderRadius: 6,
+  lineHeight: 1.2,
+} as const
+
 export default function ConfirmDialog({
   onConfirm,
   onCancel,
@@ -14,16 +25,34 @@ export default function ConfirmDialog({
   cancelLabel = "No",
 }: ConfirmDialogProps) {
   return (
-    <div className="flex gap-1 bg-gray-950 rounded-lg p-1">
+    <div
+      className="flex items-center gap-0.5 rounded-lg p-1"
+      style={{
+        background: "var(--paper)",
+        border: "1px solid var(--hairline-strong)",
+        boxShadow: "var(--shadow-sm)",
+      }}
+    >
       <button
+        type="button"
         onClick={onConfirm}
-        className="text-red-400 hover:text-red-300 text-sm px-2 py-1 rounded hover:bg-gray-800 transition"
+        className="confirm-dialog-btn"
+        style={{
+          ...baseButtonStyle,
+          color: "var(--clay-deep)",
+          fontWeight: 500,
+        }}
       >
         {confirmLabel}
       </button>
       <button
+        type="button"
         onClick={onCancel}
-        className="text-gray-400 hover:text-white text-sm px-2 py-1 rounded hover:bg-gray-800 transition"
+        className="confirm-dialog-btn"
+        style={{
+          ...baseButtonStyle,
+          color: "var(--ink-2)",
+        }}
       >
         {cancelLabel}
       </button>
