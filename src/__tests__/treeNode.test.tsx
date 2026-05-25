@@ -204,16 +204,17 @@ describe("TreeNode", () => {
     expect(TreeNode.displayName).toBe("TreeNode")
   })
 
-  it("exposes a single-person node as a focusable button to assistive tech", () => {
+  it("exposes a single-person node as a focusable treeitem to assistive tech", () => {
     const layout = singleLayoutNode({ id: "p1" }, "Alice Smith")
 
     const { container } = renderInSvg(
-      <TreeNode node={layout} onNavigate={() => {}} />,
+      <TreeNode node={layout} onNavigate={() => {}} focusedPersonId="p1" />,
     )
 
     const group = container.querySelector("g[transform]")
-    expect(group?.getAttribute("role")).toBe("button")
+    expect(group?.getAttribute("role")).toBe("treeitem")
     expect(group?.getAttribute("tabindex")).toBe("0")
+    expect(group?.getAttribute("aria-level")).toBe("1")
     expect(group?.getAttribute("aria-label")).toBe(
       "Open profile for Alice Smith",
     )
@@ -299,24 +300,52 @@ describe("TreeNode", () => {
     expect(group?.getAttribute("aria-label")).toBeNull()
   })
 
-  it("exposes both halves of a couple as focusable buttons with per-half labels", () => {
+  it("exposes both halves of a couple as focusable treeitems with per-half labels", () => {
     const layout = coupleLayoutNode(
       { id: "p1", spouseId: "p2" },
       "Alice & Bob Smith",
     )
 
     const { container } = renderInSvg(
-      <TreeNode node={layout} onNavigate={() => {}} />,
+      <TreeNode node={layout} onNavigate={() => {}} focusedPersonId="p1" />,
     )
 
     const halves = Array.from(container.querySelectorAll("g")).filter(
-      (g) => g.getAttribute("role") === "button",
+      (g) => g.getAttribute("role") === "treeitem",
     )
     expect(halves.length).toBe(2)
-    expect(halves[0].getAttribute("tabindex")).toBe("0")
-    expect(halves[1].getAttribute("tabindex")).toBe("0")
     expect(halves[0].getAttribute("aria-label")).toBe("Open profile for Alice")
     expect(halves[1].getAttribute("aria-label")).toBe("Open profile for Bob Smith")
+    expect(halves[0].getAttribute("aria-level")).toBe("1")
+    expect(halves[1].getAttribute("aria-level")).toBe("1")
+  })
+
+  it("applies roving tabindex: only the focused half of a couple has tabindex 0", () => {
+    const layout = coupleLayoutNode(
+      { id: "p1", spouseId: "p2" },
+      "Alice & Bob Smith",
+    )
+
+    const { container } = renderInSvg(
+      <TreeNode node={layout} onNavigate={() => {}} focusedPersonId="p2" />,
+    )
+
+    const halves = Array.from(container.querySelectorAll("g")).filter(
+      (g) => g.getAttribute("role") === "treeitem",
+    )
+    const tabIndexes = halves.map((g) => g.getAttribute("tabindex"))
+    expect(tabIndexes).toEqual(["-1", "0"])
+  })
+
+  it("marks a single-person node tabindex -1 when another person is focused", () => {
+    const layout = singleLayoutNode({ id: "p1" }, "Alice Smith")
+
+    const { container } = renderInSvg(
+      <TreeNode node={layout} onNavigate={() => {}} focusedPersonId="p2" />,
+    )
+
+    const group = container.querySelector("g[transform]")
+    expect(group?.getAttribute("tabindex")).toBe("-1")
   })
 
   it("activates each couple half independently on Enter", () => {
@@ -327,11 +356,11 @@ describe("TreeNode", () => {
     )
 
     const { container } = renderInSvg(
-      <TreeNode node={layout} onNavigate={onNavigate} />,
+      <TreeNode node={layout} onNavigate={onNavigate} focusedPersonId="p1" />,
     )
 
     const halves = Array.from(container.querySelectorAll("g")).filter(
-      (g) => g.getAttribute("role") === "button",
+      (g) => g.getAttribute("role") === "treeitem",
     )
     fireEvent.keyDown(halves[0], { key: "Enter" })
     fireEvent.keyDown(halves[1], { key: "Enter" })
@@ -348,17 +377,83 @@ describe("TreeNode", () => {
     )
 
     const { container: c1 } = renderInSvg(
-      <TreeNode node={single} onNavigate={onNavigate} />,
+      <TreeNode node={single} onNavigate={onNavigate} focusedPersonId="p1" />,
     )
     const { container: c2 } = renderInSvg(
-      <TreeNode node={couple} onNavigate={onNavigate} />,
+      <TreeNode node={couple} onNavigate={onNavigate} focusedPersonId="p1" />,
     )
 
     expect(
-      c1.querySelector("g.tree-node-interactive[role='button']"),
+      c1.querySelector("g.tree-node-interactive[role='treeitem']"),
     ).not.toBeNull()
     expect(
-      c2.querySelectorAll("g.tree-node-interactive[role='button']").length,
+      c2.querySelectorAll("g.tree-node-interactive[role='treeitem']").length,
     ).toBe(2)
+  })
+
+  it("forwards arrow keys to onArrowKey and suppresses default scrolling", () => {
+    const onArrowKey = vi.fn()
+    const layout = singleLayoutNode({ id: "p1" }, "Alice Smith")
+
+    const { container } = renderInSvg(
+      <TreeNode
+        node={layout}
+        onNavigate={() => {}}
+        focusedPersonId="p1"
+        onArrowKey={onArrowKey}
+      />,
+    )
+
+    const group = container.querySelector("g[transform]")
+    expect(group).not.toBeNull()
+    const event = new KeyboardEvent("keydown", {
+      key: "ArrowRight",
+      bubbles: true,
+      cancelable: true,
+    })
+    group!.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(true)
+    expect(onArrowKey).toHaveBeenCalledWith("p1", "ArrowRight")
+  })
+
+  it("does not call onArrowKey for non-arrow keys", () => {
+    const onArrowKey = vi.fn()
+    const layout = singleLayoutNode({ id: "p1" }, "Alice Smith")
+
+    const { container } = renderInSvg(
+      <TreeNode
+        node={layout}
+        onNavigate={() => {}}
+        focusedPersonId="p1"
+        onArrowKey={onArrowKey}
+      />,
+    )
+
+    const group = container.querySelector("g[transform]")
+    fireEvent.keyDown(group!, { key: "Tab" })
+    fireEvent.keyDown(group!, { key: "a" })
+    expect(onArrowKey).not.toHaveBeenCalled()
+  })
+
+  it("registers an interactive node with the parent's ref map", () => {
+    const registered: Array<[string, SVGGElement | null]> = []
+    const registerRef = (id: string, el: SVGGElement | null) => {
+      registered.push([id, el])
+    }
+    const layout = singleLayoutNode({ id: "p1" }, "Alice Smith")
+
+    renderInSvg(
+      <TreeNode
+        node={layout}
+        onNavigate={() => {}}
+        focusedPersonId="p1"
+        registerRef={registerRef}
+      />,
+    )
+
+    expect(registered.length).toBeGreaterThan(0)
+    const [id, el] = registered[0]
+    expect(id).toBe("p1")
+    expect(el).not.toBeNull()
   })
 })
