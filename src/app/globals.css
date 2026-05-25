@@ -277,6 +277,12 @@ body {
   background: var(--sage-soft) !important;
 }
 
+/* ConfirmDialog inline yes/no buttons — same inline-style approach, so the
+   hover rule lives here to override the transparent resting background. */
+.confirm-dialog-btn:hover {
+  background: var(--paper-3) !important;
+}
+
 /* Legacy gradient retoned to sage — used by pre-refresh page headers */
 .warm-gradient {
   background: linear-gradient(135deg, var(--sage) 0%, var(--sage-deep) 100%);

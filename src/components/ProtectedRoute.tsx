@@ -14,7 +14,12 @@ export default function ProtectedRoute({ children }: { children: ReactNode }) {
   if (loading || !user)
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
-        <p className="text-gray-400 text-lg">Loading...</p>
+        <p
+          className="display-italic"
+          style={{ color: "var(--ink-3)", fontSize: 18 }}
+        >
+          Loading…
+        </p>
       </div>
     )
   return <>{children}</>
