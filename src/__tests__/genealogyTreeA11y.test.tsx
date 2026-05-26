@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest"
-import { render } from "@testing-library/react"
+import { fireEvent, render } from "@testing-library/react"
 import GenealogyTree from "@/components/GenealogyTree"
 import type { TreeNode as TreeNodeData } from "@/utils/treeBuilder"
 
@@ -40,8 +40,25 @@ function tree(): TreeNodeData {
       {
         name: "Alice Smith",
         attributes: { id: "p1" },
+        children: [{ name: "Bob Smith", attributes: { id: "p2" } }],
+      },
+    ],
+  }
+}
+
+// A 5-person tree with a couple (p1+p2) and two children (p3, p4). Used for
+// arrow-key navigation tests that need both horizontal and vertical movement.
+function familyTree(): TreeNodeData {
+  return {
+    name: "Smith Family",
+    attributes: {},
+    children: [
+      {
+        name: "Alice & Bob Smith",
+        attributes: { id: "p1", spouseId: "p2" },
         children: [
-          { name: "Bob Smith", attributes: { id: "p2" } },
+          { name: "Carol Smith", attributes: { id: "p3" } },
+          { name: "Dave Smith", attributes: { id: "p4" } },
         ],
       },
     ],
@@ -67,14 +84,15 @@ describe("GenealogyTree accessibility", () => {
     }
   })
 
-  it("labels the inner tree group with role and a usage hint", () => {
+  it("labels the inner tree group with role='tree', orientation, and an arrow-key usage hint", () => {
     const { container } = render(<GenealogyTree treeData={tree()} />)
 
-    const labelled = container.querySelector('g[role="group"]')
+    const labelled = container.querySelector('g[role="tree"]')
     expect(labelled).not.toBeNull()
+    expect(labelled?.getAttribute("aria-orientation")).toBe("vertical")
     const label = labelled?.getAttribute("aria-label") ?? ""
     expect(label).toContain("Family tree")
-    expect(label).toContain("Tab")
+    expect(label.toLowerCase()).toContain("arrow")
     expect(label).toMatch(/Enter|Space/)
   })
 
@@ -96,15 +114,145 @@ describe("GenealogyTree accessibility", () => {
     }
   })
 
-  it("keeps interactive person nodes focusable inside the labelled group", () => {
+  it("renders every interactive person as a role='treeitem' nested inside the role='tree' group", () => {
     const { container } = render(<GenealogyTree treeData={tree()} />)
 
-    const group = container.querySelector('g[role="group"]')
+    const group = container.querySelector('g[role="tree"]')
     expect(group).not.toBeNull()
-    const buttons = group?.querySelectorAll('g[role="button"]')
-    expect(buttons?.length ?? 0).toBeGreaterThan(0)
-    for (const btn of Array.from(buttons ?? [])) {
-      expect(btn.getAttribute("tabindex")).toBe("0")
-    }
+    const items = group?.querySelectorAll('g[role="treeitem"]')
+    expect(items?.length ?? 0).toBeGreaterThan(0)
+  })
+
+  it("applies roving tabindex: exactly one treeitem is tabindex=0 on initial render", () => {
+    const { container } = render(<GenealogyTree treeData={familyTree()} />)
+
+    const items = Array.from(
+      container.querySelectorAll('g[role="treeitem"]'),
+    )
+    const zeros = items.filter((g) => g.getAttribute("tabindex") === "0")
+    const minusOnes = items.filter((g) => g.getAttribute("tabindex") === "-1")
+    expect(zeros.length).toBe(1)
+    expect(zeros.length + minusOnes.length).toBe(items.length)
+  })
+
+  it("ArrowDown moves the roving tabindex to the next-row treeitem", () => {
+    const { container } = render(<GenealogyTree treeData={familyTree()} />)
+
+    const tree = container.querySelector('g[role="tree"]')!
+    const focused = container.querySelector('g[role="treeitem"][tabindex="0"]')
+    expect(focused?.getAttribute("aria-label")).toContain("Alice")
+
+    fireEvent.keyDown(tree, { key: "ArrowDown" })
+
+    const newFocused = container.querySelector(
+      'g[role="treeitem"][tabindex="0"]',
+    )
+    // The two children are in the next row; either is acceptable depending on
+    // which is closest horizontally to Alice. The contract is only that the
+    // roving tabindex moved off Alice.
+    expect(newFocused?.getAttribute("aria-label")).not.toContain("Alice")
+    expect(newFocused?.getAttribute("aria-label")).toMatch(/Carol|Dave/)
+  })
+
+  it("ArrowRight moves focus to the right-side spouse within a couple", () => {
+    const { container } = render(<GenealogyTree treeData={familyTree()} />)
+
+    const tree = container.querySelector('g[role="tree"]')!
+    fireEvent.keyDown(tree, { key: "ArrowRight" })
+
+    const focused = container.querySelector(
+      'g[role="treeitem"][tabindex="0"]',
+    )
+    expect(focused?.getAttribute("aria-label")).toContain("Bob")
+  })
+
+  it("ArrowLeft from the right spouse returns focus to the left spouse", () => {
+    const { container } = render(<GenealogyTree treeData={familyTree()} />)
+
+    const tree = container.querySelector('g[role="tree"]')!
+    fireEvent.keyDown(tree, { key: "ArrowRight" })
+    fireEvent.keyDown(tree, { key: "ArrowLeft" })
+
+    const focused = container.querySelector(
+      'g[role="treeitem"][tabindex="0"]',
+    )
+    expect(focused?.getAttribute("aria-label")).toContain("Alice")
+  })
+
+  it("ArrowUp from a child row returns focus up to the parent row", () => {
+    const { container } = render(<GenealogyTree treeData={familyTree()} />)
+
+    const tree = container.querySelector('g[role="tree"]')!
+    fireEvent.keyDown(tree, { key: "ArrowDown" })
+    fireEvent.keyDown(tree, { key: "ArrowUp" })
+
+    const focused = container.querySelector(
+      'g[role="treeitem"][tabindex="0"]',
+    )
+    // Could be either spouse since both are in the parent row; the contract is
+    // only that we landed on the couple row, not on a child.
+    const label = focused?.getAttribute("aria-label") ?? ""
+    expect(label).toMatch(/Alice|Bob/)
+    expect(label).not.toMatch(/Carol|Dave/)
+  })
+
+  it("Home jumps to the first treeitem and End jumps to the last", () => {
+    const { container } = render(<GenealogyTree treeData={familyTree()} />)
+
+    const tree = container.querySelector('g[role="tree"]')!
+    fireEvent.keyDown(tree, { key: "End" })
+
+    let focused = container.querySelector('g[role="treeitem"][tabindex="0"]')
+    const endLabel = focused?.getAttribute("aria-label") ?? ""
+    expect(endLabel).toMatch(/Carol|Dave/)
+
+    fireEvent.keyDown(tree, { key: "Home" })
+    focused = container.querySelector('g[role="treeitem"][tabindex="0"]')
+    expect(focused?.getAttribute("aria-label")).toContain("Alice")
+  })
+
+  it("ArrowDown on the deepest row is a no-op", () => {
+    const { container } = render(<GenealogyTree treeData={familyTree()} />)
+
+    const tree = container.querySelector('g[role="tree"]')!
+    fireEvent.keyDown(tree, { key: "End" })
+    const beforeLabel = container
+      .querySelector('g[role="treeitem"][tabindex="0"]')
+      ?.getAttribute("aria-label")
+
+    fireEvent.keyDown(tree, { key: "ArrowDown" })
+    const afterLabel = container
+      .querySelector('g[role="treeitem"][tabindex="0"]')
+      ?.getAttribute("aria-label")
+
+    expect(afterLabel).toBe(beforeLabel)
+  })
+
+  it("preventDefaults the arrow-key event so the page does not scroll", () => {
+    const { container } = render(<GenealogyTree treeData={familyTree()} />)
+
+    const event = new KeyboardEvent("keydown", {
+      key: "ArrowDown",
+      bubbles: true,
+      cancelable: true,
+    })
+    // Dispatch from the currently-focused treeitem so the synthetic event
+    // bubbles up through the tree group's onKeyDown handler.
+    const focused = container.querySelector('g[role="treeitem"][tabindex="0"]')
+    focused!.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(true)
+  })
+
+  it("does not preventDefault on non-navigation keys so Tab still leaves the tree", () => {
+    const { container } = render(<GenealogyTree treeData={familyTree()} />)
+
+    const event = new KeyboardEvent("keydown", {
+      key: "Tab",
+      bubbles: true,
+      cancelable: true,
+    })
+    const focused = container.querySelector('g[role="treeitem"][tabindex="0"]')
+    focused!.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(false)
   })
 })

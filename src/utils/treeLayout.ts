@@ -11,6 +11,7 @@ export interface LayoutNode {
   y: number
   w: number
   h: number
+  depth: number
   data: TreeNode
   children: LayoutNode[]
 }
@@ -40,6 +41,7 @@ function buildLayoutNode(node: TreeNode, depth: number): LayoutNode {
     y: depth * (NODE_H + V_GAP),
     w,
     h: NODE_H,
+    depth,
     data: node,
     children,
   }

@@ -1,6 +1,14 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, useCallback } from "react"
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+  type KeyboardEvent,
+} from "react"
 import { zoom as d3Zoom, zoomIdentity, type ZoomBehavior } from "d3-zoom"
 import { select } from "d3-selection"
 import type { TreeNode as TreeNodeData } from "@/utils/treeBuilder"
@@ -22,6 +30,11 @@ import {
   SINGLE_AVATAR_CX,
   TreeNode,
 } from "@/components/TreeNode"
+import {
+  buildFocusables,
+  findArrowTarget,
+  isArrowNavigationKey,
+} from "@/utils/treeNavigation"
 import { useRouter } from "next/navigation"
 
 const AVATAR_R = 22
@@ -45,11 +58,56 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
   const nodes = useMemo(() => flattenNodes(layout), [layout])
   const edges = useMemo(() => collectEdges(layout), [layout])
   const bounds = useMemo(() => computeBounds(nodes), [nodes])
+  const focusables = useMemo(() => buildFocusables(nodes), [nodes])
+
+  // Roving tabindex: the currently-focused person id. On mount, default to the
+  // first focusable so Tab into the tree lands on a person rather than a node
+  // with tabindex=-1. Re-clamped when the tree changes.
+  const [focusedId, setFocusedId] = useState<string | null>(
+    () => focusables[0]?.id ?? null,
+  )
+
+  const nodeRefsRef = useRef<Map<string, SVGGElement>>(new Map())
+  // When set, useLayoutEffect calls .focus() on the corresponding DOM node
+  // after React commits the tabindex update. Distinguishes programmatic focus
+  // moves (arrow keys) from the initial render where we must NOT steal focus.
+  const pendingFocusRef = useRef<string | null>(null)
+
+  const registerNode = useCallback((id: string, el: SVGGElement | null) => {
+    if (el === null) {
+      nodeRefsRef.current.delete(id)
+      return
+    }
+    nodeRefsRef.current.set(id, el)
+  }, [])
 
   // Reset the initial-fit flag whenever the tree data changes so the new tree gets centered.
   useEffect(() => {
     initialFitDoneRef.current = false
   }, [treeData])
+
+  // Re-clamp focusedId when the tree changes. If the previously-focused person
+  // is still in the new tree, keep them; otherwise fall back to the first
+  // focusable. Reading focusedId via prevFocusables avoids the set-state-in-
+  // effect warning (matches the prev* pattern used elsewhere in the codebase).
+  const [prevFocusables, setPrevFocusables] = useState(focusables)
+  if (prevFocusables !== focusables) {
+    setPrevFocusables(focusables)
+    const stillPresent =
+      focusedId !== null && focusables.some((f) => f.id === focusedId)
+    if (!stillPresent) setFocusedId(focusables[0]?.id ?? null)
+  }
+
+  // After the tabindex update commits, move DOM focus to the requested node.
+  // Only fires when pendingFocusRef is set (arrow-key navigation), not on the
+  // initial render.
+  useLayoutEffect(() => {
+    const id = pendingFocusRef.current
+    if (id === null) return
+    pendingFocusRef.current = null
+    const el = nodeRefsRef.current.get(id)
+    if (el) el.focus()
+  }, [focusedId])
 
   // Measure container, including on resize, so the fit math stays accurate.
   useEffect(() => {
@@ -130,6 +188,21 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
     [router]
   )
 
+  const handleTreeKeyDown = useCallback(
+    (e: KeyboardEvent<SVGGElement>) => {
+      if (!isArrowNavigationKey(e.key)) return
+      if (focusedId === null) return
+      const current = focusables.find((f) => f.id === focusedId)
+      if (!current) return
+      const target = findArrowTarget(e.key, current, focusables)
+      if (!target) return
+      e.preventDefault()
+      pendingFocusRef.current = target.id
+      setFocusedId(target.id)
+    },
+    [focusables, focusedId],
+  )
+
   return (
     <div
       ref={containerRef}
@@ -163,8 +236,10 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
         </defs>
         <g
           ref={gRef}
-          role="group"
-          aria-label="Family tree. Press Tab to move between people, then Enter or Space to open a profile."
+          role="tree"
+          aria-orientation="vertical"
+          aria-label="Family tree. Use the arrow keys to move between people, then Enter or Space to open a profile."
+          onKeyDown={handleTreeKeyDown}
         >
           {/* Edges — purely decorative connecting lines, hidden from assistive tech. */}
           {edges.map((e, i) => (
@@ -181,7 +256,13 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
 
           {/* Nodes */}
           {nodes.map((node, i) => (
-            <TreeNode key={i} node={node} onNavigate={navigateToProfile} />
+            <TreeNode
+              key={i}
+              node={node}
+              onNavigate={navigateToProfile}
+              focusedPersonId={focusedId}
+              registerNode={registerNode}
+            />
           ))}
         </g>
       </svg>

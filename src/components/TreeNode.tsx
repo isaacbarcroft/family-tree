@@ -9,7 +9,7 @@ import { formatDate } from "@/utils/dates"
 const AVATAR_R = 22
 const MARRIAGE_BAR = 20
 
-// Enter and Space activate buttons per the WAI-ARIA button pattern.
+// Enter and Space activate treeitems per the WAI-ARIA tree pattern.
 // preventDefault on Space stops the browser from scrolling the page.
 function handleKeyActivate(
   e: KeyboardEvent<SVGGElement>,
@@ -19,6 +19,11 @@ function handleKeyActivate(
   e.preventDefault()
   activate()
 }
+
+// Stable per-treeitem callback ref factory. The wrapping component keeps the
+// `registerNode` callback referentially stable via useCallback in the parent,
+// so the only churn here is the tiny `(el) => registerNode(id, el)` closure.
+type RegisterNode = (id: string, el: SVGGElement | null) => void
 
 // Shared <clipPath> ids defined once in GenealogyTree's <defs>. The default
 // clipPathUnits="userSpaceOnUse" resolves the clip in the referencing element's
@@ -45,13 +50,26 @@ function getInitials(name: string): string {
 interface TreeNodeProps {
   node: LayoutNode
   onNavigate: (personId: string) => void
+  // Currently rovingly-focused person id. The treeitem matching this id renders
+  // with `tabIndex=0`; every other treeitem renders with `tabIndex=-1`.
+  focusedPersonId: string | null
+  // Registers the focusable SVG group for a given person id so the parent can
+  // imperatively call `.focus()` after arrow-key navigation. Pass `null` on
+  // unmount.
+  registerNode: RegisterNode
 }
 
-function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
+function TreeNodeComponent({
+  node,
+  onNavigate,
+  focusedPersonId,
+  registerNode,
+}: TreeNodeProps) {
   const attrs = node.data.attributes ?? {}
   const isCouple = !!attrs.spouseId
   const isRoot = !attrs.id && !attrs.spouseId
   const isDeceased = !!attrs.death
+  const ariaLevel = node.depth + 1
 
   if (isRoot && !isCouple) {
     return (
@@ -82,6 +100,8 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
     const rightId = attrs.spouseId
     const activateLeft = leftId ? () => onNavigate(leftId) : undefined
     const activateRight = rightId ? () => onNavigate(rightId) : undefined
+    const leftTabIndex = activateLeft && focusedPersonId === leftId ? 0 : -1
+    const rightTabIndex = activateRight && focusedPersonId === rightId ? 0 : -1
 
     return (
       <g transform={`translate(${nodeX}, ${nodeY})`}>
@@ -96,12 +116,14 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
 
         {/* Left person */}
         <g
+          ref={leftId ? (el) => registerNode(leftId, el) : undefined}
           onClick={activateLeft}
           onKeyDown={
             activateLeft ? (e) => handleKeyActivate(e, activateLeft) : undefined
           }
-          role={activateLeft ? "button" : undefined}
-          tabIndex={activateLeft ? 0 : -1}
+          role={activateLeft ? "treeitem" : undefined}
+          tabIndex={leftTabIndex}
+          aria-level={activateLeft ? ariaLevel : undefined}
           aria-label={activateLeft ? `Open profile for ${name1}` : undefined}
           className={activateLeft ? "tree-node-interactive" : undefined}
           style={{ cursor: "pointer" }}
@@ -146,14 +168,16 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
 
         {/* Right person (spouse) */}
         <g
+          ref={rightId ? (el) => registerNode(rightId, el) : undefined}
           onClick={activateRight}
           onKeyDown={
             activateRight
               ? (e) => handleKeyActivate(e, activateRight)
               : undefined
           }
-          role={activateRight ? "button" : undefined}
-          tabIndex={activateRight ? 0 : -1}
+          role={activateRight ? "treeitem" : undefined}
+          tabIndex={rightTabIndex}
+          aria-level={activateRight ? ariaLevel : undefined}
           aria-label={activateRight ? `Open profile for ${name2}` : undefined}
           className={activateRight ? "tree-node-interactive" : undefined}
           style={{ cursor: "pointer" }}
@@ -193,6 +217,7 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
   const birthStr = attrs.birth ? formatDate(attrs.birth) : ""
   const deathStr = attrs.death ? formatDate(attrs.death) : ""
   const activate = personId ? () => onNavigate(personId) : undefined
+  const singleTabIndex = activate && focusedPersonId === personId ? 0 : -1
   const dateLabel = (() => {
     if (isDeceased && birthStr && deathStr) return `, ${birthStr} to ${deathStr}`
     if (birthStr) return `, born ${birthStr}`
@@ -201,11 +226,13 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
 
   return (
     <g
+      ref={personId ? (el) => registerNode(personId, el) : undefined}
       transform={`translate(${nodeX}, ${nodeY})`}
       onClick={activate}
       onKeyDown={activate ? (e) => handleKeyActivate(e, activate) : undefined}
-      role={activate ? "button" : undefined}
-      tabIndex={activate ? 0 : -1}
+      role={activate ? "treeitem" : undefined}
+      tabIndex={singleTabIndex}
+      aria-level={activate ? ariaLevel : undefined}
       aria-label={
         activate ? `Open profile for ${node.data.name}${dateLabel}` : undefined
       }
