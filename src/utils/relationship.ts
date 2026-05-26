@@ -79,7 +79,20 @@ function removedSuffix(removed: number): string {
 
 // Given the BFS distances from each person to their lowest common ancestor,
 // produce the English label describing how B is related to A.
-function bloodLabel(stepsA: number, stepsB: number): string {
+//
+// `sharedParents` is the count of parent ids that appear in both `Person.parentIds`
+// arrays — only consulted for the direct-sibling case (stepsA === stepsB === 1).
+// A pair is labeled "Half-sibling" only when we can prove the half-relation
+// from the data: both people list ≥ 2 parents and the overlap is less than 2.
+// When either person has fewer than 2 parents recorded, we default to "Sibling"
+// because the missing data could equally hide a full-sibling link.
+function bloodLabel(
+  stepsA: number,
+  stepsB: number,
+  sharedParents: number,
+  parentsAKnown: number,
+  parentsBKnown: number,
+): string {
   if (stepsA === 0 && stepsB === 0) return "Self"
 
   // A is the LCA → B is a descendant of A.
@@ -95,7 +108,12 @@ function bloodLabel(stepsA: number, stepsB: number): string {
   }
 
   // Both nonzero → collateral relationship.
-  if (stepsA === 1 && stepsB === 1) return "Sibling"
+  if (stepsA === 1 && stepsB === 1) {
+    if (parentsAKnown >= 2 && parentsBKnown >= 2 && sharedParents < 2) {
+      return "Half-sibling"
+    }
+    return "Sibling"
+  }
 
   // A's parent (or grandparent, etc.) is the LCA and B sits on a sibling
   // branch below the LCA → B is a (great-)niece/nephew of A.
@@ -128,8 +146,6 @@ function bloodLabel(stepsA: number, stepsB: number): string {
 //     biological links because `Person.parentIds` is denormalized without
 //     subtype. Callers that need to distinguish should consult the
 //     `relationships` table directly.
-//   - Half-siblings are labeled "Sibling"; this could be refined by checking
-//     whether both parents are shared.
 export function findRelationship(
   personAId: string,
   personBId: string,
@@ -187,8 +203,19 @@ export function findRelationship(
 
   if (bestAncestor === null) return null
 
+  // Count of parent ids that appear in both A's and B's `parentIds`. We pass
+  // both the overlap and each side's known-parent count down to the labeler so
+  // it can distinguish full siblings from half-siblings only when the data is
+  // complete enough to prove the half-relation (see `bloodLabel`).
+  const parentsA = new Set(personA.parentIds ?? [])
+  const parentsB = new Set(personB.parentIds ?? [])
+  let sharedParents = 0
+  for (const id of parentsA) {
+    if (parentsB.has(id)) sharedParents++
+  }
+
   return {
-    label: bloodLabel(bestStepsA, bestStepsB),
+    label: bloodLabel(bestStepsA, bestStepsB, sharedParents, parentsA.size, parentsB.size),
     kind: "blood",
     stepsA: bestStepsA,
     stepsB: bestStepsB,

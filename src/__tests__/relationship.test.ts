@@ -135,8 +135,10 @@ describe("findRelationship", () => {
       expect(findRelationship("c2", "c1", map)?.label).toBe("Sibling")
     })
 
-    it("labels half-siblings as Sibling (documented limitation)", () => {
-      // c1 and c2 share only parent p1.
+    it("labels half-siblings when one parent is shared (shared mother)", () => {
+      // c1 and c2 share only parent p1 (their mother). Each has a different
+      // second parent (p2 and p3). The data is complete enough to prove the
+      // half-relation, so the label is "Half-sibling".
       const map = makeMap(
         person({ id: "p1", childIds: ["c1", "c2"] }),
         person({ id: "p2", childIds: ["c1"] }),
@@ -144,7 +146,78 @@ describe("findRelationship", () => {
         person({ id: "c1", parentIds: ["p1", "p2"] }),
         person({ id: "c2", parentIds: ["p1", "p3"] }),
       )
+      expect(findRelationship("c1", "c2", map)?.label).toBe("Half-sibling")
+      // Relation is symmetric.
+      expect(findRelationship("c2", "c1", map)?.label).toBe("Half-sibling")
+    })
+
+    it("labels half-siblings when the shared parent is the father", () => {
+      // Mirror of the previous test — the shared parent is the father (p3),
+      // and the mothers (p1 and p2) differ. Same "Half-sibling" outcome.
+      const map = makeMap(
+        person({ id: "p1", childIds: ["c1"] }),
+        person({ id: "p2", childIds: ["c2"] }),
+        person({ id: "p3", childIds: ["c1", "c2"] }),
+        person({ id: "c1", parentIds: ["p1", "p3"] }),
+        person({ id: "c2", parentIds: ["p2", "p3"] }),
+      )
+      expect(findRelationship("c1", "c2", map)?.label).toBe("Half-sibling")
+    })
+
+    it("does not falsely label as Half-sibling when one side has incomplete parent data", () => {
+      // c1 has both parents listed (p1 + p2). c2 only has p1 recorded; the
+      // other parent is missing in our data. The shared overlap is 1, but the
+      // labeler must default to "Sibling" because we cannot prove c2's other
+      // parent isn't p2. Mislabeling missing data as half-sibling would be
+      // worse than the under-specific label.
+      const map = makeMap(
+        person({ id: "p1", childIds: ["c1", "c2"] }),
+        person({ id: "p2", childIds: ["c1"] }),
+        person({ id: "c1", parentIds: ["p1", "p2"] }),
+        person({ id: "c2", parentIds: ["p1"] }),
+      )
       expect(findRelationship("c1", "c2", map)?.label).toBe("Sibling")
+      // Symmetric: from c2's POV, c1 is still "Sibling" (not Half-sibling).
+      expect(findRelationship("c2", "c1", map)?.label).toBe("Sibling")
+    })
+
+    it("does not falsely label as Half-sibling when both sides have a single shared parent", () => {
+      // Both c1 and c2 have only one parent listed, and it's the same one. The
+      // data is too sparse to distinguish — could be full siblings whose
+      // other parent isn't recorded yet. Default to "Sibling".
+      const map = makeMap(
+        person({ id: "p1", childIds: ["c1", "c2"] }),
+        person({ id: "c1", parentIds: ["p1"] }),
+        person({ id: "c2", parentIds: ["p1"] }),
+      )
+      expect(findRelationship("c1", "c2", map)?.label).toBe("Sibling")
+    })
+
+    it("still labels full siblings as Sibling when both parents overlap", () => {
+      // Regression pin for the existing full-sibling path — even with the
+      // half-sibling branch added, two children of the same couple should
+      // continue to be "Sibling", not "Half-sibling".
+      const map = familyOfFour()
+      expect(findRelationship("c1", "c2", map)?.label).toBe("Sibling")
+    })
+
+    it("keeps `kind: blood` and stepsA/stepsB === 1 for half-siblings", () => {
+      // Behavioral pin: only the label changes for half-siblings. Callers that
+      // key off `kind` ("blood") or `stepsA` / `stepsB` (e.g. for sorting by
+      // closeness) should see the same values as for a full sibling.
+      const map = makeMap(
+        person({ id: "p1", childIds: ["c1", "c2"] }),
+        person({ id: "p2", childIds: ["c1"] }),
+        person({ id: "p3", childIds: ["c2"] }),
+        person({ id: "c1", parentIds: ["p1", "p2"] }),
+        person({ id: "c2", parentIds: ["p1", "p3"] }),
+      )
+      const result = findRelationship("c1", "c2", map)
+      expect(result?.label).toBe("Half-sibling")
+      expect(result?.kind).toBe("blood")
+      expect(result?.stepsA).toBe(1)
+      expect(result?.stepsB).toBe(1)
+      expect(result?.commonAncestorId).toBe("p1")
     })
 
     it("labels aunt/uncle and niece/nephew at one level", () => {
