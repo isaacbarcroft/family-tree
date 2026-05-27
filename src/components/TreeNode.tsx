@@ -45,13 +45,31 @@ function getInitials(name: string): string {
 interface TreeNodeProps {
   node: LayoutNode
   onNavigate: (personId: string) => void
+  // The id of the currently focused treeitem in the enclosing tree, or null
+  // when no treeitem is focused. When omitted (undefined), every interactive
+  // group is tabbable, which keeps standalone unit tests of TreeNode simple
+  // (they do not need a navigation context to assert focusability).
+  focusedPersonId?: string | null
 }
 
-function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
+function shouldBeTabbable(
+  personId: string,
+  focusedPersonId: string | null | undefined,
+): boolean {
+  if (focusedPersonId === undefined) return true
+  return focusedPersonId === personId
+}
+
+function TreeNodeComponent({
+  node,
+  onNavigate,
+  focusedPersonId,
+}: TreeNodeProps) {
   const attrs = node.data.attributes ?? {}
   const isCouple = !!attrs.spouseId
   const isRoot = !attrs.id && !attrs.spouseId
   const isDeceased = !!attrs.death
+  const hasChildren = node.children.length > 0
 
   if (isRoot && !isCouple) {
     return (
@@ -100,9 +118,17 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
           onKeyDown={
             activateLeft ? (e) => handleKeyActivate(e, activateLeft) : undefined
           }
-          role={activateLeft ? "button" : undefined}
-          tabIndex={activateLeft ? 0 : -1}
+          role={activateLeft ? "treeitem" : undefined}
+          tabIndex={
+            activateLeft && leftId
+              ? shouldBeTabbable(leftId, focusedPersonId)
+                ? 0
+                : -1
+              : -1
+          }
           aria-label={activateLeft ? `Open profile for ${name1}` : undefined}
+          aria-expanded={activateLeft && hasChildren ? true : undefined}
+          data-person-id={activateLeft ? leftId : undefined}
           className={activateLeft ? "tree-node-interactive" : undefined}
           style={{ cursor: "pointer" }}
         >
@@ -152,9 +178,17 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
               ? (e) => handleKeyActivate(e, activateRight)
               : undefined
           }
-          role={activateRight ? "button" : undefined}
-          tabIndex={activateRight ? 0 : -1}
+          role={activateRight ? "treeitem" : undefined}
+          tabIndex={
+            activateRight && rightId
+              ? shouldBeTabbable(rightId, focusedPersonId)
+                ? 0
+                : -1
+              : -1
+          }
           aria-label={activateRight ? `Open profile for ${name2}` : undefined}
+          aria-expanded={activateRight && hasChildren ? true : undefined}
+          data-person-id={activateRight ? rightId : undefined}
           className={activateRight ? "tree-node-interactive" : undefined}
           style={{ cursor: "pointer" }}
         >
@@ -204,11 +238,19 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
       transform={`translate(${nodeX}, ${nodeY})`}
       onClick={activate}
       onKeyDown={activate ? (e) => handleKeyActivate(e, activate) : undefined}
-      role={activate ? "button" : undefined}
-      tabIndex={activate ? 0 : -1}
+      role={activate ? "treeitem" : undefined}
+      tabIndex={
+        activate && personId
+          ? shouldBeTabbable(personId, focusedPersonId)
+            ? 0
+            : -1
+          : -1
+      }
       aria-label={
         activate ? `Open profile for ${node.data.name}${dateLabel}` : undefined
       }
+      aria-expanded={activate && hasChildren ? true : undefined}
+      data-person-id={activate ? personId : undefined}
       className={activate ? "tree-node-interactive" : undefined}
       style={{ cursor: activate ? "pointer" : "default" }}
     >

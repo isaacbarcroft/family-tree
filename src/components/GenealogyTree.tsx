@@ -1,6 +1,13 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, useCallback } from "react"
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+  type KeyboardEvent,
+} from "react"
 import { zoom as d3Zoom, zoomIdentity, type ZoomBehavior } from "d3-zoom"
 import { select } from "d3-selection"
 import type { TreeNode as TreeNodeData } from "@/utils/treeBuilder"
@@ -22,6 +29,7 @@ import {
   SINGLE_AVATAR_CX,
   TreeNode,
 } from "@/components/TreeNode"
+import { buildNavIndex, type NavIndex } from "@/utils/treeNavigation"
 import { useRouter } from "next/navigation"
 
 const AVATAR_R = 22
@@ -45,6 +53,24 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
   const nodes = useMemo(() => flattenNodes(layout), [layout])
   const edges = useMemo(() => collectEdges(layout), [layout])
   const bounds = useMemo(() => computeBounds(nodes), [nodes])
+  const navIndex = useMemo<NavIndex>(() => buildNavIndex(layout), [layout])
+  const [focusedPersonId, setFocusedPersonId] = useState<string | null>(
+    () => navIndex.ordered[0] ?? null,
+  )
+  // Re-seed the roving tabindex when the tree changes, using the render-time
+  // prev-tracking pattern (avoids the cascading-render warning that an effect
+  // here would trigger).
+  const [prevNavIndex, setPrevNavIndex] = useState(navIndex)
+  if (prevNavIndex !== navIndex) {
+    setPrevNavIndex(navIndex)
+    if (!focusedPersonId || !navIndex.byId.has(focusedPersonId)) {
+      setFocusedPersonId(navIndex.ordered[0] ?? null)
+    }
+  }
+  // Flag set whenever an arrow / Home / End key triggers a focus move so the
+  // post-state-update effect knows to imperatively focus the new treeitem. We
+  // do not want to steal focus on initial mount or on unrelated re-renders.
+  const shouldFocusRef = useRef(false)
 
   // Reset the initial-fit flag whenever the tree data changes so the new tree gets centered.
   useEffect(() => {
@@ -130,6 +156,62 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
     [router]
   )
 
+  // After an arrow-key triggered a focus move, imperatively focus the new
+  // treeitem. Guarded by shouldFocusRef so unrelated state updates (initial
+  // mount, dims churn) do not yank focus back to the tree.
+  useEffect(() => {
+    if (!shouldFocusRef.current) return
+    shouldFocusRef.current = false
+    if (!focusedPersonId || !containerRef.current) return
+    const el = containerRef.current.querySelector(
+      `[data-person-id="${CSS.escape(focusedPersonId)}"]`,
+    )
+    if (el instanceof SVGElement || el instanceof HTMLElement) {
+      el.focus()
+    }
+  }, [focusedPersonId])
+
+  const handleTreeKeyDown = useCallback(
+    (e: KeyboardEvent<SVGGElement>) => {
+      if (!focusedPersonId) return
+      const entry = navIndex.byId.get(focusedPersonId)
+      if (!entry) return
+
+      const target = (() => {
+        if (e.key === "ArrowDown") return entry.next
+        if (e.key === "ArrowUp") return entry.prev
+        if (e.key === "ArrowRight") return entry.firstChild
+        if (e.key === "ArrowLeft") return entry.parent
+        if (e.key === "Home") return navIndex.ordered[0]
+        if (e.key === "End")
+          return navIndex.ordered[navIndex.ordered.length - 1]
+        return undefined
+      })()
+
+      if (!target) return
+      e.preventDefault()
+      shouldFocusRef.current = true
+      setFocusedPersonId(target)
+    },
+    [focusedPersonId, navIndex],
+  )
+
+  // Keep the roving tabindex in sync with whatever the user actually focuses
+  // (mouse click, Tab into the tree). Without this, clicking a non-focused
+  // treeitem would leave the previously focused id as the only tab stop.
+  const handleTreeFocusIn = useCallback(
+    (e: React.FocusEvent<SVGGElement>) => {
+      const target = e.target as Element | null
+      if (!target || !("closest" in target)) return
+      const treeitem = target.closest("[data-person-id]")
+      if (!treeitem) return
+      const id = treeitem.getAttribute("data-person-id")
+      if (!id || id === focusedPersonId) return
+      setFocusedPersonId(id)
+    },
+    [focusedPersonId],
+  )
+
   return (
     <div
       ref={containerRef}
@@ -163,8 +245,10 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
         </defs>
         <g
           ref={gRef}
-          role="group"
-          aria-label="Family tree. Press Tab to move between people, then Enter or Space to open a profile."
+          role="tree"
+          aria-label="Family tree. Tab in, then use arrow keys to move between people. Enter or Space opens a profile."
+          onKeyDown={handleTreeKeyDown}
+          onFocus={handleTreeFocusIn}
         >
           {/* Edges — purely decorative connecting lines, hidden from assistive tech. */}
           {edges.map((e, i) => (
@@ -179,10 +263,23 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
             />
           ))}
 
-          {/* Nodes */}
-          {nodes.map((node, i) => (
-            <TreeNode key={i} node={node} onNavigate={navigateToProfile} />
-          ))}
+          {/* Nodes. Derive a per-node focusedPersonId prop so React.memo
+              skips re-rendering nodes that are not gaining or losing focus
+              when the roving tabindex moves. */}
+          {nodes.map((node, i) => {
+            const attrs = node.data.attributes ?? {}
+            const isThisFocused =
+              (!!attrs.id && attrs.id === focusedPersonId) ||
+              (!!attrs.spouseId && attrs.spouseId === focusedPersonId)
+            return (
+              <TreeNode
+                key={i}
+                node={node}
+                onNavigate={navigateToProfile}
+                focusedPersonId={isThisFocused ? focusedPersonId : null}
+              />
+            )
+          })}
         </g>
       </svg>
     </div>
