@@ -228,6 +228,15 @@ body {
   stroke-width: 3;
 }
 
+/* Page heading focus target — receives programmatic focus on route load so
+   screen-reader and keyboard users land on the main heading rather than the
+   top of the document. The heading is not keyboard-tabbable (tabIndex=-1),
+   so there is no manual-focus path where an outline would be expected. */
+.profile-heading:focus,
+.profile-heading:focus-visible {
+  outline: none;
+}
+
 /* Quiet scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

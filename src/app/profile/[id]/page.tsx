@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type RefObject, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
@@ -36,6 +36,7 @@ import { formatDate } from "@/utils/dates";
 import { getErrorMessage } from "@/utils/errorMessage";
 import { findRelationship } from "@/utils/relationship";
 import { shareInvite } from "@/utils/share";
+import { useFocusOnFirstReady } from "@/utils/useFocusOnFirstReady";
 
 function ensureProtocol(url: string): string {
   if (/^https?:\/\//i.test(url)) return url;
@@ -111,6 +112,16 @@ function ProfileContent() {
   const [showDeceased, setShowDeceased] = useState(false);
   const [relationships, setRelationships] = useState<Relationship[]>([]);
   const [allPeople, setAllPeople] = useState<Person[]>([]);
+
+  // Land focus on the page heading once the profile loads so keyboard and
+  // screen-reader users do not start at the top of the document after
+  // client-side navigation (e.g. from the family tree). Re-runs when the
+  // profile id changes, so navigating between sibling profiles also lands
+  // focus on the new heading. See TODOS.md item 1.6.c.
+  const headingRef = useFocusOnFirstReady<HTMLHeadingElement>(
+    !loading && person !== null,
+    person?.id,
+  );
 
   useEffect(() => {
     if (searchParams.get("edit") === "true") setEditing(true);
@@ -422,6 +433,7 @@ function ProfileContent() {
               birthplace={birthplace}
               livesIn={livesIn}
               fullName={fullName}
+              headingRef={headingRef}
               onAddMemory={() => setShowMemoryModal(true)}
               onCopyClaim={handleCopyClaim}
               claimCopied={claimCopied}
@@ -497,6 +509,7 @@ type HeroProps = {
   birthplace: string;
   livesIn: string | null;
   fullName: string;
+  headingRef: RefObject<HTMLHeadingElement | null>;
   onAddMemory: () => void;
   onCopyClaim: () => void;
   claimCopied: boolean;
@@ -510,6 +523,7 @@ function Hero({
   birthplace,
   livesIn,
   fullName,
+  headingRef,
   onAddMemory,
   onCopyClaim,
   claimCopied,
@@ -530,7 +544,10 @@ function Hero({
           {person.roleType}
         </p>
         <h1
-          className="display"
+          ref={headingRef}
+          tabIndex={-1}
+          aria-label={fullName}
+          className="display profile-heading"
           style={{
             fontSize: "clamp(56px, 9vw, 108px)",
             margin: 0,
@@ -539,30 +556,21 @@ function Hero({
             letterSpacing: "-0.035em",
           }}
         >
-          {person.firstName}
-          {person.middleName ? (
-            <>
-              {" "}
-              <span className="display-italic" style={{ color: "var(--sage-deep)" }}>
-                {person.middleName}
-              </span>
-            </>
+          <span style={{ display: "block" }}>
+            {person.firstName}
+            {person.middleName ? (
+              <>
+                {" "}
+                <span className="display-italic" style={{ color: "var(--sage-deep)" }}>
+                  {person.middleName}
+                </span>
+              </>
+            ) : null}
+          </span>
+          {person.lastName ? (
+            <span style={{ display: "block" }}>{person.lastName}</span>
           ) : null}
         </h1>
-        {person.lastName ? (
-          <h1
-            className="display"
-            style={{
-              fontSize: "clamp(56px, 9vw, 108px)",
-              margin: 0,
-              fontWeight: 400,
-              lineHeight: 0.92,
-              letterSpacing: "-0.035em",
-            }}
-          >
-            {person.lastName}
-          </h1>
-        ) : null}
 
         {facts.length > 0 ? (
           <div
