@@ -16,12 +16,22 @@ interface AddMemoryModalProps {
   onClose: () => void
   onCreated: () => void
   preTaggedPersonId?: string
+  initialTitle?: string
+  initialDescription?: string
+  autoStartRecording?: boolean
 }
 
-export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }: AddMemoryModalProps) {
+export default function AddMemoryModal({
+  onClose,
+  onCreated,
+  preTaggedPersonId,
+  initialTitle,
+  initialDescription,
+  autoStartRecording,
+}: AddMemoryModalProps) {
   const { user } = useAuth()
-  const [title, setTitle] = useState("")
-  const [description, setDescription] = useState("")
+  const [title, setTitle] = useState(initialTitle ?? "")
+  const [description, setDescription] = useState(initialDescription ?? "")
   const [date, setDate] = useState("")
   const [files, setFiles] = useState<File[]>([])
   const [previews, setPreviews] = useState<string[]>([])
@@ -250,6 +260,18 @@ export default function AddMemoryModal({ onClose, onCreated, preTaggedPersonId }
       if (url) URL.revokeObjectURL(url)
     }
   }, [])
+
+  // When opened from the "Answer with voice" prompt CTA, begin recording right
+  // away. `useRef` captures the mount-time `startRecording` so the effect does
+  // not need it as a dependency, and the guard ref keeps it to a single start.
+  const startRecordingRef = useRef(startRecording)
+  const autoStartedRef = useRef(false)
+  useEffect(() => {
+    if (!autoStartRecording) return
+    if (autoStartedRef.current) return
+    autoStartedRef.current = true
+    startRecordingRef.current()
+  }, [autoStartRecording])
 
   const handleSubmit = async () => {
     if (!title.trim() || !user) return

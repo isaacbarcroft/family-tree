@@ -13,6 +13,7 @@ Run the SQL files in Supabase SQL Editor, in filename order:
 - `supabase/migrations/20260430_soft_delete.sql`
 - `supabase/migrations/20260501_memory_comments.sql`
 - `supabase/migrations/20260505_notification_prefs.sql`
+- `supabase/migrations/20260528_story_prompts.sql`
 
 The initial migration creates:
 
@@ -92,6 +93,7 @@ In Supabase Dashboard:
 - `20260430_soft_delete.sql` adds a `deletedAt timestamptz` column to `people`, `families`, `events`, and `memories`. The app now soft-deletes (UPDATE deletedAt) instead of hard-deleting, and every list query filters `deletedAt is null`. To restore a row, run `update <table> set "deletedAt" = null where id = '<row-id>';` from the SQL editor (admin restore UI is a deferred follow-up). To permanently purge a soft-deleted row, run `delete from <table> where id = '<row-id>' and "deletedAt" is not null;`.
 - `20260501_memory_comments.sql` adds `public.memory_comments` (id, memoryId, userId, body, parentCommentId, createdAt, updatedAt) for threaded comments on memories. RLS uses the `app_users` allowlist: SELECT for any approved user, INSERT requires `userId = auth.uid()`, UPDATE requires the row owner (no admin override on edit, by design), DELETE requires owner or admin. A trigger pins replies to one level deep; another trigger refreshes `updatedAt` on edit. Cascade FKs on `memories(id)` and `memory_comments(id)` mean deleting a memory or a parent comment removes the thread.
 - `20260505_notification_prefs.sql` adds three columns to `public.app_users`: `notificationPrefs jsonb` (default `{"digest":"weekly","reactions":true,"comments":true}`), `lastDigestSentAt timestamptz` (null = never sent; the digest worker uses the column to skip already-shipped activity), and `unsubscribeToken uuid` (random per row, unique index, used by `/api/notifications/unsubscribe`). RLS is untouched — the digest and unsubscribe routes both use the service role and bypass RLS, so the existing `app_users_admin_update` policy still keeps user-facing writes admin-only. Rollback: `20260505_notification_prefs_rollback.sql`.
+- `20260528_story_prompts.sql` adds `public.story_prompts` (id, prompt, category, createdAt) for the guided "A question for you today" home widget, seeded with 70 categorized prompts. RLS uses the `app_users` allowlist for SELECT only; INSERT/UPDATE/DELETE are not granted to `authenticated` because prompts are reference data (seed in-migration, curate via the SQL editor). `prompt` is unique and the seed uses `on conflict (prompt) do nothing`, so the migration is safe to re-run. Memories created by answering a prompt store the answer with no foreign key back to this table, so dropping it never orphans a memory. Rollback: `20260528_story_prompts_rollback.sql`.
 
 ## 5) Memory-activity digest cron
 
