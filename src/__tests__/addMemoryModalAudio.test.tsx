@@ -206,4 +206,32 @@ describe("AddMemoryModal voice recording flow", () => {
 
     expect(screen.getByRole("alert")).toHaveTextContent(/does not support voice recording/i)
   })
+
+  it("prefills the title from initialTitle (story prompt answer flow)", () => {
+    render(
+      <AddMemoryModal
+        onClose={() => {}}
+        onCreated={() => {}}
+        initialTitle="Tell me about your first car"
+      />
+    )
+
+    const titleInput = screen.getByPlaceholderText(/Summer BBQ/i) as HTMLInputElement
+    expect(titleInput.value).toBe("Tell me about your first car")
+  })
+
+  it("auto-starts recording on mount when autoStartRecording is set", async () => {
+    await act(async () => {
+      render(
+        <AddMemoryModal
+          onClose={() => {}}
+          onCreated={() => {}}
+          initialTitle="Describe a pet that felt like family"
+          autoStartRecording
+        />
+      )
+    })
+
+    expect(await screen.findByRole("button", { name: /stop recording/i })).toBeInTheDocument()
+  })
 })
