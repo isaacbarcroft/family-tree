@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { findRelationship } from "@/utils/relationship"
+import { classifySiblings, findRelationship } from "@/utils/relationship"
 import type { Person } from "@/models/Person"
 
 function person(
@@ -135,14 +135,53 @@ describe("findRelationship", () => {
       expect(findRelationship("c2", "c1", map)?.label).toBe("Sibling")
     })
 
-    it("labels half-siblings as Sibling (documented limitation)", () => {
-      // c1 and c2 share only parent p1.
+    it("labels half-siblings when each has a distinct other parent", () => {
+      // c1 (p1 + p2) and c2 (p1 + p3) share only parent p1, and each has a
+      // known second parent the other lacks → unambiguously half-siblings.
       const map = makeMap(
         person({ id: "p1", childIds: ["c1", "c2"] }),
         person({ id: "p2", childIds: ["c1"] }),
         person({ id: "p3", childIds: ["c2"] }),
         person({ id: "c1", parentIds: ["p1", "p2"] }),
         person({ id: "c2", parentIds: ["p1", "p3"] }),
+      )
+      expect(findRelationship("c1", "c2", map)?.label).toBe("Half-sibling")
+      // Direction-independent.
+      expect(findRelationship("c2", "c1", map)?.label).toBe("Half-sibling")
+    })
+
+    it("keeps the Sibling label when only one parent is on record per child", () => {
+      // Both kids list only p1. The missing second parents could be the same
+      // person (full siblings) or different (half), so we don't downgrade.
+      const map = makeMap(
+        person({ id: "p1", childIds: ["c1", "c2"] }),
+        person({ id: "c1", parentIds: ["p1"] }),
+        person({ id: "c2", parentIds: ["p1"] }),
+      )
+      expect(findRelationship("c1", "c2", map)?.label).toBe("Sibling")
+    })
+
+    it("keeps the Sibling label when one child is missing its second parent", () => {
+      // c1 has both parents (p1 + p2); c2 only lists the shared p1. c2's other
+      // parent might be p2 (full) — insufficient evidence for "Half-sibling".
+      const map = makeMap(
+        person({ id: "p1", childIds: ["c1", "c2"] }),
+        person({ id: "p2", childIds: ["c1"] }),
+        person({ id: "c1", parentIds: ["p1", "p2"] }),
+        person({ id: "c2", parentIds: ["p1"] }),
+      )
+      expect(findRelationship("c1", "c2", map)?.label).toBe("Sibling")
+      expect(findRelationship("c2", "c1", map)?.label).toBe("Sibling")
+    })
+
+    it("labels full siblings when both parents are shared", () => {
+      // Explicit full-sibling pin alongside the half-sibling cases: c1 and c2
+      // share both p1 and p2.
+      const map = makeMap(
+        person({ id: "p1", childIds: ["c1", "c2"] }),
+        person({ id: "p2", childIds: ["c1", "c2"] }),
+        person({ id: "c1", parentIds: ["p1", "p2"] }),
+        person({ id: "c2", parentIds: ["p1", "p2"] }),
       )
       expect(findRelationship("c1", "c2", map)?.label).toBe("Sibling")
     })
@@ -370,5 +409,55 @@ describe("findRelationship", () => {
       expect(r?.commonAncestorId).toBeNull()
       expect(r?.kind).toBe("spouse")
     })
+  })
+})
+
+describe("classifySiblings", () => {
+  function child(id: string, parentIds: string[]): Person {
+    return person({ id, parentIds })
+  }
+
+  it("returns 'full' when two parents are shared", () => {
+    expect(classifySiblings(child("a", ["p1", "p2"]), child("b", ["p1", "p2"]))).toBe(
+      "full",
+    )
+  })
+
+  it("returns 'full' when more than two parents are shared", () => {
+    expect(
+      classifySiblings(child("a", ["p1", "p2", "p3"]), child("b", ["p1", "p2", "p3"])),
+    ).toBe("full")
+  })
+
+  it("returns 'half' when one parent is shared and each has a distinct other parent", () => {
+    expect(classifySiblings(child("a", ["p1", "p2"]), child("b", ["p1", "p3"]))).toBe(
+      "half",
+    )
+  })
+
+  it("returns 'unknown' when no parents are shared", () => {
+    expect(classifySiblings(child("a", ["p1", "p2"]), child("b", ["p3", "p4"]))).toBe(
+      "unknown",
+    )
+  })
+
+  it("returns 'unknown' when one parent is shared but a side has only that parent", () => {
+    expect(classifySiblings(child("a", ["p1", "p2"]), child("b", ["p1"]))).toBe(
+      "unknown",
+    )
+    expect(classifySiblings(child("a", ["p1"]), child("b", ["p1"]))).toBe("unknown")
+  })
+
+  it("returns 'unknown' when either side has no parents on record", () => {
+    expect(classifySiblings(person({ id: "a" }), child("b", ["p1", "p2"]))).toBe(
+      "unknown",
+    )
+    expect(classifySiblings(child("a", []), child("b", []))).toBe("unknown")
+  })
+
+  it("is symmetric in its arguments", () => {
+    const a = child("a", ["p1", "p2"])
+    const b = child("b", ["p1", "p3"])
+    expect(classifySiblings(a, b)).toBe(classifySiblings(b, a))
   })
 })

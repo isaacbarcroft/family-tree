@@ -77,9 +77,45 @@ function removedSuffix(removed: number): string {
   return ` ${removed} times removed`
 }
 
+// Whether two people who share at least one parent are full siblings, half
+// siblings, or can't be told apart from the available data.
+//
+//   - "full"    — two or more parents in common.
+//   - "half"    — exactly one parent in common AND each side has a *known*
+//                 distinct other parent (positive evidence they differ).
+//   - "unknown" — exactly one parent in common but at least one side has no
+//                 second parent on record. The missing parent could be the
+//                 same person (making them full siblings) or someone else, so
+//                 we can't claim "half". Callers fall back to "Sibling".
+//
+// The conservative "unknown" bucket matters for a genealogy app: parent data
+// is routinely incomplete, and labeling two people "Half-sibling" purely
+// because a second parent is missing would assert a relationship the data
+// doesn't support.
+export type SiblingClass = "full" | "half" | "unknown"
+
+export function classifySiblings(a: Person, b: Person): SiblingClass {
+  const aParents = new Set(a.parentIds ?? [])
+  const bParents = new Set(b.parentIds ?? [])
+
+  let sharedCount = 0
+  for (const parentId of aParents) {
+    if (bParents.has(parentId)) sharedCount += 1
+  }
+
+  if (sharedCount >= 2) return "full"
+  if (sharedCount === 1 && aParents.size >= 2 && bParents.size >= 2) return "half"
+  return "unknown"
+}
+
 // Given the BFS distances from each person to their lowest common ancestor,
-// produce the English label describing how B is related to A.
-function bloodLabel(stepsA: number, stepsB: number): string {
+// produce the English label describing how B is related to A. `siblingClass`
+// refines the sibling case (full vs. half) and is ignored otherwise.
+function bloodLabel(
+  stepsA: number,
+  stepsB: number,
+  siblingClass: SiblingClass = "unknown",
+): string {
   if (stepsA === 0 && stepsB === 0) return "Self"
 
   // A is the LCA → B is a descendant of A.
@@ -95,7 +131,9 @@ function bloodLabel(stepsA: number, stepsB: number): string {
   }
 
   // Both nonzero → collateral relationship.
-  if (stepsA === 1 && stepsB === 1) return "Sibling"
+  if (stepsA === 1 && stepsB === 1) {
+    return siblingClass === "half" ? "Half-sibling" : "Sibling"
+  }
 
   // A's parent (or grandparent, etc.) is the LCA and B sits on a sibling
   // branch below the LCA → B is a (great-)niece/nephew of A.
@@ -128,8 +166,9 @@ function bloodLabel(stepsA: number, stepsB: number): string {
 //     biological links because `Person.parentIds` is denormalized without
 //     subtype. Callers that need to distinguish should consult the
 //     `relationships` table directly.
-//   - Half-siblings are labeled "Sibling"; this could be refined by checking
-//     whether both parents are shared.
+//   - Siblings who share exactly one parent are labeled "Half-sibling" only
+//     when each has a known distinct other parent; with incomplete parent data
+//     the label stays "Sibling" (see `classifySiblings`).
 export function findRelationship(
   personAId: string,
   personBId: string,
@@ -187,8 +226,13 @@ export function findRelationship(
 
   if (bestAncestor === null) return null
 
+  const siblingClass: SiblingClass =
+    bestStepsA === 1 && bestStepsB === 1
+      ? classifySiblings(personA, personB)
+      : "unknown"
+
   return {
-    label: bloodLabel(bestStepsA, bestStepsB),
+    label: bloodLabel(bestStepsA, bestStepsB, siblingClass),
     kind: "blood",
     stepsA: bestStepsA,
     stepsB: bestStepsB,
