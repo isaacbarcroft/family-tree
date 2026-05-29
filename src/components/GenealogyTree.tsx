@@ -11,7 +11,14 @@ import {
   edgePath,
   flattenNodes,
   layoutTree,
+  type LayoutNode,
 } from "@/utils/treeLayout"
+import {
+  buildTreeNavModel,
+  nextItemId,
+  type TreeNavKey,
+  type TreeNavSide,
+} from "@/utils/treeNavigation"
 import {
   AVATAR_CY,
   CLIP_ID_COUPLE_LEFT,
@@ -45,6 +52,15 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
   const nodes = useMemo(() => flattenNodes(layout), [layout])
   const edges = useMemo(() => collectEdges(layout), [layout])
   const bounds = useMemo(() => computeBounds(nodes), [nodes])
+  const navModel = useMemo(() => buildTreeNavModel(layout), [layout])
+
+  // Roving tabindex: exactly one treeitem is in the tab order at a time. The
+  // active item starts at the top of the tree and resets there when the tree
+  // data changes.
+  const [activeId, setActiveId] = useState<string | null>(() => navModel.first)
+  useEffect(() => {
+    setActiveId(navModel.first)
+  }, [navModel])
 
   // Reset the initial-fit flag whenever the tree data changes so the new tree gets centered.
   useEffect(() => {
@@ -130,6 +146,38 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
     [router]
   )
 
+  const handleArrowKey = useCallback(
+    (fromId: string, key: TreeNavKey) => {
+      const target = nextItemId(navModel, fromId, key)
+      if (!target) return
+      setActiveId(target)
+      const el = gRef.current?.querySelector<SVGGElement>(
+        `[data-tree-item-id="${target}"]`
+      )
+      el?.focus()
+    },
+    [navModel]
+  )
+
+  const activeSideForNode = (node: LayoutNode): TreeNavSide | null => {
+    if (!activeId) return null
+    const attrs = node.data.attributes ?? {}
+    if (attrs.spouseId) {
+      if (attrs.id === activeId) return "left"
+      if (attrs.spouseId === activeId) return "right"
+      return null
+    }
+    if (attrs.id && attrs.id === activeId) return "single"
+    return null
+  }
+
+  const levelForNode = (node: LayoutNode): number | undefined => {
+    const attrs = node.data.attributes ?? {}
+    const repId = attrs.spouseId ? attrs.id || attrs.spouseId : attrs.id
+    if (!repId) return undefined
+    return navModel.items[repId]?.level
+  }
+
   return (
     <div
       ref={containerRef}
@@ -163,8 +211,8 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
         </defs>
         <g
           ref={gRef}
-          role="group"
-          aria-label="Family tree. Press Tab to move between people, then Enter or Space to open a profile."
+          role="tree"
+          aria-label="Family tree. Press Tab to enter, then use the arrow keys to move between people and Enter or Space to open a profile."
         >
           {/* Edges — purely decorative connecting lines, hidden from assistive tech. */}
           {edges.map((e, i) => (
@@ -181,7 +229,14 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
 
           {/* Nodes */}
           {nodes.map((node, i) => (
-            <TreeNode key={i} node={node} onNavigate={navigateToProfile} />
+            <TreeNode
+              key={i}
+              node={node}
+              onNavigate={navigateToProfile}
+              active={activeSideForNode(node)}
+              level={levelForNode(node)}
+              onArrowKey={handleArrowKey}
+            />
           ))}
         </g>
       </svg>
