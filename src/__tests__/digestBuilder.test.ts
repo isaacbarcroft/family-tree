@@ -497,6 +497,48 @@ describe("buildDigests", () => {
     ])
   })
 
+  it("observes a Feb 29 birthday on Feb 28 in a non-leap year instead of skipping it", () => {
+    // Window is (Feb 25, Feb 28] of 2026 (a non-leap year). A Feb 29 birthday
+    // previously overflowed to Mar 1, which fell outside this window and was
+    // silently dropped. It must now land on Feb 28 and be included.
+    const recipients = [
+      makeRecipient({
+        userId: "owner1",
+        prefs: { digest: "daily", reactions: true, comments: true },
+        lastDigestSentAt: "2026-02-25T00:00:00Z",
+      }),
+    ]
+    const leapDayPeople = [
+      {
+        id: "leaper",
+        userId: null,
+        firstName: "Effie",
+        lastName: "Leap",
+        birthDate: "1992-02-29",
+        deathDate: null,
+      },
+    ]
+
+    const out = buildDigests({
+      recipients,
+      memories: [],
+      events: [],
+      people: leapDayPeople,
+      reactions: [],
+      comments: [],
+      actorNames: [],
+      now: new Date("2026-02-28T12:00:00Z"),
+    })
+
+    expect(out).toHaveLength(1)
+    expect(out[0].totalBirthdays).toBe(1)
+    expect(out[0].birthdays[0].displayName).toBe("Effie Leap")
+    expect(out[0].birthdays[0].age).toBe(34)
+    const occurrence = new Date(out[0].birthdays[0].occurrenceDate)
+    expect(occurrence.getMonth()).toBe(1) // February, not March
+    expect(occurrence.getDate()).toBe(28)
+  })
+
   it("skips deceased people and non-milestone anniversaries", () => {
     const recipients = [
       makeRecipient({

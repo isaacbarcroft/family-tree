@@ -2,7 +2,7 @@
 // Supabase / Resend / Next imports so the logic can be unit-tested in
 // isolation.
 
-import { parseLocalDate } from "@/utils/dates"
+import { parseLocalDate, recurringDateInYear } from "@/utils/dates"
 
 export type DigestFrequency = "off" | "daily" | "weekly"
 
@@ -173,7 +173,7 @@ function findOccurrenceInWindow(
   let year = since.getFullYear()
   const nowYear = now.getFullYear()
   while (year <= nowYear) {
-    const occurrence = new Date(year, source.getMonth(), source.getDate())
+    const occurrence = recurringDateInYear(year, source.getMonth(), source.getDate())
     const occurrenceTime = occurrence.getTime()
     if (!Number.isNaN(occurrenceTime)) {
       if (occurrenceTime > sinceTime && occurrenceTime <= now.getTime()) {
