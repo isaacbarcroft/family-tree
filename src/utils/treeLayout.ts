@@ -134,3 +134,109 @@ export function edgePath(e: Edge): string {
   const midY = e.parentY + (e.childY - e.parentY) / 2
   return `M ${e.parentX} ${e.parentY} L ${e.parentX} ${midY} L ${e.childX} ${midY} L ${e.childX} ${e.childY}`
 }
+
+// Per-treeitem navigation info used by GenealogyTree to implement the W3C
+// tree-widget pattern (roving tabindex + arrow-key movement). One entry per
+// treeitem id, where a couple LayoutNode contributes two ids (left + right).
+//
+// Siblings are treeitems whose layout-parent is the same: both halves of the
+// same couple AND all treeitems contributed by sibling layout nodes. The flat
+// order within a sibling group is left-then-right per couple, then the next
+// sibling layout node, in layout order.
+//
+// The parent of a treeitem is the FIRST treeitem id contributed by its layout
+// node's parent (or null at the top level). For couples, we deliberately pick
+// the left half as the canonical parent so ArrowUp is deterministic; users
+// can press ArrowRight from there to reach the right half.
+//
+// FirstChildId is the first treeitem id contributed by its layout node's first
+// child (or null for leaves).
+export interface TreeNavInfo {
+  id: string
+  level: number
+  parentId: string | null
+  firstChildId: string | null
+  prevSiblingId: string | null
+  nextSiblingId: string | null
+  posInSet: number
+  setSize: number
+}
+
+export interface TreeNavMap {
+  byId: Map<string, TreeNavInfo>
+  order: string[]
+  firstId: string | null
+}
+
+function getTreeItemIds(node: LayoutNode): string[] {
+  const attrs = node.data.attributes ?? {}
+  const ids: string[] = []
+  if (attrs.id) ids.push(attrs.id)
+  if (attrs.spouseId) ids.push(attrs.spouseId)
+  return ids
+}
+
+export function buildTreeNavMap(root: LayoutNode): TreeNavMap {
+  const byId = new Map<string, TreeNavInfo>()
+  const order: string[] = []
+
+  function preOrder(node: LayoutNode): void {
+    for (const id of getTreeItemIds(node)) {
+      order.push(id)
+    }
+    for (const child of node.children) {
+      preOrder(child)
+    }
+  }
+  preOrder(root)
+
+  // The aria-level for the first row of treeitems is 1. When the layout root
+  // is the synthetic family wrapper (no ids of its own), its children form
+  // that first row; when the layout root itself carries treeitem ids (the
+  // single-root collapse in buildHierarchy), the root IS the first row.
+  const rootHasIds = getTreeItemIds(root).length > 0
+  const levelOffset = rootHasIds ? 0 : -1
+
+  function walk(
+    node: LayoutNode,
+    depth: number,
+    parentTreeItemId: string | null,
+    siblingFlatIds: string[],
+  ): void {
+    const myIds = getTreeItemIds(node)
+    const childrenFlatIds = node.children.flatMap(getTreeItemIds)
+    const firstChildId = childrenFlatIds[0] ?? null
+
+    for (const id of myIds) {
+      const idx = siblingFlatIds.indexOf(id)
+      const prevSiblingId = idx > 0 ? siblingFlatIds[idx - 1] : null
+      const nextSiblingId =
+        idx >= 0 && idx < siblingFlatIds.length - 1
+          ? siblingFlatIds[idx + 1]
+          : null
+      byId.set(id, {
+        id,
+        level: depth + 1 + levelOffset,
+        parentId: parentTreeItemId,
+        firstChildId,
+        prevSiblingId,
+        nextSiblingId,
+        posInSet: idx + 1,
+        setSize: siblingFlatIds.length,
+      })
+    }
+
+    const nextParentId = myIds[0] ?? parentTreeItemId
+    for (const child of node.children) {
+      walk(child, depth + 1, nextParentId, childrenFlatIds)
+    }
+  }
+
+  walk(root, 0, null, getTreeItemIds(root))
+
+  return {
+    byId,
+    order,
+    firstId: order[0] ?? null,
+  }
+}

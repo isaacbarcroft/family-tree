@@ -1,11 +1,19 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, useCallback } from "react"
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+  type KeyboardEvent,
+} from "react"
 import { zoom as d3Zoom, zoomIdentity, type ZoomBehavior } from "d3-zoom"
 import { select } from "d3-selection"
 import type { TreeNode as TreeNodeData } from "@/utils/treeBuilder"
 import { GENEALOGY_TREE_HEIGHT } from "@/config/constants"
 import {
+  buildTreeNavMap,
   collectEdges,
   computeBounds,
   edgePath,
@@ -32,6 +40,24 @@ interface GenealogyTreeProps {
   treeData: TreeNodeData
 }
 
+// Arrow keys plus Home / End move focus between treeitems per the W3C tree
+// pattern. ArrowLeft / ArrowRight walk horizontal siblings (including the
+// other half of the same couple); ArrowUp / ArrowDown walk between
+// generations. The user can still Tab into the tree, which lands them on
+// whichever treeitem currently holds tabIndex=0 (the active id).
+const ARROW_KEYS = new Set([
+  "ArrowLeft",
+  "ArrowRight",
+  "ArrowUp",
+  "ArrowDown",
+  "Home",
+  "End",
+])
+
+function escapeAttrValue(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
+}
+
 export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const gRef = useRef<SVGGElement>(null)
@@ -45,11 +71,19 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
   const nodes = useMemo(() => flattenNodes(layout), [layout])
   const edges = useMemo(() => collectEdges(layout), [layout])
   const bounds = useMemo(() => computeBounds(nodes), [nodes])
+  const navMap = useMemo(() => buildTreeNavMap(layout), [layout])
+  const [activeId, setActiveId] = useState<string | null>(navMap.firstId)
+  const moveFocusRef = useRef<string | null>(null)
 
-  // Reset the initial-fit flag whenever the tree data changes so the new tree gets centered.
+  // Reset the active treeitem and the initial-fit flag whenever the tree
+  // data changes. The user's pan / zoom is preserved because the zoom
+  // behavior itself is set up once.
   useEffect(() => {
     initialFitDoneRef.current = false
   }, [treeData])
+  useEffect(() => {
+    setActiveId(navMap.firstId)
+  }, [navMap])
 
   // Measure container, including on resize, so the fit math stays accurate.
   useEffect(() => {
@@ -130,6 +164,55 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
     [router]
   )
 
+  const handleNodeFocus = useCallback((personId: string) => {
+    setActiveId(personId)
+  }, [])
+
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent<SVGGElement>) => {
+      if (!ARROW_KEYS.has(e.key)) return
+      if (!activeId) return
+      const info = navMap.byId.get(activeId)
+      if (!info) return
+
+      let nextId: string | null = null
+      if (e.key === "ArrowLeft") nextId = info.prevSiblingId
+      if (e.key === "ArrowRight") nextId = info.nextSiblingId
+      if (e.key === "ArrowUp") nextId = info.parentId
+      if (e.key === "ArrowDown") nextId = info.firstChildId
+      if (e.key === "Home") nextId = navMap.order[0] ?? null
+      if (e.key === "End") {
+        nextId = navMap.order[navMap.order.length - 1] ?? null
+      }
+
+      // Swallow the key in all arrow / Home / End cases so the scroll
+      // container does not also pan. If there's no neighbour, the key still
+      // does nothing visible, which is the right outcome.
+      e.preventDefault()
+      e.stopPropagation()
+      if (!nextId || nextId === activeId) return
+      setActiveId(nextId)
+      moveFocusRef.current = nextId
+    },
+    [activeId, navMap],
+  )
+
+  // After setActiveId schedules a re-render with the new tabIndex layout,
+  // imperatively move DOM focus to the newly-active treeitem so screen readers
+  // and keyboard users follow.
+  useEffect(() => {
+    const targetId = moveFocusRef.current
+    if (!targetId) return
+    const g = gRef.current
+    if (!g) return
+    const selector = `[data-treeitem-id="${escapeAttrValue(targetId)}"]`
+    const el = g.querySelector(selector)
+    if (el instanceof SVGElement || el instanceof HTMLElement) {
+      el.focus()
+    }
+    moveFocusRef.current = null
+  }, [activeId])
+
   return (
     <div
       ref={containerRef}
@@ -163,8 +246,9 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
         </defs>
         <g
           ref={gRef}
-          role="group"
-          aria-label="Family tree. Press Tab to move between people, then Enter or Space to open a profile."
+          role="tree"
+          aria-label="Family tree. Press Tab to enter, arrow keys to move between people, Home or End to jump to the first or last, and Enter or Space to open a profile."
+          onKeyDown={handleKeyDown}
         >
           {/* Edges — purely decorative connecting lines, hidden from assistive tech. */}
           {edges.map((e, i) => (
@@ -181,7 +265,14 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
 
           {/* Nodes */}
           {nodes.map((node, i) => (
-            <TreeNode key={i} node={node} onNavigate={navigateToProfile} />
+            <TreeNode
+              key={i}
+              node={node}
+              onNavigate={navigateToProfile}
+              navMap={navMap}
+              activeId={activeId}
+              onFocus={handleNodeFocus}
+            />
           ))}
         </g>
       </svg>
