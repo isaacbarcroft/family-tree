@@ -77,9 +77,32 @@ function removedSuffix(removed: number): string {
   return ` ${removed} times removed`
 }
 
+// Count parents present in both `personA.parentIds` and `personB.parentIds`.
+// Used to distinguish full siblings (two shared parents) from half-siblings
+// (exactly one). Parents that are not present in `peopleById` still count —
+// the comparison is by id alone, so a known shared parent who is missing from
+// the lookup map still informs the label.
+function sharedParentCount(
+  personAId: string,
+  personBId: string,
+  peopleById: Map<string, Person>,
+): number {
+  const personA = peopleById.get(personAId)
+  const personB = peopleById.get(personBId)
+  if (!personA || !personB) return 0
+  const parentsA = new Set(personA.parentIds ?? [])
+  let shared = 0
+  for (const pid of personB.parentIds ?? []) {
+    if (parentsA.has(pid)) shared += 1
+  }
+  return shared
+}
+
 // Given the BFS distances from each person to their lowest common ancestor,
-// produce the English label describing how B is related to A.
-function bloodLabel(stepsA: number, stepsB: number): string {
+// produce the English label describing how B is related to A. `sharedParents`
+// is only consulted in the sibling branch (stepsA === 1 && stepsB === 1) to
+// distinguish full siblings from half-siblings.
+function bloodLabel(stepsA: number, stepsB: number, sharedParents: number): string {
   if (stepsA === 0 && stepsB === 0) return "Self"
 
   // A is the LCA → B is a descendant of A.
@@ -95,7 +118,10 @@ function bloodLabel(stepsA: number, stepsB: number): string {
   }
 
   // Both nonzero → collateral relationship.
-  if (stepsA === 1 && stepsB === 1) return "Sibling"
+  if (stepsA === 1 && stepsB === 1) {
+    if (sharedParents <= 1) return "Half-sibling"
+    return "Sibling"
+  }
 
   // A's parent (or grandparent, etc.) is the LCA and B sits on a sibling
   // branch below the LCA → B is a (great-)niece/nephew of A.
@@ -128,8 +154,12 @@ function bloodLabel(stepsA: number, stepsB: number): string {
 //     biological links because `Person.parentIds` is denormalized without
 //     subtype. Callers that need to distinguish should consult the
 //     `relationships` table directly.
-//   - Half-siblings are labeled "Sibling"; this could be refined by checking
-//     whether both parents are shared.
+//   - Half-siblings are detected via the count of shared parent ids on the two
+//     `Person.parentIds` arrays. A missing parent on either side (parentIds of
+//     length 1) is treated the same as a known non-shared parent, so a person
+//     with one recorded parent who shares that parent with a sibling will be
+//     labeled "Half-sibling". If both parents are unknown on either side the
+//     pair will not appear related at all (no common ancestor in the BFS).
 export function findRelationship(
   personAId: string,
   personBId: string,
@@ -187,8 +217,13 @@ export function findRelationship(
 
   if (bestAncestor === null) return null
 
+  const shared =
+    bestStepsA === 1 && bestStepsB === 1
+      ? sharedParentCount(personAId, personBId, peopleById)
+      : 0
+
   return {
-    label: bloodLabel(bestStepsA, bestStepsB),
+    label: bloodLabel(bestStepsA, bestStepsB, shared),
     kind: "blood",
     stepsA: bestStepsA,
     stepsB: bestStepsB,
