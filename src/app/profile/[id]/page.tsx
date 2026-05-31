@@ -630,6 +630,8 @@ function Hero({
           rounded={2}
           frame
           label={`${person.firstName}'s portrait`}
+          sizes="(min-width: 1024px) 440px, (min-width: 768px) 360px, 100vw"
+          priority
         />
         <p
           className="display-italic muted"
@@ -1021,7 +1023,13 @@ function GalleryGrid({ memories }: { memories: Memory[] }) {
   return (
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
       <figure className="m-0 lg:col-span-5">
-        <PhotoFrame src={heroSrc} alt={hero.title} ratio="4 / 5" rounded={2} />
+        <PhotoFrame
+          src={heroSrc}
+          alt={hero.title}
+          ratio="4 / 5"
+          rounded={2}
+          sizes="(min-width: 1024px) 410px, 100vw"
+        />
         <figcaption className="display-italic muted mt-2" style={{ fontSize: 12 }}>
           {hero.title}
           {hero.date ? <> · {formatDate(hero.date)}</> : null}
@@ -1032,7 +1040,13 @@ function GalleryGrid({ memories }: { memories: Memory[] }) {
           const src = toDisplayImageUrl(m.imageUrls?.[0]) || null;
           return (
             <figure key={m.id} className="m-0">
-              <PhotoFrame src={src} alt={m.title} ratio="4 / 3" rounded={2} />
+              <PhotoFrame
+                src={src}
+                alt={m.title}
+                ratio="4 / 3"
+                rounded={2}
+                sizes="(min-width: 1024px) 290px, 50vw"
+              />
               <figcaption
                 className="display-italic muted mt-2"
                 style={{ fontSize: 12 }}

@@ -363,7 +363,15 @@ function PersonCard({
         className="block"
         style={{ textDecoration: "none", color: "inherit" }}
       >
-        <PhotoFrame src={p.profilePhotoUrl} alt={fullName} ratio="3 / 4" rounded={4} frame label={p.firstName} />
+        <PhotoFrame
+          src={p.profilePhotoUrl}
+          alt={fullName}
+          ratio="3 / 4"
+          rounded={4}
+          frame
+          label={p.firstName}
+          sizes="(min-width: 1024px) 240px, (min-width: 640px) 33vw, 50vw"
+        />
         <div className="mt-3">
           <div
             className="display"
