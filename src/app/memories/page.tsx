@@ -312,6 +312,11 @@ function MemoryCard({
           ratio={isExpanded ? "21 / 9" : "4 / 3"}
           rounded={0}
           label={m.title}
+          sizes={
+            isExpanded
+              ? "(min-width: 768px) 768px, 100vw"
+              : "(min-width: 1024px) 320px, (min-width: 640px) 50vw, 100vw"
+          }
         />
       </button>
 
@@ -430,6 +435,7 @@ function MemoryCard({
                         alt={`${m.title} ${i + 1}`}
                         ratio="1 / 1"
                         rounded={2}
+                        sizes="(min-width: 640px) 240px, 50vw"
                       />
                     ))}
                   </div>
