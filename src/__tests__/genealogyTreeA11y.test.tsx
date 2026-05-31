@@ -67,14 +67,14 @@ describe("GenealogyTree accessibility", () => {
     }
   })
 
-  it("labels the inner tree group with role and a usage hint", () => {
+  it("labels the inner tree container with role='tree' and an arrow-key usage hint", () => {
     const { container } = render(<GenealogyTree treeData={tree()} />)
 
-    const labelled = container.querySelector('g[role="group"]')
+    const labelled = container.querySelector('g[role="tree"]')
     expect(labelled).not.toBeNull()
     const label = labelled?.getAttribute("aria-label") ?? ""
     expect(label).toContain("Family tree")
-    expect(label).toContain("Tab")
+    expect(label).toMatch(/arrow keys/i)
     expect(label).toMatch(/Enter|Space/)
   })
 
@@ -96,15 +96,21 @@ describe("GenealogyTree accessibility", () => {
     }
   })
 
-  it("keeps interactive person nodes focusable inside the labelled group", () => {
+  it("keeps interactive person nodes as treeitems inside the labelled tree", () => {
     const { container } = render(<GenealogyTree treeData={tree()} />)
 
-    const group = container.querySelector('g[role="group"]')
+    const group = container.querySelector('g[role="tree"]')
     expect(group).not.toBeNull()
-    const buttons = group?.querySelectorAll('g[role="button"]')
-    expect(buttons?.length ?? 0).toBeGreaterThan(0)
-    for (const btn of Array.from(buttons ?? [])) {
-      expect(btn.getAttribute("tabindex")).toBe("0")
-    }
+    const treeitems = group?.querySelectorAll('g[role="treeitem"]')
+    expect(treeitems?.length ?? 0).toBeGreaterThan(0)
+    // Roving-tabindex contract: exactly one treeitem is in the tab cycle.
+    const tabbable = Array.from(treeitems ?? []).filter(
+      (t) => t.getAttribute("tabindex") === "0",
+    )
+    const untabbable = Array.from(treeitems ?? []).filter(
+      (t) => t.getAttribute("tabindex") === "-1",
+    )
+    expect(tabbable.length).toBe(1)
+    expect(tabbable.length + untabbable.length).toBe(treeitems?.length ?? 0)
   })
 })

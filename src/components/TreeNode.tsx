@@ -45,13 +45,25 @@ function getInitials(name: string): string {
 interface TreeNodeProps {
   node: LayoutNode
   onNavigate: (personId: string) => void
+  focusedId: string | null
+  registerRef: (id: string, el: SVGGElement | null) => void
 }
 
-function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
+function TreeNodeComponent({
+  node,
+  onNavigate,
+  focusedId,
+  registerRef,
+}: TreeNodeProps) {
   const attrs = node.data.attributes ?? {}
   const isCouple = !!attrs.spouseId
   const isRoot = !attrs.id && !attrs.spouseId
   const isDeceased = !!attrs.death
+  // aria-level is 1-based per WAI-ARIA. The synthetic family-root sits at
+  // layout level 0 but is not a treeitem, so the first interactive depth
+  // surfaces as level 2 to screen readers — acceptable trade-off since the
+  // alternative (re-mapping levels) loses fidelity for trees without a root.
+  const ariaLevel = node.level + 1
 
   if (isRoot && !isCouple) {
     return (
@@ -82,6 +94,12 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
     const rightId = attrs.spouseId
     const activateLeft = leftId ? () => onNavigate(leftId) : undefined
     const activateRight = rightId ? () => onNavigate(rightId) : undefined
+    const leftRefCb = leftId
+      ? (el: SVGGElement | null) => registerRef(leftId, el)
+      : undefined
+    const rightRefCb = rightId
+      ? (el: SVGGElement | null) => registerRef(rightId, el)
+      : undefined
 
     return (
       <g transform={`translate(${nodeX}, ${nodeY})`}>
@@ -96,12 +114,17 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
 
         {/* Left person */}
         <g
+          ref={leftRefCb}
+          data-tree-item-id={leftId}
           onClick={activateLeft}
           onKeyDown={
             activateLeft ? (e) => handleKeyActivate(e, activateLeft) : undefined
           }
-          role={activateLeft ? "button" : undefined}
-          tabIndex={activateLeft ? 0 : -1}
+          role={activateLeft ? "treeitem" : undefined}
+          tabIndex={
+            activateLeft ? (focusedId === leftId ? 0 : -1) : undefined
+          }
+          aria-level={activateLeft ? ariaLevel : undefined}
           aria-label={activateLeft ? `Open profile for ${name1}` : undefined}
           className={activateLeft ? "tree-node-interactive" : undefined}
           style={{ cursor: "pointer" }}
@@ -146,14 +169,19 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
 
         {/* Right person (spouse) */}
         <g
+          ref={rightRefCb}
+          data-tree-item-id={rightId}
           onClick={activateRight}
           onKeyDown={
             activateRight
               ? (e) => handleKeyActivate(e, activateRight)
               : undefined
           }
-          role={activateRight ? "button" : undefined}
-          tabIndex={activateRight ? 0 : -1}
+          role={activateRight ? "treeitem" : undefined}
+          tabIndex={
+            activateRight ? (focusedId === rightId ? 0 : -1) : undefined
+          }
+          aria-level={activateRight ? ariaLevel : undefined}
           aria-label={activateRight ? `Open profile for ${name2}` : undefined}
           className={activateRight ? "tree-node-interactive" : undefined}
           style={{ cursor: "pointer" }}
@@ -193,6 +221,9 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
   const birthStr = attrs.birth ? formatDate(attrs.birth) : ""
   const deathStr = attrs.death ? formatDate(attrs.death) : ""
   const activate = personId ? () => onNavigate(personId) : undefined
+  const singleRefCb = personId
+    ? (el: SVGGElement | null) => registerRef(personId, el)
+    : undefined
   const dateLabel = (() => {
     if (isDeceased && birthStr && deathStr) return `, ${birthStr} to ${deathStr}`
     if (birthStr) return `, born ${birthStr}`
@@ -201,11 +232,16 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
 
   return (
     <g
+      ref={singleRefCb}
       transform={`translate(${nodeX}, ${nodeY})`}
+      data-tree-item-id={personId}
       onClick={activate}
       onKeyDown={activate ? (e) => handleKeyActivate(e, activate) : undefined}
-      role={activate ? "button" : undefined}
-      tabIndex={activate ? 0 : -1}
+      role={activate ? "treeitem" : undefined}
+      tabIndex={
+        activate ? (focusedId === personId ? 0 : -1) : undefined
+      }
+      aria-level={activate ? ariaLevel : undefined}
       aria-label={
         activate ? `Open profile for ${node.data.name}${dateLabel}` : undefined
       }
