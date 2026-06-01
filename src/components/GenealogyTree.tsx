@@ -12,6 +12,7 @@ import {
   flattenNodes,
   layoutTree,
 } from "@/utils/treeLayout"
+import { buildSlots, type SlotDirection } from "@/utils/treeSlots"
 import {
   AVATAR_CY,
   CLIP_ID_COUPLE_LEFT,
@@ -38,17 +39,38 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const zoomBehaviorRef = useRef<ZoomBehavior<SVGSVGElement, unknown> | null>(null)
   const initialFitDoneRef = useRef(false)
+  const pendingFocusRef = useRef<string | null>(null)
   const [dims, setDims] = useState({ width: 0, height: 0 })
+  const [activeKey, setActiveKey] = useState<string | null>(null)
+  const [prevTreeData, setPrevTreeData] = useState(treeData)
   const router = useRouter()
+
+  // Reset the focused treeitem whenever the tree data changes. Doing this
+  // during render (React 19 pattern, matching MemoryImage / PhotoFrame)
+  // avoids the set-state-in-effect anti-pattern. Ref resets live in an
+  // effect below (the lint rule forbids mutating refs during render too).
+  if (treeData !== prevTreeData) {
+    setPrevTreeData(treeData)
+    setActiveKey(null)
+  }
 
   const layout = useMemo(() => layoutTree(treeData), [treeData])
   const nodes = useMemo(() => flattenNodes(layout), [layout])
   const edges = useMemo(() => collectEdges(layout), [layout])
   const bounds = useMemo(() => computeBounds(nodes), [nodes])
+  const slots = useMemo(() => buildSlots(layout), [layout])
 
-  // Reset the initial-fit flag whenever the tree data changes so the new tree gets centered.
+  // One treeitem is focusable at a time. Until the user moves, default to the
+  // first slot so Tab into the tree lands on a real person rather than the
+  // outer container.
+  const effectiveActiveKey = activeKey ?? slots.firstKey
+
+  // Mirror the render-time state reset into the ref-tracked state so the
+  // initial-fit effect re-centers on the new tree and any stale focus
+  // request from before the swap is dropped.
   useEffect(() => {
     initialFitDoneRef.current = false
+    pendingFocusRef.current = null
   }, [treeData])
 
   // Measure container, including on resize, so the fit math stays accurate.
@@ -130,6 +152,33 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
     [router]
   )
 
+  const handleKeyNav = useCallback(
+    (direction: SlotDirection, fromPersonId: string) => {
+      const neighbors = slots.map.get(fromPersonId)
+      if (!neighbors) return
+      const next = neighbors[direction]
+      if (!next) return
+      pendingFocusRef.current = next
+      setActiveKey(next)
+    },
+    [slots]
+  )
+
+  // After the active treeitem changes via a key press, move DOM focus to it.
+  // Other state changes (initial render, resize-driven dims update) leave
+  // pendingFocusRef.current === null, so they don't steal focus.
+  useEffect(() => {
+    const pending = pendingFocusRef.current
+    if (!pending) return
+    const root = gRef.current
+    if (!root) return
+    const target = Array.from(
+      root.querySelectorAll<SVGGElement>("[data-tree-key]")
+    ).find((el) => el.dataset.treeKey === pending)
+    pendingFocusRef.current = null
+    if (target) target.focus()
+  }, [activeKey])
+
   return (
     <div
       ref={containerRef}
@@ -163,8 +212,8 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
         </defs>
         <g
           ref={gRef}
-          role="group"
-          aria-label="Family tree. Press Tab to move between people, then Enter or Space to open a profile."
+          role="tree"
+          aria-label="Family tree. Press Tab to enter, then arrow keys to move between people. Press Enter or Space to open a profile."
         >
           {/* Edges — purely decorative connecting lines, hidden from assistive tech. */}
           {edges.map((e, i) => (
@@ -180,9 +229,23 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
           ))}
 
           {/* Nodes */}
-          {nodes.map((node, i) => (
-            <TreeNode key={i} node={node} onNavigate={navigateToProfile} />
-          ))}
+          {nodes.map((node, i) => {
+            const attrs = node.data.attributes ?? {}
+            const isLeftActive =
+              !!attrs.id && attrs.id === effectiveActiveKey
+            const isRightActive =
+              !!attrs.spouseId && attrs.spouseId === effectiveActiveKey
+            return (
+              <TreeNode
+                key={i}
+                node={node}
+                onNavigate={navigateToProfile}
+                isLeftActive={isLeftActive}
+                isRightActive={isRightActive}
+                onKeyNav={handleKeyNav}
+              />
+            )
+          })}
         </g>
       </svg>
     </div>

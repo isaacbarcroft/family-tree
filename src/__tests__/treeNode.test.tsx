@@ -204,7 +204,7 @@ describe("TreeNode", () => {
     expect(TreeNode.displayName).toBe("TreeNode")
   })
 
-  it("exposes a single-person node as a focusable button to assistive tech", () => {
+  it("exposes a single-person node as a focusable treeitem to assistive tech", () => {
     const layout = singleLayoutNode({ id: "p1" }, "Alice Smith")
 
     const { container } = renderInSvg(
@@ -212,11 +212,24 @@ describe("TreeNode", () => {
     )
 
     const group = container.querySelector("g[transform]")
-    expect(group?.getAttribute("role")).toBe("button")
+    expect(group?.getAttribute("role")).toBe("treeitem")
     expect(group?.getAttribute("tabindex")).toBe("0")
     expect(group?.getAttribute("aria-label")).toBe(
       "Open profile for Alice Smith",
     )
+    expect(group?.getAttribute("data-tree-key")).toBe("p1")
+  })
+
+  it("renders an inactive treeitem with tabIndex -1 when isLeftActive is false", () => {
+    const layout = singleLayoutNode({ id: "p1" }, "Alice Smith")
+
+    const { container } = renderInSvg(
+      <TreeNode node={layout} onNavigate={() => {}} isLeftActive={false} />,
+    )
+
+    const group = container.querySelector("g[transform]")
+    expect(group?.getAttribute("role")).toBe("treeitem")
+    expect(group?.getAttribute("tabindex")).toBe("-1")
   })
 
   it("includes birth and death dates in the single-person aria-label", () => {
@@ -252,7 +265,7 @@ describe("TreeNode", () => {
     expect(onNavigate).toHaveBeenNthCalledWith(2, "p1")
   })
 
-  it("ignores other keys on a single-person node", () => {
+  it("does not activate onNavigate from non-Enter / non-Space keys", () => {
     const onNavigate = vi.fn()
     const layout = singleLayoutNode({ id: "p1" }, "Alice Smith")
 
@@ -265,6 +278,55 @@ describe("TreeNode", () => {
     fireEvent.keyDown(group!, { key: "ArrowDown" })
     fireEvent.keyDown(group!, { key: "a" })
     expect(onNavigate).not.toHaveBeenCalled()
+  })
+
+  it("routes arrow keys + Home + End to onKeyNav with the slot direction", () => {
+    const onKeyNav = vi.fn()
+    const layout = singleLayoutNode({ id: "p1" }, "Alice Smith")
+
+    const { container } = renderInSvg(
+      <TreeNode
+        node={layout}
+        onNavigate={() => {}}
+        onKeyNav={onKeyNav}
+      />,
+    )
+
+    const group = container.querySelector("g[transform]")
+    expect(group).not.toBeNull()
+    fireEvent.keyDown(group!, { key: "ArrowUp" })
+    fireEvent.keyDown(group!, { key: "ArrowDown" })
+    fireEvent.keyDown(group!, { key: "ArrowLeft" })
+    fireEvent.keyDown(group!, { key: "ArrowRight" })
+    fireEvent.keyDown(group!, { key: "Home" })
+    fireEvent.keyDown(group!, { key: "End" })
+    expect(onKeyNav).toHaveBeenNthCalledWith(1, "up", "p1")
+    expect(onKeyNav).toHaveBeenNthCalledWith(2, "down", "p1")
+    expect(onKeyNav).toHaveBeenNthCalledWith(3, "left", "p1")
+    expect(onKeyNav).toHaveBeenNthCalledWith(4, "right", "p1")
+    expect(onKeyNav).toHaveBeenNthCalledWith(5, "first", "p1")
+    expect(onKeyNav).toHaveBeenNthCalledWith(6, "last", "p1")
+  })
+
+  it("prevents default on arrow keys so the page does not pan", () => {
+    const layout = singleLayoutNode({ id: "p1" }, "Alice Smith")
+
+    const { container } = renderInSvg(
+      <TreeNode
+        node={layout}
+        onNavigate={() => {}}
+        onKeyNav={() => {}}
+      />,
+    )
+
+    const group = container.querySelector("g[transform]")
+    const event = new KeyboardEvent("keydown", {
+      key: "ArrowDown",
+      bubbles: true,
+      cancelable: true,
+    })
+    group!.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(true)
   })
 
   it("prevents default on Space to stop the page from scrolling", () => {
@@ -285,7 +347,7 @@ describe("TreeNode", () => {
     expect(event.defaultPrevented).toBe(true)
   })
 
-  it("does not expose a button role on the synthetic family-root label", () => {
+  it("does not expose a treeitem role on the synthetic family-root label", () => {
     const root: TreeNodeData = { name: "Smith Family", attributes: {} }
     const layout = layoutTree(root)
 
@@ -297,9 +359,10 @@ describe("TreeNode", () => {
     expect(group?.getAttribute("role")).toBeNull()
     expect(group?.getAttribute("tabindex")).toBeNull()
     expect(group?.getAttribute("aria-label")).toBeNull()
+    expect(group?.getAttribute("data-tree-key")).toBeNull()
   })
 
-  it("exposes both halves of a couple as focusable buttons with per-half labels", () => {
+  it("exposes both halves of a couple as focusable treeitems with per-half labels", () => {
     const layout = coupleLayoutNode(
       { id: "p1", spouseId: "p2" },
       "Alice & Bob Smith",
@@ -310,13 +373,38 @@ describe("TreeNode", () => {
     )
 
     const halves = Array.from(container.querySelectorAll("g")).filter(
-      (g) => g.getAttribute("role") === "button",
+      (g) => g.getAttribute("role") === "treeitem",
     )
     expect(halves.length).toBe(2)
     expect(halves[0].getAttribute("tabindex")).toBe("0")
     expect(halves[1].getAttribute("tabindex")).toBe("0")
     expect(halves[0].getAttribute("aria-label")).toBe("Open profile for Alice")
     expect(halves[1].getAttribute("aria-label")).toBe("Open profile for Bob Smith")
+    expect(halves[0].getAttribute("data-tree-key")).toBe("p1")
+    expect(halves[1].getAttribute("data-tree-key")).toBe("p2")
+  })
+
+  it("toggles tabIndex per half of a couple based on isLeftActive / isRightActive", () => {
+    const layout = coupleLayoutNode(
+      { id: "p1", spouseId: "p2" },
+      "Alice & Bob Smith",
+    )
+
+    const { container } = renderInSvg(
+      <TreeNode
+        node={layout}
+        onNavigate={() => {}}
+        isLeftActive={false}
+        isRightActive={true}
+      />,
+    )
+
+    const halves = Array.from(container.querySelectorAll("g")).filter(
+      (g) => g.getAttribute("role") === "treeitem",
+    )
+    expect(halves.length).toBe(2)
+    expect(halves[0].getAttribute("tabindex")).toBe("-1")
+    expect(halves[1].getAttribute("tabindex")).toBe("0")
   })
 
   it("activates each couple half independently on Enter", () => {
@@ -331,7 +419,7 @@ describe("TreeNode", () => {
     )
 
     const halves = Array.from(container.querySelectorAll("g")).filter(
-      (g) => g.getAttribute("role") === "button",
+      (g) => g.getAttribute("role") === "treeitem",
     )
     fireEvent.keyDown(halves[0], { key: "Enter" })
     fireEvent.keyDown(halves[1], { key: "Enter" })
@@ -355,10 +443,10 @@ describe("TreeNode", () => {
     )
 
     expect(
-      c1.querySelector("g.tree-node-interactive[role='button']"),
+      c1.querySelector("g.tree-node-interactive[role='treeitem']"),
     ).not.toBeNull()
     expect(
-      c2.querySelectorAll("g.tree-node-interactive[role='button']").length,
+      c2.querySelectorAll("g.tree-node-interactive[role='treeitem']").length,
     ).toBe(2)
   })
 })
