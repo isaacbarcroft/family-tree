@@ -36,7 +36,9 @@ describe("PhotoFrame", () => {
       <PhotoFrame src="https://example.com/replacement.jpg" alt="Eleanor at 22" label="photograph" />,
     );
     const img = screen.getByRole("img", { name: "Eleanor at 22" });
-    expect(img.getAttribute("src")).toBe("https://example.com/replacement.jpg");
+    // next/image rewrites the src through `/_next/image?url=...`, so assert
+    // the rendered img reflects the new source URL (encoded).
+    expect(img.getAttribute("src")).toContain(encodeURIComponent("https://example.com/replacement.jpg"));
   });
 
   it("applies the requested aspect ratio", () => {
@@ -50,5 +52,42 @@ describe("PhotoFrame", () => {
     const wrapper = container.firstElementChild as HTMLElement;
     expect(wrapper.style.border).toContain("1px solid");
     expect(wrapper.style.boxShadow).toContain("var(--shadow-sm)");
+  });
+
+  it("forwards the sizes prop to next/image (lets callers tune responsive variants)", () => {
+    render(
+      <PhotoFrame
+        src="https://example.com/photo.jpg"
+        alt="Eleanor at 22"
+        sizes="(min-width: 1024px) 320px, 50vw"
+      />,
+    );
+    const img = screen.getByRole("img", { name: "Eleanor at 22" });
+    expect(img.getAttribute("sizes")).toBe("(min-width: 1024px) 320px, 50vw");
+  });
+
+  it("lazy-loads by default and only marks priority images eager", () => {
+    const { rerender } = render(
+      <PhotoFrame src="https://example.com/lazy.jpg" alt="lazy" />,
+    );
+    expect(screen.getByRole("img", { name: "lazy" }).getAttribute("loading")).toBe("lazy");
+
+    rerender(<PhotoFrame src="https://example.com/hero.jpg" alt="hero" priority />);
+    expect(screen.getByRole("img", { name: "hero" }).getAttribute("loading")).not.toBe("lazy");
+  });
+
+  it("skips the next/image optimizer for blob URLs (upload preview)", () => {
+    render(<PhotoFrame src="blob:http://localhost/abc-123" alt="upload preview" />);
+    const img = screen.getByRole("img", { name: "upload preview" });
+    // Unoptimized mode passes the original src straight through instead of
+    // routing it via `/_next/image?url=...`.
+    expect(img.getAttribute("src")).toBe("blob:http://localhost/abc-123");
+  });
+
+  it("skips the next/image optimizer for Supabase render-image URLs (preserves HEIC format params)", () => {
+    const renderUrl = "https://abc.supabase.co/storage/v1/render/image/public/memories/photo.heic?format=jpeg&quality=85";
+    render(<PhotoFrame src={renderUrl} alt="HEIC memory" />);
+    const img = screen.getByRole("img", { name: "HEIC memory" });
+    expect(img.getAttribute("src")).toBe(renderUrl);
   });
 });

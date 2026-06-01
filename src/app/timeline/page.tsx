@@ -283,6 +283,7 @@ function TimelineRow({
             alt={item.title}
             ratio="1 / 1"
             rounded={2}
+            sizes="64px"
             style={{ width: 64, flexShrink: 0 }}
           />
         ) : null}
