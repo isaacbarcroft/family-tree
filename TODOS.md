@@ -10,14 +10,14 @@
 
 ## Next up
 
-**In priority order (refreshed 2026-05-27):**
+**In priority order (refreshed 2026-06-01):**
 
 1. **1.6.a Arrow-key navigation on the D3 tree.** Upgrade the tree to W3C tree-widget semantics (`role="tree"` / `role="treeitem"` with arrow-key roving tabindex). Largest remaining 1.6 sub-piece.
 2. **1.6.b Per-section `<section>` / `<article>` landmarks inside page bodies.** Page shells already get `<main>` and `<nav>` via layout; this is the inner-content landmark pass.
 3. **1.6.d Run [axe DevTools](https://www.deque.com/axe/devtools/)** and fix all critical / serious issues. Best done after 1.6.a and 1.6.b so the tree and landmark changes are reflected in the report.
 4. **T-15** — `middleware.ts` for route-level auth. Defense-in-depth on top of RLS. **Re-scope note:** the current `src/lib/supabase.ts` is a hand-rolled client that stores the session in `localStorage`, not in an HTTP cookie. Edge middleware can't read `localStorage`, so the TODOS' 1h estimate undercounts the work — this is either a full migration to `@supabase/ssr` (cookie-based sessions, several hours plus a re-test of every auth path) or a narrower "redirect any request without an `apikey`/`Authorization` cookie to `/login`" pattern that requires the client to first set such a cookie. Worth a separate scoping conversation with Isaac.
 5. **1.4** — guided story prompts. Last unshipped Phase 1 engagement feature.
-6. **T-3** — extend `next/image` adoption beyond `ProfileAvatar`.
+6. **T-3.a / T-3.b** — finish off image optimization: delete the dead `MemoryImage` component (replaced by `PhotoFrame`) and migrate `ui/Avatar` to `next/image`. The big `PhotoFrame` → `next/image` migration shipped 2026-06-01.
 
 ---
 
@@ -319,10 +319,14 @@ Current tests cover utilities (dates, colors, enums, gedcom, geocode, normalize,
 - `PlacesMap` pin aggregation
   **Effort:** 10–12h
 
-### T-3. Image optimization (partially done)
+### T-3. Image optimization (partially done — 2026-06-01)
 
-`src/components/ProfileAvatar.tsx` already uses `next/image`. Memory thumbnails (`MemoryImage` and the per-tile renders on `/memories` and `/profile/[id]`) are still on plain `<img>` tags. Switch them to `next/image` with explicit `sizes`. Generate thumbnail variants on upload (sharp in an edge function or server action).
-**Effort:** 3h
+`src/components/ProfileAvatar.tsx` already uses `next/image`. `src/components/ui/PhotoFrame.tsx` — the design-system primitive used for every memory thumbnail, profile portrait, timeline tile, and family-tree grid card — also now uses `next/image` with `fill` + a `sizes` prop (default `(max-width: 768px) 100vw, 33vw`, with tighter per-call-site values for small fixed-width tiles like the 64–80px timeline / "In memory" thumbnails). Hero images on `/`, `/profile/[id]`, and the expanded memory card use `priority`. The optimizer is bypassed for `blob:`/`data:` URLs (upload preview) and Supabase's `/storage/v1/render/image/public/` endpoint (already returns the HEIC→JPEG conversion via `toDisplayImageUrl`). Coverage: 4 new Vitest cases in `src/__tests__/ui/PhotoFrame.test.tsx`. **Open follow-ups:**
+
+- **T-3.a** Delete the now-unused `src/components/MemoryImage.tsx` + its test. Replaced by `PhotoFrame` in the design-system refresh; the only remaining importer is its own test file. +15min.
+- **T-3.b** Migrate `src/components/ui/Avatar.tsx` (new design-system avatar) to `next/image` as well — it's currently still a raw `<img>` with no lazy/responsive handling. ~30min.
+- **T-3.c** Generate thumbnail variants on upload (sharp in an edge function or server action) so the optimizer doesn't fetch the full original each time. +2h.
+
 **Reference:** [next/image docs](https://nextjs.org/docs/app/api-reference/components/image)
 
 ### ~~T-4. Error boundaries around top-level pages~~ ✅ Done 2026-04-25
