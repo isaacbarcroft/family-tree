@@ -67,14 +67,15 @@ describe("GenealogyTree accessibility", () => {
     }
   })
 
-  it("labels the inner tree group with role and a usage hint", () => {
+  it("labels the inner tree container with role=tree and a usage hint", () => {
     const { container } = render(<GenealogyTree treeData={tree()} />)
 
-    const labelled = container.querySelector('g[role="group"]')
+    const labelled = container.querySelector('g[role="tree"]')
     expect(labelled).not.toBeNull()
     const label = labelled?.getAttribute("aria-label") ?? ""
     expect(label).toContain("Family tree")
     expect(label).toContain("Tab")
+    expect(label).toMatch(/arrow keys/i)
     expect(label).toMatch(/Enter|Space/)
   })
 
@@ -96,15 +97,23 @@ describe("GenealogyTree accessibility", () => {
     }
   })
 
-  it("keeps interactive person nodes focusable inside the labelled group", () => {
+  it("nests every interactive person node as a treeitem inside the tree container", () => {
     const { container } = render(<GenealogyTree treeData={tree()} />)
 
-    const group = container.querySelector('g[role="group"]')
-    expect(group).not.toBeNull()
-    const buttons = group?.querySelectorAll('g[role="button"]')
-    expect(buttons?.length ?? 0).toBeGreaterThan(0)
-    for (const btn of Array.from(buttons ?? [])) {
-      expect(btn.getAttribute("tabindex")).toBe("0")
-    }
+    const treeContainer = container.querySelector('g[role="tree"]')
+    expect(treeContainer).not.toBeNull()
+    const items = treeContainer?.querySelectorAll('g[role="treeitem"]')
+    expect(items?.length ?? 0).toBeGreaterThan(0)
+  })
+
+  it("keeps exactly one treeitem focusable at a time (roving tabindex)", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+
+    const items = container.querySelectorAll('g[role="treeitem"]')
+    expect(items.length).toBeGreaterThan(1)
+    const focusable = Array.from(items).filter(
+      (el) => el.getAttribute("tabindex") === "0",
+    )
+    expect(focusable.length).toBe(1)
   })
 })

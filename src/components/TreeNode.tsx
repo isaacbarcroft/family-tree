@@ -3,21 +3,42 @@
 import { memo, type KeyboardEvent } from "react"
 import type { LayoutNode } from "@/utils/treeLayout"
 import { COUPLE_W, NODE_H, NODE_W } from "@/utils/treeLayout"
+import type { SlotDirection } from "@/utils/treeSlots"
 import { stringToColor } from "@/utils/colors"
 import { formatDate } from "@/utils/dates"
 
 const AVATAR_R = 22
 const MARRIAGE_BAR = 20
 
-// Enter and Space activate buttons per the WAI-ARIA button pattern.
-// preventDefault on Space stops the browser from scrolling the page.
-function handleKeyActivate(
+const ARROW_KEY_TO_DIRECTION: Record<string, SlotDirection> = {
+  ArrowUp: "up",
+  ArrowDown: "down",
+  ArrowLeft: "left",
+  ArrowRight: "right",
+  Home: "first",
+  End: "last",
+}
+
+// Treeitem keys per the W3C tree widget pattern. Enter and Space activate the
+// item; arrow keys + Home/End move focus to a sibling/parent/child treeitem
+// via the parent-supplied callback. preventDefault on Space stops the page
+// from scrolling; on arrow keys it stops the page from panning.
+function handleTreeItemKey(
   e: KeyboardEvent<SVGGElement>,
+  personId: string,
   activate: () => void,
+  onKeyNav: ((d: SlotDirection, p: string) => void) | undefined,
 ) {
-  if (e.key !== "Enter" && e.key !== " ") return
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault()
+    activate()
+    return
+  }
+  const direction = ARROW_KEY_TO_DIRECTION[e.key]
+  if (!direction) return
   e.preventDefault()
-  activate()
+  if (!onKeyNav) return
+  onKeyNav(direction, personId)
 }
 
 // Shared <clipPath> ids defined once in GenealogyTree's <defs>. The default
@@ -45,9 +66,18 @@ function getInitials(name: string): string {
 interface TreeNodeProps {
   node: LayoutNode
   onNavigate: (personId: string) => void
+  isLeftActive?: boolean
+  isRightActive?: boolean
+  onKeyNav?: (direction: SlotDirection, fromPersonId: string) => void
 }
 
-function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
+function TreeNodeComponent({
+  node,
+  onNavigate,
+  isLeftActive = true,
+  isRightActive = true,
+  onKeyNav,
+}: TreeNodeProps) {
   const attrs = node.data.attributes ?? {}
   const isCouple = !!attrs.spouseId
   const isRoot = !attrs.id && !attrs.spouseId
@@ -98,11 +128,14 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
         <g
           onClick={activateLeft}
           onKeyDown={
-            activateLeft ? (e) => handleKeyActivate(e, activateLeft) : undefined
+            activateLeft && leftId
+              ? (e) => handleTreeItemKey(e, leftId, activateLeft, onKeyNav)
+              : undefined
           }
-          role={activateLeft ? "button" : undefined}
-          tabIndex={activateLeft ? 0 : -1}
+          role={activateLeft ? "treeitem" : undefined}
+          tabIndex={activateLeft ? (isLeftActive ? 0 : -1) : undefined}
           aria-label={activateLeft ? `Open profile for ${name1}` : undefined}
+          data-tree-key={leftId}
           className={activateLeft ? "tree-node-interactive" : undefined}
           style={{ cursor: "pointer" }}
         >
@@ -148,13 +181,14 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
         <g
           onClick={activateRight}
           onKeyDown={
-            activateRight
-              ? (e) => handleKeyActivate(e, activateRight)
+            activateRight && rightId
+              ? (e) => handleTreeItemKey(e, rightId, activateRight, onKeyNav)
               : undefined
           }
-          role={activateRight ? "button" : undefined}
-          tabIndex={activateRight ? 0 : -1}
+          role={activateRight ? "treeitem" : undefined}
+          tabIndex={activateRight ? (isRightActive ? 0 : -1) : undefined}
           aria-label={activateRight ? `Open profile for ${name2}` : undefined}
+          data-tree-key={rightId}
           className={activateRight ? "tree-node-interactive" : undefined}
           style={{ cursor: "pointer" }}
         >
@@ -203,12 +237,17 @@ function TreeNodeComponent({ node, onNavigate }: TreeNodeProps) {
     <g
       transform={`translate(${nodeX}, ${nodeY})`}
       onClick={activate}
-      onKeyDown={activate ? (e) => handleKeyActivate(e, activate) : undefined}
-      role={activate ? "button" : undefined}
-      tabIndex={activate ? 0 : -1}
+      onKeyDown={
+        activate && personId
+          ? (e) => handleTreeItemKey(e, personId, activate, onKeyNav)
+          : undefined
+      }
+      role={activate ? "treeitem" : undefined}
+      tabIndex={activate ? (isLeftActive ? 0 : -1) : undefined}
       aria-label={
         activate ? `Open profile for ${node.data.name}${dateLabel}` : undefined
       }
+      data-tree-key={personId}
       className={activate ? "tree-node-interactive" : undefined}
       style={{ cursor: activate ? "pointer" : "default" }}
     >
