@@ -528,6 +528,7 @@ function FeaturedMemory({ memory }: { memory: Memory | null }) {
           rounded={4}
           frame
           label={memory.title}
+          sizes="(min-width: 1024px) 600px, (min-width: 640px) 60vw, 100vw"
         />
         <div className="mt-5">
           <h3 className="display m-0" style={{ fontSize: 28, fontWeight: 500, color: "var(--ink)" }}>
@@ -736,6 +737,7 @@ function InMemoryColumn({ person }: { person: Person }) {
           rounded={2}
           frame
           style={{ width: 80, flexShrink: 0 }}
+          sizes="80px"
         />
         <div>
           <h4 className="display-italic m-0" style={{ fontSize: 20 }}>
