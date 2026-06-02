@@ -21,7 +21,9 @@ import {
   COUPLE_RIGHT_CX,
   SINGLE_AVATAR_CX,
   TreeNode,
+  type TreeItemHandlers,
 } from "@/components/TreeNode"
+import { buildTreeItems, nextFocusKey, type ArrowDirection } from "@/utils/treeNav"
 import { useRouter } from "next/navigation"
 
 const AVATAR_R = 22
@@ -45,6 +47,36 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
   const nodes = useMemo(() => flattenNodes(layout), [layout])
   const edges = useMemo(() => collectEdges(layout), [layout])
   const bounds = useMemo(() => computeBounds(nodes), [nodes])
+  const treeItems = useMemo(() => buildTreeItems(layout), [layout])
+  const treeItemsByKey = useMemo(() => {
+    const map = new Map<string, (typeof treeItems)[number]>()
+    for (const it of treeItems) map.set(it.key, it)
+    return map
+  }, [treeItems])
+
+  // Roving tabindex: exactly one treeitem holds tabIndex=0 at a time. We
+  // store the user's explicit pick separately so we can derive an effective
+  // focusedKey at render time (falling back to the first focusable item
+  // whenever the explicit pick is missing or no longer in the tree). This
+  // avoids needing a state-in-effect reset when treeData changes.
+  const [explicitFocusedKey, setExplicitFocusedKey] = useState<string | null>(
+    null,
+  )
+  const focusedKey =
+    explicitFocusedKey && treeItemsByKey.has(explicitFocusedKey)
+      ? explicitFocusedKey
+      : treeItems[0]?.key ?? null
+
+  // Element refs for programmatic focus. Stored in a ref'd Map so child
+  // treeitems can register themselves without forcing a re-render.
+  const elementRefs = useRef<Map<string, SVGGElement>>(new Map())
+  const registerRef = useCallback((key: string, el: SVGGElement | null) => {
+    if (el) {
+      elementRefs.current.set(key, el)
+      return
+    }
+    elementRefs.current.delete(key)
+  }, [])
 
   // Reset the initial-fit flag whenever the tree data changes so the new tree gets centered.
   useEffect(() => {
@@ -130,6 +162,28 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
     [router]
   )
 
+  const handleArrow = useCallback(
+    (currentKey: string, direction: ArrowDirection) => {
+      const target = nextFocusKey(currentKey, direction, treeItems)
+      if (!target) return
+      setExplicitFocusedKey(target)
+      const el = elementRefs.current.get(target)
+      if (el) el.focus({ preventScroll: false })
+    },
+    [treeItems],
+  )
+
+  const handlers: TreeItemHandlers = useMemo(
+    () => ({
+      items: treeItemsByKey,
+      focusedKey,
+      onActivate: navigateToProfile,
+      onArrow: handleArrow,
+      registerRef,
+    }),
+    [treeItemsByKey, focusedKey, navigateToProfile, handleArrow, registerRef],
+  )
+
   return (
     <div
       ref={containerRef}
@@ -163,8 +217,8 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
         </defs>
         <g
           ref={gRef}
-          role="group"
-          aria-label="Family tree. Press Tab to move between people, then Enter or Space to open a profile."
+          role="tree"
+          aria-label="Family tree. Tab into the tree, then use arrow keys to move between people. Enter or Space opens a profile."
         >
           {/* Edges — purely decorative connecting lines, hidden from assistive tech. */}
           {edges.map((e, i) => (
@@ -181,7 +235,7 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
 
           {/* Nodes */}
           {nodes.map((node, i) => (
-            <TreeNode key={i} node={node} onNavigate={navigateToProfile} />
+            <TreeNode key={i} node={node} handlers={handlers} />
           ))}
         </g>
       </svg>
