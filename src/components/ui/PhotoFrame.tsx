@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from "react";
 import { useState } from "react";
+import Image from "next/image";
 
 type PhotoFrameProps = {
   src?: string | null;
@@ -12,6 +13,16 @@ type PhotoFrameProps = {
   style?: CSSProperties;
   rounded?: number;
   frame?: boolean;
+  /**
+   * `next/image` `sizes` hint. Pass the rendered width per breakpoint so the
+   * browser can pick the right variant from the srcset (e.g. "(min-width:
+   * 1024px) 480px, 100vw"). Defaults to "100vw" — accurate for full-bleed
+   * heroes; under-optimal for narrow tiles, so callers in grids should pass a
+   * tighter value.
+   */
+  sizes?: string;
+  /** Mark the image as a priority LCP candidate (skips lazy loading). */
+  priority?: boolean;
 };
 
 export function PhotoFrame({
@@ -23,13 +34,15 @@ export function PhotoFrame({
   style,
   rounded = 10,
   frame = false,
+  sizes = "100vw",
+  priority = false,
 }: PhotoFrameProps) {
   const [failed, setFailed] = useState(false);
   const [prevSrc, setPrevSrc] = useState(src);
 
   // Reset the error flag when the caller swaps the source. Doing this during
-  // render (React 19 pattern, matching MemoryImage / ProfileAvatar) avoids
-  // the cascading re-render a useEffect would cause.
+  // render (React 19 pattern, matching ProfileAvatar) avoids the cascading
+  // re-render a useEffect would cause.
   if (src !== prevSrc) {
     setPrevSrc(src);
     setFailed(false);
@@ -50,12 +63,15 @@ export function PhotoFrame({
       }}
     >
       {showImg && src ? (
-        <img
+        <Image
           src={src}
           alt={alt}
+          fill
+          sizes={sizes}
+          priority={priority}
           draggable={false}
           onError={() => setFailed(true)}
-          className="block h-full w-full object-cover"
+          className="block object-cover"
         />
       ) : (
         <div className="photo-placeholder h-full w-full">{label}</div>
