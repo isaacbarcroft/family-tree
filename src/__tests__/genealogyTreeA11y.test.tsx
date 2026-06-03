@@ -7,8 +7,6 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }))
 
-// d3-zoom and d3-selection touch the DOM in ways jsdom does not fully support
-// (zoom.transform calls into svg.__zoom). Stub both so the component renders.
 vi.mock("d3-zoom", () => {
   const zoomBehavior = () => {
     const fn = () => {}
@@ -32,7 +30,6 @@ vi.mock("d3-selection", () => ({
 }))
 
 function tree(): TreeNodeData {
-  // A 3-node parent → child layout so the layout helper emits at least one edge.
   return {
     name: "Smith Family",
     attributes: {},
@@ -50,8 +47,6 @@ function tree(): TreeNodeData {
 
 describe("GenealogyTree accessibility", () => {
   beforeEach(() => {
-    // jsdom does not implement getBoundingClientRect for SVG-hosted containers
-    // in a useful way; stub it so the component's measure step has finite dims.
     Element.prototype.getBoundingClientRect = function () {
       return {
         x: 0,
@@ -67,14 +62,14 @@ describe("GenealogyTree accessibility", () => {
     }
   })
 
-  it("labels the inner tree group with role and a usage hint", () => {
+  it("labels the inner tree container with role=tree and a usage hint", () => {
     const { container } = render(<GenealogyTree treeData={tree()} />)
 
-    const labelled = container.querySelector('g[role="group"]')
+    const labelled = container.querySelector('g[role="tree"]')
     expect(labelled).not.toBeNull()
     const label = labelled?.getAttribute("aria-label") ?? ""
     expect(label).toContain("Family tree")
-    expect(label).toContain("Tab")
+    expect(label).toMatch(/arrow|Arrow/)
     expect(label).toMatch(/Enter|Space/)
   })
 
@@ -96,15 +91,39 @@ describe("GenealogyTree accessibility", () => {
     }
   })
 
-  it("keeps interactive person nodes focusable inside the labelled group", () => {
+  it("exposes interactive person nodes as treeitems inside the tree", () => {
     const { container } = render(<GenealogyTree treeData={tree()} />)
 
-    const group = container.querySelector('g[role="group"]')
-    expect(group).not.toBeNull()
-    const buttons = group?.querySelectorAll('g[role="button"]')
-    expect(buttons?.length ?? 0).toBeGreaterThan(0)
-    for (const btn of Array.from(buttons ?? [])) {
-      expect(btn.getAttribute("tabindex")).toBe("0")
-    }
+    const treeContainer = container.querySelector('g[role="tree"]')
+    expect(treeContainer).not.toBeNull()
+    const items = treeContainer?.querySelectorAll('g[role="treeitem"]')
+    expect(items?.length ?? 0).toBeGreaterThan(0)
+  })
+
+  it("keeps exactly one treeitem in the roving-tabindex (tabindex=0) position", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+
+    const items = container.querySelectorAll('g[role="treeitem"]')
+    const tabIndices = Array.from(items).map((el) => el.getAttribute("tabindex"))
+    expect(tabIndices.filter((t) => t === "0").length).toBe(1)
+    expect(tabIndices.filter((t) => t === "-1").length).toBe(items.length - 1)
+  })
+
+  it("tags treeitems with aria-level reflecting their generation", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+
+    const items = Array.from(
+      container.querySelectorAll('g[role="treeitem"]'),
+    )
+    // p1 is at depth 1 (level 2), p2 is at depth 2 (level 3) under the
+    // synthetic family root.
+    const labels = items.map((el) => ({
+      label: el.getAttribute("aria-label"),
+      level: el.getAttribute("aria-level"),
+    }))
+    const alice = labels.find((l) => l.label?.includes("Alice"))
+    const bob = labels.find((l) => l.label?.includes("Bob"))
+    expect(alice?.level).toBe("2")
+    expect(bob?.level).toBe("3")
   })
 })
