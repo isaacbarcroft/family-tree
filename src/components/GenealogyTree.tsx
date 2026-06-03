@@ -1,6 +1,13 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, useCallback } from "react"
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+  type KeyboardEvent,
+} from "react"
 import { zoom as d3Zoom, zoomIdentity, type ZoomBehavior } from "d3-zoom"
 import { select } from "d3-selection"
 import type { TreeNode as TreeNodeData } from "@/utils/treeBuilder"
@@ -12,6 +19,11 @@ import {
   flattenNodes,
   layoutTree,
 } from "@/utils/treeLayout"
+import {
+  buildTreeNav,
+  isNavigationKey,
+  resolveNavigationKey,
+} from "@/utils/treeNavigation"
 import {
   AVATAR_CY,
   CLIP_ID_COUPLE_LEFT,
@@ -38,6 +50,7 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const zoomBehaviorRef = useRef<ZoomBehavior<SVGSVGElement, unknown> | null>(null)
   const initialFitDoneRef = useRef(false)
+  const itemRefs = useRef(new Map<string, SVGGElement>())
   const [dims, setDims] = useState({ width: 0, height: 0 })
   const router = useRouter()
 
@@ -45,13 +58,27 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
   const nodes = useMemo(() => flattenNodes(layout), [layout])
   const edges = useMemo(() => collectEdges(layout), [layout])
   const bounds = useMemo(() => computeBounds(nodes), [nodes])
+  const nav = useMemo(() => buildTreeNav(layout), [layout])
 
-  // Reset the initial-fit flag whenever the tree data changes so the new tree gets centered.
+  const [focusedPersonId, setFocusedPersonId] = useState<string | null>(
+    nav.firstId,
+  )
+  const [prevNav, setPrevNav] = useState(nav)
+
+  // Reset the roving-tabindex anchor when the nav graph changes and the
+  // previously focused id is no longer reachable. Doing this during render
+  // (React 19 pattern) avoids the cascading re-render a useEffect would cause.
+  if (prevNav !== nav) {
+    setPrevNav(nav)
+    if (!focusedPersonId || !nav.byId.has(focusedPersonId)) {
+      setFocusedPersonId(nav.firstId)
+    }
+  }
+
   useEffect(() => {
     initialFitDoneRef.current = false
   }, [treeData])
 
-  // Measure container, including on resize, so the fit math stays accurate.
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
@@ -68,8 +95,6 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
     return () => observer.disconnect()
   }, [])
 
-  // Set up the zoom behavior once. Re-running this on every treeData change was
-  // wiping the user's pan/zoom state on any parent re-render.
   useEffect(() => {
     if (!svgRef.current || !gRef.current) return
     const svg = select(svgRef.current)
@@ -110,7 +135,6 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
     )
   }, [bounds, dims])
 
-  // Apply the initial centering once per tree, and once dimensions are known.
   useEffect(() => {
     if (initialFitDoneRef.current) return
     if (!bounds) return
@@ -128,6 +152,37 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
       router.push(`/profile/${personId}`)
     },
     [router]
+  )
+
+  const registerItem = useCallback(
+    (personId: string, el: SVGGElement | null) => {
+      if (el === null) {
+        itemRefs.current.delete(personId)
+        return
+      }
+      itemRefs.current.set(personId, el)
+    },
+    [],
+  )
+
+  const handleItemKeyDown = useCallback(
+    (e: KeyboardEvent<SVGGElement>, personId: string) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault()
+        navigateToProfile(personId)
+        return
+      }
+      if (!isNavigationKey(e.key)) return
+      const map = nav.neighbors.get(personId)
+      if (!map) return
+      const targetId = resolveNavigationKey(e.key, map)
+      if (!targetId) return
+      e.preventDefault()
+      setFocusedPersonId(targetId)
+      const targetEl = itemRefs.current.get(targetId)
+      if (targetEl) targetEl.focus()
+    },
+    [nav, navigateToProfile],
   )
 
   return (
@@ -163,8 +218,8 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
         </defs>
         <g
           ref={gRef}
-          role="group"
-          aria-label="Family tree. Press Tab to move between people, then Enter or Space to open a profile."
+          role="tree"
+          aria-label="Family tree. Tab to enter, then use arrow keys to move between people; Home and End jump to the first or last person on a row; Enter or Space opens a profile."
         >
           {/* Edges — purely decorative connecting lines, hidden from assistive tech. */}
           {edges.map((e, i) => (
@@ -181,7 +236,15 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
 
           {/* Nodes */}
           {nodes.map((node, i) => (
-            <TreeNode key={i} node={node} onNavigate={navigateToProfile} />
+            <TreeNode
+              key={i}
+              node={node}
+              onNavigate={navigateToProfile}
+              nav={nav}
+              focusedPersonId={focusedPersonId}
+              onItemKeyDown={handleItemKeyDown}
+              registerItem={registerItem}
+            />
           ))}
         </g>
       </svg>
