@@ -36,7 +36,11 @@ describe("PhotoFrame", () => {
       <PhotoFrame src="https://example.com/replacement.jpg" alt="Eleanor at 22" label="photograph" />,
     );
     const img = screen.getByRole("img", { name: "Eleanor at 22" });
-    expect(img.getAttribute("src")).toBe("https://example.com/replacement.jpg");
+    // next/image rewrites the src through the /_next/image optimizer; the
+    // original URL is preserved as the `url=` query param.
+    expect(img.getAttribute("src")).toContain(
+      encodeURIComponent("https://example.com/replacement.jpg"),
+    );
   });
 
   it("applies the requested aspect ratio", () => {
@@ -50,5 +54,26 @@ describe("PhotoFrame", () => {
     const wrapper = container.firstElementChild as HTMLElement;
     expect(wrapper.style.border).toContain("1px solid");
     expect(wrapper.style.boxShadow).toContain("var(--shadow-sm)");
+  });
+
+  it("passes the sizes hint through to next/image", () => {
+    render(
+      <PhotoFrame
+        src="https://example.com/photo.jpg"
+        alt="grid tile"
+        sizes="(min-width: 1024px) 33vw, 100vw"
+      />,
+    );
+    const img = screen.getByRole("img", { name: "grid tile" });
+    expect(img.getAttribute("sizes")).toBe("(min-width: 1024px) 33vw, 100vw");
+  });
+
+  it("renders inside a position:relative parent (required by next/image fill)", () => {
+    const { container } = render(<PhotoFrame src="https://example.com/photo.jpg" alt="t" />);
+    const wrapper = container.firstElementChild as HTMLElement;
+    // The Tailwind `relative` class gives the fill-mode image a valid CSS
+    // containing block. JSDOM doesn't compute the cascade, so assert on the
+    // class instead of getComputedStyle.
+    expect(wrapper.className).toContain("relative");
   });
 });

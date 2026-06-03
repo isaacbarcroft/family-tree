@@ -12,7 +12,9 @@ describe("Avatar", () => {
     render(<Avatar name="Eleanor Barcroft" src="https://example.com/x.jpg" />);
     const img = screen.getByRole("img", { name: "Eleanor Barcroft" });
     expect(img).toBeInTheDocument();
-    expect(img.getAttribute("src")).toBe("https://example.com/x.jpg");
+    // next/image rewrites the src through the /_next/image optimizer; the
+    // original URL is preserved as the `url=` query param.
+    expect(img.getAttribute("src")).toContain(encodeURIComponent("https://example.com/x.jpg"));
   });
 
   it("falls back to initials when the image errors", () => {
@@ -31,7 +33,9 @@ describe("Avatar", () => {
 
     rerender(<Avatar name="Margaret Doe" src="https://example.com/replacement.jpg" />);
     const img = screen.getByRole("img", { name: "Margaret Doe" });
-    expect(img.getAttribute("src")).toBe("https://example.com/replacement.jpg");
+    expect(img.getAttribute("src")).toContain(
+      encodeURIComponent("https://example.com/replacement.jpg"),
+    );
   });
 
   it("caps initials at two characters", () => {
@@ -44,5 +48,12 @@ describe("Avatar", () => {
     const wrapper = container.firstElementChild as HTMLElement;
     expect(wrapper.style.width).toBe("64px");
     expect(wrapper.style.height).toBe("64px");
+  });
+
+  it("passes the size through to next/image width and height attributes", () => {
+    render(<Avatar name="Henry Wells" src="https://example.com/h.jpg" size={56} />);
+    const img = screen.getByRole("img", { name: "Henry Wells" });
+    expect(img.getAttribute("width")).toBe("56");
+    expect(img.getAttribute("height")).toBe("56");
   });
 });

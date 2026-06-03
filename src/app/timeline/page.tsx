@@ -284,6 +284,7 @@ function TimelineRow({
             ratio="1 / 1"
             rounded={2}
             style={{ width: 64, flexShrink: 0 }}
+            sizes="64px"
           />
         ) : null}
         <div className="min-w-0 flex-1">
