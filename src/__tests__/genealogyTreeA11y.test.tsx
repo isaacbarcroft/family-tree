@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest"
-import { render } from "@testing-library/react"
+import { fireEvent, render } from "@testing-library/react"
 import GenealogyTree from "@/components/GenealogyTree"
 import type { TreeNode as TreeNodeData } from "@/utils/treeBuilder"
 
@@ -67,14 +67,14 @@ describe("GenealogyTree accessibility", () => {
     }
   })
 
-  it("labels the inner tree group with role and a usage hint", () => {
+  it("labels the inner tree group with role=tree and a usage hint", () => {
     const { container } = render(<GenealogyTree treeData={tree()} />)
 
-    const labelled = container.querySelector('g[role="group"]')
+    const labelled = container.querySelector('g[role="tree"]')
     expect(labelled).not.toBeNull()
     const label = labelled?.getAttribute("aria-label") ?? ""
     expect(label).toContain("Family tree")
-    expect(label).toContain("Tab")
+    expect(label).toMatch(/arrow/i)
     expect(label).toMatch(/Enter|Space/)
   })
 
@@ -96,15 +96,121 @@ describe("GenealogyTree accessibility", () => {
     }
   })
 
-  it("keeps interactive person nodes focusable inside the labelled group", () => {
+  it("renders interactive person nodes as treeitems inside the labelled tree", () => {
     const { container } = render(<GenealogyTree treeData={tree()} />)
 
-    const group = container.querySelector('g[role="group"]')
+    const group = container.querySelector('g[role="tree"]')
     expect(group).not.toBeNull()
-    const buttons = group?.querySelectorAll('g[role="button"]')
-    expect(buttons?.length ?? 0).toBeGreaterThan(0)
-    for (const btn of Array.from(buttons ?? [])) {
-      expect(btn.getAttribute("tabindex")).toBe("0")
+    const items = group?.querySelectorAll('g[role="treeitem"]')
+    expect(items?.length ?? 0).toBeGreaterThan(0)
+  })
+
+  it("applies roving tabindex: exactly one treeitem has tabindex=0", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+
+    const items = container.querySelectorAll('g[role="treeitem"]')
+    const focusable = Array.from(items).filter(
+      (i) => i.getAttribute("tabindex") === "0",
+    )
+    expect(focusable.length).toBe(1)
+  })
+
+  it("seeds the roving anchor on the first person in document order", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+
+    const items = container.querySelectorAll('g[role="treeitem"]')
+    const focusable = Array.from(items).find(
+      (i) => i.getAttribute("tabindex") === "0",
+    )
+    // First interactive person under the synthetic root is Alice (p1).
+    expect(focusable?.getAttribute("aria-label")).toContain("Alice")
+    expect(focusable?.getAttribute("aria-selected")).toBe("true")
+  })
+
+  it("moves the roving anchor to the child on ArrowDown", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+
+    const initial = Array.from(
+      container.querySelectorAll('g[role="treeitem"]'),
+    ).find((i) => i.getAttribute("tabindex") === "0")
+    expect(initial?.getAttribute("aria-label")).toContain("Alice")
+
+    fireEvent.keyDown(initial!, { key: "ArrowDown" })
+
+    const after = Array.from(
+      container.querySelectorAll('g[role="treeitem"]'),
+    ).find((i) => i.getAttribute("tabindex") === "0")
+    expect(after?.getAttribute("aria-label")).toContain("Bob")
+    // The previously-focused item now sits at tabindex=-1.
+    const aliceAfter = Array.from(
+      container.querySelectorAll('g[role="treeitem"]'),
+    ).find((i) => i.getAttribute("aria-label")?.includes("Alice"))
+    expect(aliceAfter?.getAttribute("tabindex")).toBe("-1")
+  })
+
+  it("moves the roving anchor back to the parent on ArrowUp", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+
+    const alice = Array.from(
+      container.querySelectorAll('g[role="treeitem"]'),
+    ).find((i) => i.getAttribute("aria-label")?.includes("Alice"))!
+    fireEvent.keyDown(alice, { key: "ArrowDown" })
+
+    const bob = Array.from(
+      container.querySelectorAll('g[role="treeitem"]'),
+    ).find((i) => i.getAttribute("tabindex") === "0")!
+    fireEvent.keyDown(bob, { key: "ArrowUp" })
+
+    const after = Array.from(
+      container.querySelectorAll('g[role="treeitem"]'),
+    ).find((i) => i.getAttribute("tabindex") === "0")
+    expect(after?.getAttribute("aria-label")).toContain("Alice")
+  })
+
+  it("End jumps to the last person; Home returns to the first", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+
+    const alice = Array.from(
+      container.querySelectorAll('g[role="treeitem"]'),
+    ).find((i) => i.getAttribute("aria-label")?.includes("Alice"))!
+    fireEvent.keyDown(alice, { key: "End" })
+
+    const last = Array.from(
+      container.querySelectorAll('g[role="treeitem"]'),
+    ).find((i) => i.getAttribute("tabindex") === "0")!
+    expect(last.getAttribute("aria-label")).toContain("Bob")
+
+    fireEvent.keyDown(last, { key: "Home" })
+
+    const back = Array.from(
+      container.querySelectorAll('g[role="treeitem"]'),
+    ).find((i) => i.getAttribute("tabindex") === "0")
+    expect(back?.getAttribute("aria-label")).toContain("Alice")
+  })
+
+  it("annotates treeitems with aria-level, aria-posinset, and aria-setsize", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+
+    const items = Array.from(container.querySelectorAll('g[role="treeitem"]'))
+    for (const item of items) {
+      expect(item.getAttribute("aria-level")).not.toBeNull()
+      expect(item.getAttribute("aria-posinset")).not.toBeNull()
+      expect(item.getAttribute("aria-setsize")).not.toBeNull()
     }
+  })
+
+  it("marks the parent treeitem as aria-expanded=true when it owns children", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+
+    const alice = Array.from(
+      container.querySelectorAll('g[role="treeitem"]'),
+    ).find((i) => i.getAttribute("aria-label")?.includes("Alice"))
+    expect(alice?.getAttribute("aria-expanded")).toBe("true")
+
+    const bob = Array.from(
+      container.querySelectorAll('g[role="treeitem"]'),
+    ).find((i) => i.getAttribute("aria-label")?.includes("Bob"))
+    // Bob is a leaf in this fixture (no children of his own).
+    expect(bob?.getAttribute("aria-expanded")).toBeNull()
   })
 })

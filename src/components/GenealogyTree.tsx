@@ -21,7 +21,9 @@ import {
   COUPLE_RIGHT_CX,
   SINGLE_AVATAR_CX,
   TreeNode,
+  type TreeItemMeta,
 } from "@/components/TreeNode"
+import { buildTreeNavigation, getNextFocusKey } from "@/utils/treeNavigation"
 import { useRouter } from "next/navigation"
 
 const AVATAR_R = 22
@@ -45,11 +47,79 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
   const nodes = useMemo(() => flattenNodes(layout), [layout])
   const edges = useMemo(() => collectEdges(layout), [layout])
   const bounds = useMemo(() => computeBounds(nodes), [nodes])
+  const navigation = useMemo(() => buildTreeNavigation(layout), [layout])
 
-  // Reset the initial-fit flag whenever the tree data changes so the new tree gets centered.
+  // Per-half ARIA + roving-tabindex metadata, keyed by personId. Rebuilt only
+  // when the navigation graph or focused key changes.
+  const [focusedKey, setFocusedKey] = useState<string | null>(
+    () => navigation.ordered[0] ?? null,
+  )
+
+  // Reset the roving anchor when the navigation graph changes so it stays
+  // inside the current set of people. Render-time tracking pattern (matches
+  // the project's existing approach in MemoryImage / ProfileAvatar / NavBar)
+  // to avoid the react-hooks/set-state-in-effect warning.
+  const [prevNavigation, setPrevNavigation] = useState(navigation)
+  if (navigation !== prevNavigation) {
+    setPrevNavigation(navigation)
+    setFocusedKey(navigation.ordered[0] ?? null)
+  }
+
+  const itemMeta = useMemo<Map<string, TreeItemMeta>>(() => {
+    const map = new Map<string, TreeItemMeta>()
+    for (const [key, item] of navigation.items) {
+      map.set(key, {
+        focusedKey,
+        level: item.level,
+        posInSet: item.posInSet,
+        setSize: item.setSize,
+        // Right-half couples carry no children of their own; only show the
+        // expanded affordance when the half actually owns the children list.
+        hasChildren: item.childKeys.length > 0,
+      })
+    }
+    return map
+  }, [navigation, focusedKey])
+
+  // Ref map for programmatic focus management. Stable identity across renders
+  // so the inline ref callbacks on TreeNode don't bounce per render.
+  const refsMap = useRef<Map<string, SVGGElement>>(new Map())
+  const registerRef = useCallback(
+    (key: string, el: SVGGElement | null): void => {
+      if (el) {
+        refsMap.current.set(key, el)
+        return
+      }
+      refsMap.current.delete(key)
+    },
+    [],
+  )
+
+  // Tracks whether the most recent focusedKey change came from a user keypress
+  // (and therefore requires a follow-up .focus() call) vs. a derived/seed
+  // change like the treeData reset (which must not steal focus).
+  const moveFocusRef = useRef(false)
+
+  const handleTreeKeyDown = useCallback(
+    (key: string, fromKey: string): void => {
+      const next = getNextFocusKey(fromKey, key, navigation)
+      if (!next) return
+      if (next === fromKey) return
+      moveFocusRef.current = true
+      setFocusedKey(next)
+    },
+    [navigation],
+  )
+
+  // After a user-driven roving change, move DOM focus to the new treeitem.
   useEffect(() => {
-    initialFitDoneRef.current = false
-  }, [treeData])
+    if (!moveFocusRef.current) return
+    moveFocusRef.current = false
+    if (!focusedKey) return
+    const el = refsMap.current.get(focusedKey)
+    if (!el) return
+    el.focus({ preventScroll: false })
+  }, [focusedKey])
 
   // Measure container, including on resize, so the fit math stays accurate.
   useEffect(() => {
@@ -110,6 +180,11 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
     )
   }, [bounds, dims])
 
+  // Reset the initial-fit flag whenever the tree data changes so the new tree gets centered.
+  useEffect(() => {
+    initialFitDoneRef.current = false
+  }, [treeData])
+
   // Apply the initial centering once per tree, and once dimensions are known.
   useEffect(() => {
     if (initialFitDoneRef.current) return
@@ -163,10 +238,10 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
         </defs>
         <g
           ref={gRef}
-          role="group"
-          aria-label="Family tree. Press Tab to move between people, then Enter or Space to open a profile."
+          role="tree"
+          aria-label="Family tree. Use arrow keys to move between people. Press Enter or Space to open a profile."
         >
-          {/* Edges — purely decorative connecting lines, hidden from assistive tech. */}
+          {/* Edges, purely decorative connecting lines, hidden from assistive tech. */}
           {edges.map((e, i) => (
             <path
               key={i}
@@ -181,7 +256,14 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
 
           {/* Nodes */}
           {nodes.map((node, i) => (
-            <TreeNode key={i} node={node} onNavigate={navigateToProfile} />
+            <TreeNode
+              key={i}
+              node={node}
+              onNavigate={navigateToProfile}
+              itemMeta={itemMeta}
+              registerRef={registerRef}
+              onTreeKeyDown={handleTreeKeyDown}
+            />
           ))}
         </g>
       </svg>
