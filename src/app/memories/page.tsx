@@ -143,7 +143,7 @@ export default function MemoriesPage() {
         className="mx-auto px-6 pb-16 pt-10 md:px-12"
         style={{ background: "var(--paper)", color: "var(--ink)", maxWidth: 1280 }}
       >
-        <div
+        <header
           className="mb-8 flex flex-col gap-4 pb-5 md:flex-row md:items-end md:justify-between"
           style={{ borderBottom: "1px solid var(--hairline)" }}
         >
@@ -152,6 +152,7 @@ export default function MemoriesPage() {
               The family album
             </p>
             <h1
+              id="memories-title"
               className="display"
               style={{
                 fontSize: "clamp(36px, 5vw, 48px)",
@@ -171,70 +172,72 @@ export default function MemoriesPage() {
           <Button variant="primary" icon="plus" onClick={() => setShowAddModal(true)}>
             Add memory
           </Button>
-        </div>
+        </header>
 
-        {memories.length === 0 ? (
-          <div
-            className="rounded-lg p-12 text-center"
-            style={{ background: "var(--paper-2)", border: "1px solid var(--hairline)" }}
-          >
-            <p className="display-italic muted" style={{ fontSize: 22, margin: 0 }}>
-              No memories yet.
-            </p>
-            <p className="muted mt-2" style={{ fontSize: 14 }}>
-              Be the first to share a family memory.
-            </p>
-            <div className="mt-5">
-              <Button variant="primary" icon="photo" onClick={() => setShowAddModal(true)}>
-                Add memory
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {memories.map((m) => {
-                const isExpanded = expandedId === m.id;
-                const isEditing = editingId === m.id;
-                const isOwner = user?.id === m.createdBy;
-                return (
-                  <MemoryCard
-                    key={m.id}
-                    memory={m}
-                    isExpanded={isExpanded}
-                    isEditing={isEditing}
-                    isOwner={isOwner}
-                    peopleMap={peopleMap}
-                    editForm={editForm}
-                    confirmDelete={confirmDeleteId === m.id}
-                    onExpand={() => setExpandedId(isExpanded ? null : m.id)}
-                    onEdit={() => handleEdit(m)}
-                    onCancelEdit={() => setEditingId(null)}
-                    onUpdateField={(field, value) =>
-                      setEditForm((f) => ({ ...f, [field]: value }))
-                    }
-                    onSaveEdit={handleSaveEdit}
-                    onConfirmDelete={() => setConfirmDeleteId(m.id)}
-                    onCancelDelete={() => setConfirmDeleteId(null)}
-                    onDelete={() => handleDelete(m.id)}
-                  />
-                );
-              })}
-            </div>
-            {hasMore ? (
-              <div className="mt-10 text-center">
-                <Button
-                  variant="ghost"
-                  onClick={loadMore}
-                  disabled={loadingMore}
-                  icon="arrow"
-                >
-                  {loadingMore ? "Loading…" : "Load more"}
+        <section aria-labelledby="memories-title">
+          {memories.length === 0 ? (
+            <div
+              className="rounded-lg p-12 text-center"
+              style={{ background: "var(--paper-2)", border: "1px solid var(--hairline)" }}
+            >
+              <p className="display-italic muted" style={{ fontSize: 22, margin: 0 }}>
+                No memories yet.
+              </p>
+              <p className="muted mt-2" style={{ fontSize: 14 }}>
+                Be the first to share a family memory.
+              </p>
+              <div className="mt-5">
+                <Button variant="primary" icon="photo" onClick={() => setShowAddModal(true)}>
+                  Add memory
                 </Button>
               </div>
-            ) : null}
-          </>
-        )}
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {memories.map((m) => {
+                  const isExpanded = expandedId === m.id;
+                  const isEditing = editingId === m.id;
+                  const isOwner = user?.id === m.createdBy;
+                  return (
+                    <MemoryCard
+                      key={m.id}
+                      memory={m}
+                      isExpanded={isExpanded}
+                      isEditing={isEditing}
+                      isOwner={isOwner}
+                      peopleMap={peopleMap}
+                      editForm={editForm}
+                      confirmDelete={confirmDeleteId === m.id}
+                      onExpand={() => setExpandedId(isExpanded ? null : m.id)}
+                      onEdit={() => handleEdit(m)}
+                      onCancelEdit={() => setEditingId(null)}
+                      onUpdateField={(field, value) =>
+                        setEditForm((f) => ({ ...f, [field]: value }))
+                      }
+                      onSaveEdit={handleSaveEdit}
+                      onConfirmDelete={() => setConfirmDeleteId(m.id)}
+                      onCancelDelete={() => setConfirmDeleteId(null)}
+                      onDelete={() => handleDelete(m.id)}
+                    />
+                  );
+                })}
+              </div>
+              {hasMore ? (
+                <div className="mt-10 text-center">
+                  <Button
+                    variant="ghost"
+                    onClick={loadMore}
+                    disabled={loadingMore}
+                    icon="arrow"
+                  >
+                    {loadingMore ? "Loading…" : "Load more"}
+                  </Button>
+                </div>
+              ) : null}
+            </>
+          )}
+        </section>
 
         {showAddModal ? (
           <AddMemoryModal

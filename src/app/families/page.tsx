@@ -87,7 +87,7 @@ export default function FamiliesPage() {
         className="mx-auto px-6 pb-16 pt-10 md:px-12"
         style={{ background: "var(--paper)", color: "var(--ink)", maxWidth: 1200 }}
       >
-        <div
+        <header
           className="mb-8 flex flex-col gap-4 pb-5 md:flex-row md:items-end md:justify-between"
           style={{ borderBottom: "1px solid var(--hairline)" }}
         >
@@ -96,6 +96,7 @@ export default function FamiliesPage() {
               Branches of the family
             </p>
             <h1
+              id="families-title"
               className="display"
               style={{
                 fontSize: "clamp(36px, 5vw, 48px)",
@@ -115,120 +116,122 @@ export default function FamiliesPage() {
           <Button variant="primary" icon="plus" onClick={() => setShowAddModal(true)}>
             Add family
           </Button>
-        </div>
+        </header>
 
-        {families.length === 0 ? (
-          <div
-            className="rounded-lg p-12 text-center"
-            style={{ background: "var(--paper-2)", border: "1px solid var(--hairline)" }}
-          >
-            <p className="display-italic muted" style={{ fontSize: 22, margin: 0 }}>
-              No families yet.
-            </p>
-            <p className="muted mt-2" style={{ fontSize: 14 }}>
-              Create a family to group related people together.
-            </p>
-            <div className="mt-5">
-              <Button variant="primary" icon="plus" onClick={() => setShowAddModal(true)}>
-                Add family
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <>
-            <ul className="m-0 grid list-none grid-cols-1 gap-6 p-0 sm:grid-cols-2 lg:grid-cols-3">
-              {families.map((f) => {
-                const isOwner = user?.id === f.createdBy;
-                return (
-                  <li key={f.id} className="relative">
-                    <Link
-                      href={`/families/${f.id}`}
-                      className="flex h-full flex-col justify-between rounded-md p-5 transition-colors"
-                      style={{
-                        background: "var(--paper)",
-                        border: "1px solid var(--hairline)",
-                        textDecoration: "none",
-                        color: "var(--ink)",
-                      }}
-                    >
-                      <div>
-                        <h2
-                          className="display m-0 pr-10"
-                          style={{ fontSize: 22, fontWeight: 500 }}
-                        >
-                          {f.name}
-                        </h2>
-                        {f.origin ? (
-                          <p className="display-italic muted mt-2" style={{ fontSize: 13 }}>
-                            from {f.origin}
-                          </p>
-                        ) : null}
-                        {f.description ? (
-                          <p
-                            className="mt-3 line-clamp-3"
-                            style={{ fontSize: 14, lineHeight: 1.55, color: "var(--ink-2)" }}
-                          >
-                            {f.description}
-                          </p>
-                        ) : null}
-                      </div>
-
-                      <div
-                        className="muted mt-4 flex items-center justify-between"
-                        style={{ fontSize: 12 }}
-                      >
-                        <span>Created {formatDate(f.createdAt)}</span>
-                        {f.members ? (
-                          <span style={{ fontFamily: "var(--font-display)", fontSize: 13 }}>
-                            {f.members.length} {f.members.length === 1 ? "member" : "members"}
-                          </span>
-                        ) : null}
-                      </div>
-                    </Link>
-                    {isOwner ? (
-                      <div className="absolute right-3 top-3">
-                        {confirmDeleteId === f.id ? (
-                          <ConfirmDialog
-                            onConfirm={async () => {
-                              await deleteFamily(f.id);
-                              setConfirmDeleteId(null);
-                              fetchFamilies();
-                            }}
-                            onCancel={() => setConfirmDeleteId(null)}
-                          />
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setConfirmDeleteId(f.id);
-                            }}
-                            aria-label={`Delete ${f.name}`}
-                            className="flex h-7 w-7 items-center justify-center rounded-full"
-                            style={{
-                              background: "var(--paper)",
-                              border: "1px solid var(--hairline-strong)",
-                              color: "var(--ink-3)",
-                            }}
-                          >
-                            <Icon name="close" size={12} />
-                          </button>
-                        )}
-                      </div>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
-            {hasMore ? (
-              <div className="mt-10 text-center">
-                <Button variant="ghost" icon="arrow" onClick={loadMore} disabled={loadingMore}>
-                  {loadingMore ? "Loading…" : "Load more"}
+        <section aria-labelledby="families-title">
+          {families.length === 0 ? (
+            <div
+              className="rounded-lg p-12 text-center"
+              style={{ background: "var(--paper-2)", border: "1px solid var(--hairline)" }}
+            >
+              <p className="display-italic muted" style={{ fontSize: 22, margin: 0 }}>
+                No families yet.
+              </p>
+              <p className="muted mt-2" style={{ fontSize: 14 }}>
+                Create a family to group related people together.
+              </p>
+              <div className="mt-5">
+                <Button variant="primary" icon="plus" onClick={() => setShowAddModal(true)}>
+                  Add family
                 </Button>
               </div>
-            ) : null}
-          </>
-        )}
+            </div>
+          ) : (
+            <>
+              <ul className="m-0 grid list-none grid-cols-1 gap-6 p-0 sm:grid-cols-2 lg:grid-cols-3">
+                {families.map((f) => {
+                  const isOwner = user?.id === f.createdBy;
+                  return (
+                    <li key={f.id} className="relative">
+                      <Link
+                        href={`/families/${f.id}`}
+                        className="flex h-full flex-col justify-between rounded-md p-5 transition-colors"
+                        style={{
+                          background: "var(--paper)",
+                          border: "1px solid var(--hairline)",
+                          textDecoration: "none",
+                          color: "var(--ink)",
+                        }}
+                      >
+                        <div>
+                          <h2
+                            className="display m-0 pr-10"
+                            style={{ fontSize: 22, fontWeight: 500 }}
+                          >
+                            {f.name}
+                          </h2>
+                          {f.origin ? (
+                            <p className="display-italic muted mt-2" style={{ fontSize: 13 }}>
+                              from {f.origin}
+                            </p>
+                          ) : null}
+                          {f.description ? (
+                            <p
+                              className="mt-3 line-clamp-3"
+                              style={{ fontSize: 14, lineHeight: 1.55, color: "var(--ink-2)" }}
+                            >
+                              {f.description}
+                            </p>
+                          ) : null}
+                        </div>
+
+                        <div
+                          className="muted mt-4 flex items-center justify-between"
+                          style={{ fontSize: 12 }}
+                        >
+                          <span>Created {formatDate(f.createdAt)}</span>
+                          {f.members ? (
+                            <span style={{ fontFamily: "var(--font-display)", fontSize: 13 }}>
+                              {f.members.length} {f.members.length === 1 ? "member" : "members"}
+                            </span>
+                          ) : null}
+                        </div>
+                      </Link>
+                      {isOwner ? (
+                        <div className="absolute right-3 top-3">
+                          {confirmDeleteId === f.id ? (
+                            <ConfirmDialog
+                              onConfirm={async () => {
+                                await deleteFamily(f.id);
+                                setConfirmDeleteId(null);
+                                fetchFamilies();
+                              }}
+                              onCancel={() => setConfirmDeleteId(null)}
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setConfirmDeleteId(f.id);
+                              }}
+                              aria-label={`Delete ${f.name}`}
+                              className="flex h-7 w-7 items-center justify-center rounded-full"
+                              style={{
+                                background: "var(--paper)",
+                                border: "1px solid var(--hairline-strong)",
+                                color: "var(--ink-3)",
+                              }}
+                            >
+                              <Icon name="close" size={12} />
+                            </button>
+                          )}
+                        </div>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+              {hasMore ? (
+                <div className="mt-10 text-center">
+                  <Button variant="ghost" icon="arrow" onClick={loadMore} disabled={loadingMore}>
+                    {loadingMore ? "Loading…" : "Load more"}
+                  </Button>
+                </div>
+              ) : null}
+            </>
+          )}
+        </section>
 
         {showAddModal ? (
           <AddFamilyModal

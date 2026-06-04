@@ -93,7 +93,7 @@ export default function FamilyTreePage() {
         style={{ background: "var(--paper)", color: "var(--ink)", maxWidth: 1280 }}
       >
         {/* Header */}
-        <div
+        <header
           className="mb-7 flex flex-col gap-4 pb-5 md:flex-row md:items-end md:justify-between"
           style={{ borderBottom: "1px solid var(--hairline)" }}
         >
@@ -102,6 +102,7 @@ export default function FamilyTreePage() {
               The family
             </p>
             <h1
+              id="people-title"
               className="display"
               style={{
                 fontSize: "clamp(36px, 5vw, 48px)",
@@ -131,11 +132,12 @@ export default function FamilyTreePage() {
               {showForm ? "Cancel" : "Add person"}
             </Button>
           </div>
-        </div>
+        </header>
 
         {showForm ? (
           <form
             onSubmit={handleSubmit}
+            aria-label="Add a person"
             className="mb-8 rounded-lg p-5"
             style={{ background: "var(--paper-2)", border: "1px solid var(--hairline)" }}
           >
@@ -197,63 +199,65 @@ export default function FamilyTreePage() {
           </form>
         ) : null}
 
-        {loading ? (
-          <SkeletonPage rows={5} />
-        ) : people.length === 0 ? (
-          <div className="rounded-lg p-12 text-center" style={{ background: "var(--paper-2)", border: "1px solid var(--hairline)" }}>
-            <p className="display-italic muted" style={{ fontSize: 22, margin: 0 }}>
-              No family members yet.
-            </p>
-            <p className="muted mt-2" style={{ fontSize: 14 }}>
-              Add the first person to start the page.
-            </p>
-            <div className="mt-5">
-              <Button variant="primary" icon="plus" onClick={() => setShowForm(true)}>
-                Add person
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <>
-            {view === "grid" ? (
-              <PeopleGrid
-                people={people}
-                user={user}
-                confirmDeleteId={confirmDeleteId}
-                setConfirmDeleteId={setConfirmDeleteId}
-                onDelete={async (id) => {
-                  await deletePerson(id);
-                  setConfirmDeleteId(null);
-                  await fetchPage(1, true);
-                }}
-              />
-            ) : (
-              <PeopleList
-                people={people}
-                user={user}
-                confirmDeleteId={confirmDeleteId}
-                setConfirmDeleteId={setConfirmDeleteId}
-                onDelete={async (id) => {
-                  await deletePerson(id);
-                  setConfirmDeleteId(null);
-                  await fetchPage(1, true);
-                }}
-              />
-            )}
-            {hasMore ? (
-              <div className="mt-10 text-center">
-                <Button
-                  variant="ghost"
-                  onClick={loadMore}
-                  disabled={loadingMore}
-                  icon="arrow"
-                >
-                  {loadingMore ? "Loading…" : "Load more"}
+        <section aria-labelledby="people-title">
+          {loading ? (
+            <SkeletonPage rows={5} />
+          ) : people.length === 0 ? (
+            <div className="rounded-lg p-12 text-center" style={{ background: "var(--paper-2)", border: "1px solid var(--hairline)" }}>
+              <p className="display-italic muted" style={{ fontSize: 22, margin: 0 }}>
+                No family members yet.
+              </p>
+              <p className="muted mt-2" style={{ fontSize: 14 }}>
+                Add the first person to start the page.
+              </p>
+              <div className="mt-5">
+                <Button variant="primary" icon="plus" onClick={() => setShowForm(true)}>
+                  Add person
                 </Button>
               </div>
-            ) : null}
-          </>
-        )}
+            </div>
+          ) : (
+            <>
+              {view === "grid" ? (
+                <PeopleGrid
+                  people={people}
+                  user={user}
+                  confirmDeleteId={confirmDeleteId}
+                  setConfirmDeleteId={setConfirmDeleteId}
+                  onDelete={async (id) => {
+                    await deletePerson(id);
+                    setConfirmDeleteId(null);
+                    await fetchPage(1, true);
+                  }}
+                />
+              ) : (
+                <PeopleList
+                  people={people}
+                  user={user}
+                  confirmDeleteId={confirmDeleteId}
+                  setConfirmDeleteId={setConfirmDeleteId}
+                  onDelete={async (id) => {
+                    await deletePerson(id);
+                    setConfirmDeleteId(null);
+                    await fetchPage(1, true);
+                  }}
+                />
+              )}
+              {hasMore ? (
+                <div className="mt-10 text-center">
+                  <Button
+                    variant="ghost"
+                    onClick={loadMore}
+                    disabled={loadingMore}
+                    icon="arrow"
+                  >
+                    {loadingMore ? "Loading…" : "Load more"}
+                  </Button>
+                </div>
+              ) : null}
+            </>
+          )}
+        </section>
 
         {showImportModal ? (
           <ImportGedcomModal

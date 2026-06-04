@@ -104,7 +104,7 @@ export default function TimelinePage() {
         className="mx-auto px-6 pb-16 pt-10 md:px-12"
         style={{ background: "var(--paper)", color: "var(--ink)", maxWidth: 960 }}
       >
-        <div
+        <header
           className="mb-10 flex flex-col gap-4 pb-5 md:flex-row md:items-end md:justify-between"
           style={{ borderBottom: "1px solid var(--hairline)" }}
         >
@@ -113,6 +113,7 @@ export default function TimelinePage() {
               The page, year by year
             </p>
             <h1
+              id="timeline-title"
               className="display"
               style={{
                 fontSize: "clamp(36px, 5vw, 48px)",
@@ -127,14 +128,14 @@ export default function TimelinePage() {
               {items.length} {items.length === 1 ? "entry" : "entries"} from your family history
             </p>
           </div>
-        </div>
+        </header>
 
-        {/* Filters */}
-        <div className="mb-10 flex flex-wrap items-center gap-3">
+        <section aria-label="Timeline filters" className="mb-10 flex flex-wrap items-center gap-3">
           <FilterToggle value={filterType} onChange={setFilterType} />
           <select
             value={filterPerson}
             onChange={(e) => setFilterPerson(e.target.value)}
+            aria-label="Filter by person"
             className="rounded-full px-4 py-2"
             style={{
               background: "var(--paper-2)",
@@ -151,43 +152,45 @@ export default function TimelinePage() {
               </option>
             ))}
           </select>
-        </div>
+        </section>
 
-        {filtered.length === 0 ? (
-          <div
-            className="rounded-lg p-12 text-center"
-            style={{ background: "var(--paper-2)", border: "1px solid var(--hairline)" }}
-          >
-            <p className="display-italic muted" style={{ fontSize: 22, margin: 0 }}>
-              Nothing on the timeline yet.
-            </p>
-            <p className="muted mt-2" style={{ fontSize: 14 }}>
-              Add a memory or an event to start the page.
-            </p>
-          </div>
-        ) : (
-          <div className="relative" style={{ paddingLeft: 110 }}>
-            {/* Vertical hairline */}
-            <span
-              aria-hidden="true"
-              style={{
-                position: "absolute",
-                left: 80,
-                top: 6,
-                bottom: 0,
-                width: 1,
-                background: "var(--hairline)",
-              }}
-            />
-            {filtered.map((item) => (
-              <TimelineRow
-                key={`${item.type}-${item.id}`}
-                item={item}
-                peopleMap={peopleMap}
+        <section aria-labelledby="timeline-title">
+          {filtered.length === 0 ? (
+            <div
+              className="rounded-lg p-12 text-center"
+              style={{ background: "var(--paper-2)", border: "1px solid var(--hairline)" }}
+            >
+              <p className="display-italic muted" style={{ fontSize: 22, margin: 0 }}>
+                Nothing on the timeline yet.
+              </p>
+              <p className="muted mt-2" style={{ fontSize: 14 }}>
+                Add a memory or an event to start the page.
+              </p>
+            </div>
+          ) : (
+            <div className="relative" style={{ paddingLeft: 110 }}>
+              {/* Vertical hairline */}
+              <span
+                aria-hidden="true"
+                style={{
+                  position: "absolute",
+                  left: 80,
+                  top: 6,
+                  bottom: 0,
+                  width: 1,
+                  background: "var(--hairline)",
+                }}
               />
-            ))}
-          </div>
-        )}
+              {filtered.map((item) => (
+                <TimelineRow
+                  key={`${item.type}-${item.id}`}
+                  item={item}
+                  peopleMap={peopleMap}
+                />
+              ))}
+            </div>
+          )}
+        </section>
       </div>
     </ProtectedRoute>
   );
