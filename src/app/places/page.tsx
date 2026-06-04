@@ -188,7 +188,7 @@ export default function PlacesPage() {
         className="mx-auto px-6 pb-16 pt-10 md:px-12"
         style={{ background: "var(--paper)", color: "var(--ink)", maxWidth: 1400 }}
       >
-        <div
+        <header
           className="mb-8 flex flex-col gap-2 pb-5 md:flex-row md:items-end md:justify-between"
           style={{ borderBottom: "1px solid var(--hairline)" }}
         >
@@ -197,6 +197,7 @@ export default function PlacesPage() {
               Where they lived
             </p>
             <h1
+              id="places-title"
               className="display"
               style={{
                 fontSize: "clamp(36px, 5vw, 48px)",
@@ -216,63 +217,67 @@ export default function PlacesPage() {
               Locating new places…
             </p>
           ) : null}
-        </div>
+        </header>
 
-        {loading ? (
-          <div className="space-y-4">
-            <SkeletonLine className="w-full" />
-            <div
-              className="w-full animate-pulse rounded-md"
-              style={{
-                height: PLACES_MAP_HEIGHT,
-                background: "var(--paper-2)",
-                border: "1px solid var(--hairline)",
-              }}
-            />
-            <SkeletonCard />
-          </div>
-        ) : pins.length === 0 && ungeocodedRows.length === 0 ? (
-          <div
-            className="rounded-lg p-12 text-center"
-            style={{ background: "var(--paper-2)", border: "1px solid var(--hairline)" }}
-          >
-            <p className="display-italic muted" style={{ fontSize: 22, margin: 0 }}>
-              No places yet.
-            </p>
-            <p className="muted mt-2" style={{ fontSize: 14, maxWidth: 480, margin: "8px auto 0" }}>
-              Open a family member&rsquo;s profile, click Edit, and fill in a birthplace, place of
-              passing, or a &ldquo;Place lived.&rdquo; They&rsquo;ll appear here.
-            </p>
-          </div>
-        ) : (
-          <div className="grid gap-6 md:grid-cols-[1fr_320px]">
-            <div>
+        <section aria-labelledby="places-title">
+          {loading ? (
+            <div className="space-y-4">
+              <SkeletonLine className="w-full" />
               <div
-                className="overflow-hidden rounded-md"
-                style={{ border: "1px solid var(--hairline)" }}
-              >
-                <PlacesMap pins={pins} />
-              </div>
-              <div
-                className="mt-3 flex flex-wrap items-center gap-4"
-                style={{ fontSize: 12, color: "var(--ink-3)" }}
-              >
-                <LegendDot color="var(--sage-deep)" label="Born here" />
-                <LegendDot color="var(--sage)" label="Lived here" />
-                <LegendDot color="var(--clay-deep)" label="Died here" />
-                <span className="ml-auto" style={{ fontFamily: "var(--font-display)" }}>
-                  {pins.length} {pins.length === 1 ? "place" : "places"}
-                </span>
-              </div>
+                className="w-full animate-pulse rounded-md"
+                style={{
+                  height: PLACES_MAP_HEIGHT,
+                  background: "var(--paper-2)",
+                  border: "1px solid var(--hairline)",
+                }}
+              />
+              <SkeletonCard />
             </div>
-            <UngeocodedSidebar
-              rows={ungeocodedRows}
-              people={people}
-              residences={residences}
-              onChange={refresh}
-            />
-          </div>
-        )}
+          ) : pins.length === 0 && ungeocodedRows.length === 0 ? (
+            <div
+              className="rounded-lg p-12 text-center"
+              style={{ background: "var(--paper-2)", border: "1px solid var(--hairline)" }}
+            >
+              <p className="display-italic muted" style={{ fontSize: 22, margin: 0 }}>
+                No places yet.
+              </p>
+              <p className="muted mt-2" style={{ fontSize: 14, maxWidth: 480, margin: "8px auto 0" }}>
+                Open a family member&rsquo;s profile, click Edit, and fill in a birthplace, place of
+                passing, or a &ldquo;Place lived.&rdquo; They&rsquo;ll appear here.
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-6 md:grid-cols-[1fr_320px]">
+              <div>
+                <div
+                  className="overflow-hidden rounded-md"
+                  style={{ border: "1px solid var(--hairline)" }}
+                >
+                  <PlacesMap pins={pins} />
+                </div>
+                <div
+                  className="mt-3 flex flex-wrap items-center gap-4"
+                  style={{ fontSize: 12, color: "var(--ink-3)" }}
+                >
+                  <LegendDot color="var(--sage-deep)" label="Born here" />
+                  <LegendDot color="var(--sage)" label="Lived here" />
+                  <LegendDot color="var(--clay-deep)" label="Died here" />
+                  <span className="ml-auto" style={{ fontFamily: "var(--font-display)" }}>
+                    {pins.length} {pins.length === 1 ? "place" : "places"}
+                  </span>
+                </div>
+              </div>
+              <aside aria-label="Unmapped places">
+                <UngeocodedSidebar
+                  rows={ungeocodedRows}
+                  people={people}
+                  residences={residences}
+                  onChange={refresh}
+                />
+              </aside>
+            </div>
+          )}
+        </section>
       </div>
     </ProtectedRoute>
   );

@@ -143,7 +143,7 @@ export default function EventsPage() {
         className="mx-auto px-6 pb-16 pt-10 md:px-12"
         style={{ background: "var(--paper)", color: "var(--ink)", maxWidth: 1080 }}
       >
-        <div
+        <header
           className="mb-8 flex flex-col gap-4 pb-5 md:flex-row md:items-end md:justify-between"
           style={{ borderBottom: "1px solid var(--hairline)" }}
         >
@@ -152,6 +152,7 @@ export default function EventsPage() {
               Milestones &amp; gatherings
             </p>
             <h1
+              id="events-title"
               className="display"
               style={{
                 fontSize: "clamp(36px, 5vw, 48px)",
@@ -171,71 +172,73 @@ export default function EventsPage() {
           <Button variant="primary" icon="plus" onClick={() => setShowAddModal(true)}>
             Add event
           </Button>
-        </div>
+        </header>
 
-        {events.length === 0 ? (
-          <div
-            className="rounded-lg p-12 text-center"
-            style={{ background: "var(--paper-2)", border: "1px solid var(--hairline)" }}
-          >
-            <p className="display-italic muted" style={{ fontSize: 22, margin: 0 }}>
-              No events yet.
-            </p>
-            <p className="muted mt-2" style={{ fontSize: 14 }}>
-              Add milestones, celebrations, and important moments.
-            </p>
-            <div className="mt-5">
-              <Button variant="primary" icon="plus" onClick={() => setShowAddModal(true)}>
-                Add event
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <>
-            <ul className="m-0 list-none space-y-4 p-0">
-              {events.map((e) => {
-                const isEditing = editingId === e.id;
-                const isOwner = user?.id === e.createdBy;
-                return (
-                  <li
-                    key={e.id}
-                    className="rounded-md p-5"
-                    style={{ background: "var(--paper)", border: "1px solid var(--hairline)" }}
-                  >
-                    {isEditing ? (
-                      <EventEditForm
-                        form={editForm}
-                        onChange={(field, value) =>
-                          setEditForm((f) => ({ ...f, [field]: value }))
-                        }
-                        onSave={handleSaveEdit}
-                        onCancel={() => setEditingId(null)}
-                      />
-                    ) : (
-                      <EventRow
-                        event={e}
-                        peopleMap={peopleMap}
-                        isOwner={isOwner}
-                        confirmDelete={confirmDeleteId === e.id}
-                        onEdit={() => handleEdit(e)}
-                        onConfirmDelete={() => setConfirmDeleteId(e.id)}
-                        onCancelDelete={() => setConfirmDeleteId(null)}
-                        onDelete={() => handleDelete(e.id)}
-                      />
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-            {hasMore ? (
-              <div className="mt-10 text-center">
-                <Button variant="ghost" icon="arrow" onClick={loadMore} disabled={loadingMore}>
-                  {loadingMore ? "Loading…" : "Load more"}
+        <section aria-labelledby="events-title">
+          {events.length === 0 ? (
+            <div
+              className="rounded-lg p-12 text-center"
+              style={{ background: "var(--paper-2)", border: "1px solid var(--hairline)" }}
+            >
+              <p className="display-italic muted" style={{ fontSize: 22, margin: 0 }}>
+                No events yet.
+              </p>
+              <p className="muted mt-2" style={{ fontSize: 14 }}>
+                Add milestones, celebrations, and important moments.
+              </p>
+              <div className="mt-5">
+                <Button variant="primary" icon="plus" onClick={() => setShowAddModal(true)}>
+                  Add event
                 </Button>
               </div>
-            ) : null}
-          </>
-        )}
+            </div>
+          ) : (
+            <>
+              <ul className="m-0 list-none space-y-4 p-0">
+                {events.map((e) => {
+                  const isEditing = editingId === e.id;
+                  const isOwner = user?.id === e.createdBy;
+                  return (
+                    <li
+                      key={e.id}
+                      className="rounded-md p-5"
+                      style={{ background: "var(--paper)", border: "1px solid var(--hairline)" }}
+                    >
+                      {isEditing ? (
+                        <EventEditForm
+                          form={editForm}
+                          onChange={(field, value) =>
+                            setEditForm((f) => ({ ...f, [field]: value }))
+                          }
+                          onSave={handleSaveEdit}
+                          onCancel={() => setEditingId(null)}
+                        />
+                      ) : (
+                        <EventRow
+                          event={e}
+                          peopleMap={peopleMap}
+                          isOwner={isOwner}
+                          confirmDelete={confirmDeleteId === e.id}
+                          onEdit={() => handleEdit(e)}
+                          onConfirmDelete={() => setConfirmDeleteId(e.id)}
+                          onCancelDelete={() => setConfirmDeleteId(null)}
+                          onDelete={() => handleDelete(e.id)}
+                        />
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+              {hasMore ? (
+                <div className="mt-10 text-center">
+                  <Button variant="ghost" icon="arrow" onClick={loadMore} disabled={loadingMore}>
+                    {loadingMore ? "Loading…" : "Load more"}
+                  </Button>
+                </div>
+              ) : null}
+            </>
+          )}
+        </section>
 
         {showAddModal ? (
           <AddEventModal
