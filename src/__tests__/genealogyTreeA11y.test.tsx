@@ -67,14 +67,14 @@ describe("GenealogyTree accessibility", () => {
     }
   })
 
-  it("labels the inner tree group with role and a usage hint", () => {
+  it("labels the inner tree group with role=tree and a usage hint", () => {
     const { container } = render(<GenealogyTree treeData={tree()} />)
 
-    const labelled = container.querySelector('g[role="group"]')
+    const labelled = container.querySelector('g[role="tree"]')
     expect(labelled).not.toBeNull()
     const label = labelled?.getAttribute("aria-label") ?? ""
     expect(label).toContain("Family tree")
-    expect(label).toContain("Tab")
+    expect(label).toMatch(/arrow/i)
     expect(label).toMatch(/Enter|Space/)
   })
 
@@ -99,12 +99,49 @@ describe("GenealogyTree accessibility", () => {
   it("keeps interactive person nodes focusable inside the labelled group", () => {
     const { container } = render(<GenealogyTree treeData={tree()} />)
 
-    const group = container.querySelector('g[role="group"]')
+    const group = container.querySelector('g[role="tree"]')
     expect(group).not.toBeNull()
-    const buttons = group?.querySelectorAll('g[role="button"]')
-    expect(buttons?.length ?? 0).toBeGreaterThan(0)
-    for (const btn of Array.from(buttons ?? [])) {
-      expect(btn.getAttribute("tabindex")).toBe("0")
-    }
+    const treeitems = group?.querySelectorAll('g[role="treeitem"]')
+    expect(treeitems?.length ?? 0).toBeGreaterThan(0)
+  })
+
+  it("applies roving tabindex so exactly one treeitem is keyboard-tabbable", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+
+    const treeitems = Array.from(
+      container.querySelectorAll('g[role="treeitem"]'),
+    )
+    expect(treeitems.length).toBeGreaterThan(1)
+    const tabbable = treeitems.filter(
+      (g) => g.getAttribute("tabindex") === "0",
+    )
+    expect(tabbable.length).toBe(1)
+    // The first focusable item is the roving tabindex holder on mount.
+    expect(tabbable[0].getAttribute("data-tree-key")).toBe("p1")
+  })
+
+  it("sets aria-level per treeitem reflecting the focusable hierarchy", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+
+    const treeitems = Array.from(
+      container.querySelectorAll('g[role="treeitem"]'),
+    )
+    const p1 = treeitems.find((t) => t.getAttribute("data-tree-key") === "p1")
+    const p2 = treeitems.find((t) => t.getAttribute("data-tree-key") === "p2")
+    expect(p1?.getAttribute("aria-level")).toBe("1")
+    expect(p2?.getAttribute("aria-level")).toBe("2")
+  })
+
+  it("sets aria-expanded=true on treeitems with focusable descendants", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+
+    const treeitems = Array.from(
+      container.querySelectorAll('g[role="treeitem"]'),
+    )
+    const p1 = treeitems.find((t) => t.getAttribute("data-tree-key") === "p1")
+    const p2 = treeitems.find((t) => t.getAttribute("data-tree-key") === "p2")
+    expect(p1?.getAttribute("aria-expanded")).toBe("true")
+    // Leaf treeitems should omit aria-expanded entirely per W3C tree pattern.
+    expect(p2?.getAttribute("aria-expanded")).toBeNull()
   })
 })

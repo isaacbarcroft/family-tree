@@ -1,6 +1,13 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, useCallback } from "react"
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+  type KeyboardEvent,
+} from "react"
 import { zoom as d3Zoom, zoomIdentity, type ZoomBehavior } from "d3-zoom"
 import { select } from "d3-selection"
 import type { TreeNode as TreeNodeData } from "@/utils/treeBuilder"
@@ -12,6 +19,10 @@ import {
   flattenNodes,
   layoutTree,
 } from "@/utils/treeLayout"
+import {
+  buildNavigationGraph,
+  collectFocusableItems,
+} from "@/utils/treeNavigation"
 import {
   AVATAR_CY,
   CLIP_ID_COUPLE_LEFT,
@@ -45,11 +56,73 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
   const nodes = useMemo(() => flattenNodes(layout), [layout])
   const edges = useMemo(() => collectEdges(layout), [layout])
   const bounds = useMemo(() => computeBounds(nodes), [nodes])
+  const focusableItems = useMemo(() => collectFocusableItems(layout), [layout])
+  const navigationGraph = useMemo(
+    () => buildNavigationGraph(layout, focusableItems),
+    [layout, focusableItems],
+  )
+  const itemsByLayoutNode = useMemo(() => {
+    const map = new Map<
+      ReturnType<typeof flattenNodes>[number],
+      { leftKey: string | null; rightKey: string | null; level: number; hasChildren: boolean }
+    >()
+    for (const item of focusableItems) {
+      const existing = map.get(item.layoutNode) ?? {
+        leftKey: null,
+        rightKey: null,
+        level: 1,
+        hasChildren: false,
+      }
+      const nav = navigationGraph.get(item.key)
+      if (nav) {
+        existing.level = nav.level
+        existing.hasChildren = nav.hasChildren
+      }
+      if (item.side === "right") {
+        existing.rightKey = item.key
+      } else {
+        existing.leftKey = item.key
+      }
+      map.set(item.layoutNode, existing)
+    }
+    return map
+  }, [focusableItems, navigationGraph])
+
+  // The currently focused treeitem key (roving tabindex). Null means "no key
+  // has been chosen yet" — the first focusable item gets tabIndex=0 as the
+  // initial roving position so Tab into the tree always lands somewhere.
+  const [focusedKey, setFocusedKey] = useState<string | null>(null)
+  const pendingFocusKeyRef = useRef<string | null>(null)
+
+  const effectiveFocusedKey =
+    focusedKey !== null && navigationGraph.has(focusedKey)
+      ? focusedKey
+      : focusableItems[0]?.key ?? null
 
   // Reset the initial-fit flag whenever the tree data changes so the new tree gets centered.
   useEffect(() => {
     initialFitDoneRef.current = false
   }, [treeData])
+
+  // Move keyboard focus to the element matching pendingFocusKeyRef after each
+  // render. This drives the actual DOM focus shift for arrow-key navigation.
+  useEffect(() => {
+    const pending = pendingFocusKeyRef.current
+    if (pending === null) return
+    pendingFocusKeyRef.current = null
+    const container = containerRef.current
+    if (!container) return
+    const escaped =
+      typeof CSS !== "undefined" && typeof CSS.escape === "function"
+        ? CSS.escape(pending)
+        : pending.replace(/"/g, '\\"')
+    const target = container.querySelector(
+      `[data-tree-key="${escaped}"]`,
+    ) as SVGGElement | null
+    if (target && typeof target.focus === "function") {
+      target.focus()
+    }
+  })
 
   // Measure container, including on resize, so the fit math stays accurate.
   useEffect(() => {
@@ -123,11 +196,66 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
     fitToView()
   }, [fitToView])
 
+  const moveFocus = useCallback((nextKey: string) => {
+    pendingFocusKeyRef.current = nextKey
+    setFocusedKey(nextKey)
+  }, [])
+
   const navigateToProfile = useCallback(
     (personId: string) => {
+      // A click also adopts the clicked item as the roving-tabindex holder so
+      // subsequent Tab+arrow navigation resumes from there if the user returns.
+      setFocusedKey(personId)
       router.push(`/profile/${personId}`)
     },
-    [router]
+    [router],
+  )
+
+  const onTreeItemKeyDown = useCallback(
+    (e: KeyboardEvent<SVGGElement>, key: string) => {
+      const nav = navigationGraph.get(key)
+      if (!nav) return
+
+      if (e.key === "ArrowDown") {
+        if (nav.firstChild === null) return
+        e.preventDefault()
+        moveFocus(nav.firstChild)
+        return
+      }
+      if (e.key === "ArrowUp") {
+        if (nav.parent === null) return
+        e.preventDefault()
+        moveFocus(nav.parent)
+        return
+      }
+      if (e.key === "ArrowRight") {
+        if (nav.nextSibling === null) return
+        e.preventDefault()
+        moveFocus(nav.nextSibling)
+        return
+      }
+      if (e.key === "ArrowLeft") {
+        if (nav.prevSibling === null) return
+        e.preventDefault()
+        moveFocus(nav.prevSibling)
+        return
+      }
+      if (e.key === "Home") {
+        const firstKey = focusableItems[0]?.key
+        if (!firstKey) return
+        e.preventDefault()
+        moveFocus(firstKey)
+        return
+      }
+      if (e.key === "End") {
+        const lastKey = focusableItems[focusableItems.length - 1]?.key
+        if (!lastKey) return
+        e.preventDefault()
+        moveFocus(lastKey)
+        return
+      }
+    },
+    [navigationGraph, focusableItems, moveFocus],
   )
 
   return (
@@ -163,8 +291,8 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
         </defs>
         <g
           ref={gRef}
-          role="group"
-          aria-label="Family tree. Press Tab to move between people, then Enter or Space to open a profile."
+          role="tree"
+          aria-label="Family tree. Use the arrow keys to move between people. Press Enter or Space to open a profile."
         >
           {/* Edges — purely decorative connecting lines, hidden from assistive tech. */}
           {edges.map((e, i) => (
@@ -180,9 +308,30 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
           ))}
 
           {/* Nodes */}
-          {nodes.map((node, i) => (
-            <TreeNode key={i} node={node} onNavigate={navigateToProfile} />
-          ))}
+          {nodes.map((node, i) => {
+            const meta = itemsByLayoutNode.get(node)
+            const leftKey = meta?.leftKey ?? null
+            const rightKey = meta?.rightKey ?? null
+            const level = meta?.level ?? 1
+            const hasChildren = meta?.hasChildren ?? false
+            const ariaExpanded = hasChildren ? true : undefined
+            const treeItemTabIndex: 0 | -1 =
+              leftKey !== null && leftKey === effectiveFocusedKey ? 0 : -1
+            const treeItemTabIndexRight: 0 | -1 =
+              rightKey !== null && rightKey === effectiveFocusedKey ? 0 : -1
+            return (
+              <TreeNode
+                key={i}
+                node={node}
+                onNavigate={navigateToProfile}
+                onTreeItemKeyDown={onTreeItemKeyDown}
+                treeItemTabIndex={treeItemTabIndex}
+                treeItemTabIndexRight={treeItemTabIndexRight}
+                ariaLevel={level}
+                ariaExpanded={ariaExpanded}
+              />
+            )
+          })}
         </g>
       </svg>
     </div>
