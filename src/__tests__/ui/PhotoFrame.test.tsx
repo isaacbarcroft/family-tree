@@ -51,4 +51,27 @@ describe("PhotoFrame", () => {
     expect(wrapper.style.border).toContain("1px solid");
     expect(wrapper.style.boxShadow).toContain("var(--shadow-sm)");
   });
+
+  // Regression pin: HEIC profile photos uploaded from iOS render via the
+  // Supabase image transform endpoint, not the raw object URL. Without this,
+  // every PhotoFrame callsite that passed a raw profilePhotoUrl (family-tree
+  // grid, home page "In memory", profile hero portrait) silently rendered the
+  // placeholder for HEIC uploads.
+  it("routes HEIC Supabase URLs through the render-image endpoint", () => {
+    const src =
+      "https://abc.supabase.co/storage/v1/object/public/media/people/p1/photo.heic";
+    render(<PhotoFrame src={src} alt="HEIC portrait" />);
+    const img = screen.getByRole("img", { name: "HEIC portrait" });
+    expect(img.getAttribute("src")).toBe(
+      "https://abc.supabase.co/storage/v1/render/image/public/media/people/p1/photo.heic?format=jpeg&quality=85",
+    );
+  });
+
+  it("passes through non-HEIC Supabase URLs unchanged", () => {
+    const src =
+      "https://abc.supabase.co/storage/v1/object/public/media/people/p1/photo.jpg";
+    render(<PhotoFrame src={src} alt="JPG portrait" />);
+    const img = screen.getByRole("img", { name: "JPG portrait" });
+    expect(img.getAttribute("src")).toBe(src);
+  });
 });

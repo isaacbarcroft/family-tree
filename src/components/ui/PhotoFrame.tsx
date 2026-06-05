@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from "react";
 import { useState } from "react";
+import { toDisplayImageUrl } from "@/utils/imageUrl";
 
 type PhotoFrameProps = {
   src?: string | null;
@@ -35,7 +36,12 @@ export function PhotoFrame({
     setFailed(false);
   }
 
-  const showImg = Boolean(src) && !failed;
+  // Route HEIC Supabase URLs through the render-image endpoint so iOS uploads
+  // display in browsers that can't decode HEIC natively. Matches the behavior
+  // already baked into MemoryImage and ProfileAvatar; idempotent for any other
+  // URL shape.
+  const displayUrl = toDisplayImageUrl(src);
+  const showImg = Boolean(displayUrl) && !failed;
 
   return (
     <div
@@ -49,9 +55,9 @@ export function PhotoFrame({
         ...style,
       }}
     >
-      {showImg && src ? (
+      {showImg ? (
         <img
-          src={src}
+          src={displayUrl}
           alt={alt}
           draggable={false}
           onError={() => setFailed(true)}
