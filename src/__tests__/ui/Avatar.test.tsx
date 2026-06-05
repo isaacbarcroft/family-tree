@@ -45,4 +45,27 @@ describe("Avatar", () => {
     expect(wrapper.style.width).toBe("64px");
     expect(wrapper.style.height).toBe("64px");
   });
+
+  // Regression pin: HEIC profile photos uploaded from iOS render via the
+  // Supabase image transform endpoint, not the raw object URL. Without this,
+  // every Avatar callsite that passed a raw profilePhotoUrl (families list,
+  // family-tree list view, home page birthdays + suggested people, profile
+  // page breadcrumb) silently fell back to initials for HEIC uploads.
+  it("routes HEIC Supabase URLs through the render-image endpoint", () => {
+    const src =
+      "https://abc.supabase.co/storage/v1/object/public/media/people/p1/photo.heic";
+    render(<Avatar name="Eleanor Barcroft" src={src} />);
+    const img = screen.getByRole("img", { name: "Eleanor Barcroft" });
+    expect(img.getAttribute("src")).toBe(
+      "https://abc.supabase.co/storage/v1/render/image/public/media/people/p1/photo.heic?format=jpeg&quality=85",
+    );
+  });
+
+  it("passes through non-HEIC Supabase URLs unchanged", () => {
+    const src =
+      "https://abc.supabase.co/storage/v1/object/public/media/people/p1/photo.jpg";
+    render(<Avatar name="Eleanor Barcroft" src={src} />);
+    const img = screen.getByRole("img", { name: "Eleanor Barcroft" });
+    expect(img.getAttribute("src")).toBe(src);
+  });
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toDisplayImageUrl } from "@/utils/imageUrl";
 
 type AvatarProps = {
   src?: string | null;
@@ -31,7 +32,11 @@ export function Avatar({ src, name, size = 40, ring = false, className = "" }: A
     .toUpperCase();
 
   const fontSize = Math.round(size * 0.38);
-  const showImg = Boolean(src) && !failed;
+  // Route HEIC Supabase URLs through the render-image endpoint so iOS uploads
+  // display in browsers that can't decode HEIC natively. Matches MemoryImage
+  // and ProfileAvatar; idempotent for any other URL shape.
+  const displayUrl = toDisplayImageUrl(src);
+  const showImg = Boolean(displayUrl) && !failed;
 
   return (
     <span
@@ -48,9 +53,9 @@ export function Avatar({ src, name, size = 40, ring = false, className = "" }: A
       }}
       aria-label={name}
     >
-      {showImg && src ? (
+      {showImg ? (
         <img
-          src={src}
+          src={displayUrl}
           alt={name}
           draggable={false}
           onError={() => setFailed(true)}
