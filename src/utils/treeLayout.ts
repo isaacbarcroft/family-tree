@@ -6,6 +6,15 @@ export const COUPLE_W = 360
 export const V_GAP = 120
 export const H_GAP = 40
 
+// Avatar geometry shared between layout-driven navigation math and the
+// SVG renderer. Lives here (not in TreeNode.tsx) so utilities can import
+// these without pulling the component into the build graph.
+export const AVATAR_R = 22
+export const AVATAR_CY = NODE_H / 2
+export const SINGLE_AVATAR_CX = AVATAR_R + 12
+export const COUPLE_LEFT_CX = NODE_H / 2 + 8
+export const COUPLE_RIGHT_CX = COUPLE_W - NODE_H / 2 - 8
+
 export interface LayoutNode {
   x: number
   y: number

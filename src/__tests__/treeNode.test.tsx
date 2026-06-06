@@ -204,7 +204,7 @@ describe("TreeNode", () => {
     expect(TreeNode.displayName).toBe("TreeNode")
   })
 
-  it("exposes a single-person node as a focusable button to assistive tech", () => {
+  it("exposes a single-person node as a focusable treeitem to assistive tech", () => {
     const layout = singleLayoutNode({ id: "p1" }, "Alice Smith")
 
     const { container } = renderInSvg(
@@ -212,11 +212,13 @@ describe("TreeNode", () => {
     )
 
     const group = container.querySelector("g[transform]")
-    expect(group?.getAttribute("role")).toBe("button")
+    expect(group?.getAttribute("role")).toBe("treeitem")
     expect(group?.getAttribute("tabindex")).toBe("0")
     expect(group?.getAttribute("aria-label")).toBe(
       "Open profile for Alice Smith",
     )
+    expect(group?.getAttribute("data-treeitem-id")).toBe("p1")
+    expect(group?.getAttribute("aria-level")).toBe("1")
   })
 
   it("includes birth and death dates in the single-person aria-label", () => {
@@ -299,7 +301,7 @@ describe("TreeNode", () => {
     expect(group?.getAttribute("aria-label")).toBeNull()
   })
 
-  it("exposes both halves of a couple as focusable buttons with per-half labels", () => {
+  it("exposes both halves of a couple as focusable treeitems with per-half labels", () => {
     const layout = coupleLayoutNode(
       { id: "p1", spouseId: "p2" },
       "Alice & Bob Smith",
@@ -310,13 +312,15 @@ describe("TreeNode", () => {
     )
 
     const halves = Array.from(container.querySelectorAll("g")).filter(
-      (g) => g.getAttribute("role") === "button",
+      (g) => g.getAttribute("role") === "treeitem",
     )
     expect(halves.length).toBe(2)
     expect(halves[0].getAttribute("tabindex")).toBe("0")
     expect(halves[1].getAttribute("tabindex")).toBe("0")
     expect(halves[0].getAttribute("aria-label")).toBe("Open profile for Alice")
     expect(halves[1].getAttribute("aria-label")).toBe("Open profile for Bob Smith")
+    expect(halves[0].getAttribute("data-treeitem-id")).toBe("p1")
+    expect(halves[1].getAttribute("data-treeitem-id")).toBe("p2")
   })
 
   it("activates each couple half independently on Enter", () => {
@@ -331,7 +335,7 @@ describe("TreeNode", () => {
     )
 
     const halves = Array.from(container.querySelectorAll("g")).filter(
-      (g) => g.getAttribute("role") === "button",
+      (g) => g.getAttribute("role") === "treeitem",
     )
     fireEvent.keyDown(halves[0], { key: "Enter" })
     fireEvent.keyDown(halves[1], { key: "Enter" })
@@ -355,10 +359,44 @@ describe("TreeNode", () => {
     )
 
     expect(
-      c1.querySelector("g.tree-node-interactive[role='button']"),
+      c1.querySelector("g.tree-node-interactive[role='treeitem']"),
     ).not.toBeNull()
     expect(
-      c2.querySelectorAll("g.tree-node-interactive[role='button']").length,
+      c2.querySelectorAll("g.tree-node-interactive[role='treeitem']").length,
     ).toBe(2)
+  })
+
+  it("applies roving tabindex when a tabbableId is supplied", () => {
+    // The W3C tree pattern keeps exactly one treeitem keyboard-reachable
+    // from outside the tree. Non-tabbable items must still expose role and
+    // aria-label so they can be focused programmatically.
+    const layout = coupleLayoutNode(
+      { id: "p1", spouseId: "p2" },
+      "Alice & Bob Smith",
+    )
+
+    const { container } = renderInSvg(
+      <TreeNode node={layout} onNavigate={() => {}} tabbableId="p2" />,
+    )
+
+    const halves = Array.from(container.querySelectorAll("g")).filter(
+      (g) => g.getAttribute("role") === "treeitem",
+    )
+    const left = halves.find((g) => g.getAttribute("data-treeitem-id") === "p1")
+    const right = halves.find((g) => g.getAttribute("data-treeitem-id") === "p2")
+    expect(left?.getAttribute("tabindex")).toBe("-1")
+    expect(right?.getAttribute("tabindex")).toBe("0")
+  })
+
+  it("publishes aria-level on each treeitem reflecting hierarchy depth", () => {
+    const layout = singleLayoutNode({ id: "p1" }, "Alice Smith")
+
+    const { container } = renderInSvg(
+      <TreeNode node={layout} onNavigate={() => {}} depth={2} />,
+    )
+
+    const group = container.querySelector("g[transform]")
+    // depth=2 → aria-level=3 (1-indexed).
+    expect(group?.getAttribute("aria-level")).toBe("3")
   })
 })

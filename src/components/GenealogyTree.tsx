@@ -1,11 +1,23 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, useCallback } from "react"
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+  type KeyboardEvent,
+} from "react"
 import { zoom as d3Zoom, zoomIdentity, type ZoomBehavior } from "d3-zoom"
 import { select } from "d3-selection"
 import type { TreeNode as TreeNodeData } from "@/utils/treeBuilder"
 import { GENEALOGY_TREE_HEIGHT } from "@/config/constants"
 import {
+  AVATAR_CY,
+  AVATAR_R,
+  COUPLE_LEFT_CX,
+  COUPLE_RIGHT_CX,
+  SINGLE_AVATAR_CX,
   collectEdges,
   computeBounds,
   edgePath,
@@ -13,20 +25,27 @@ import {
   layoutTree,
 } from "@/utils/treeLayout"
 import {
-  AVATAR_CY,
   CLIP_ID_COUPLE_LEFT,
   CLIP_ID_COUPLE_RIGHT,
   CLIP_ID_SINGLE,
-  COUPLE_LEFT_CX,
-  COUPLE_RIGHT_CX,
-  SINGLE_AVATAR_CX,
   TreeNode,
 } from "@/components/TreeNode"
+import {
+  collectTreeItems,
+  nextInDirection,
+  type Direction,
+} from "@/utils/treeNavigation"
 import { useRouter } from "next/navigation"
 
-const AVATAR_R = 22
 const FIT_PADDING = 80
 const FIT_TOP_OFFSET = 40
+
+const ARROW_DIRECTIONS: Record<string, Direction> = {
+  ArrowDown: "down",
+  ArrowUp: "up",
+  ArrowLeft: "left",
+  ArrowRight: "right",
+}
 
 interface GenealogyTreeProps {
   treeData: TreeNodeData
@@ -45,6 +64,43 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
   const nodes = useMemo(() => flattenNodes(layout), [layout])
   const edges = useMemo(() => collectEdges(layout), [layout])
   const bounds = useMemo(() => computeBounds(nodes), [nodes])
+  const treeItems = useMemo(() => collectTreeItems(layout), [layout])
+
+  // Roving tabindex: a single treeitem is keyboard-reachable from outside
+  // the tree at any time. Initialize to the first interactive person on the
+  // first paint, then preserve the selection across re-renders as long as
+  // the id still exists in the new layout. The render-time `prev*` pattern
+  // re-derives focusedId when treeItems flips without resorting to a
+  // setState-in-effect (https://react.dev/learn/you-might-not-need-an-effect).
+  const [focusedId, setFocusedId] = useState<string | null>(
+    () => treeItems[0]?.id ?? null,
+  )
+  const [prevTreeItems, setPrevTreeItems] = useState(treeItems)
+  if (prevTreeItems !== treeItems) {
+    setPrevTreeItems(treeItems)
+    const stillPresent = focusedId
+      ? treeItems.some((it) => it.id === focusedId)
+      : false
+    if (!stillPresent) setFocusedId(treeItems[0]?.id ?? null)
+  }
+  // Set by the arrow-key handler so the next paint moves DOM focus to the
+  // new treeitem. Initial mount must not steal focus from the page, so this
+  // stays false until the user presses an arrow key.
+  const shouldFocusRef = useRef(false)
+
+  // Build a depth lookup so each TreeNode can publish aria-level without
+  // re-walking the tree per render.
+  const depthById = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const it of treeItems) map.set(it.id, it.depth)
+    return map
+  }, [treeItems])
+
+  function depthForNode(node: TreeNodeData): number {
+    const id = node.attributes?.id
+    if (id && depthById.has(id)) return depthById.get(id) ?? 0
+    return 0
+  }
 
   // Reset the initial-fit flag whenever the tree data changes so the new tree gets centered.
   useEffect(() => {
@@ -130,6 +186,51 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
     [router]
   )
 
+  // Move DOM focus to the newly selected treeitem after the roving tabindex
+  // has been re-applied. `shouldFocusRef` gates this so the initial mount
+  // does not steal focus from the rest of the page.
+  useEffect(() => {
+    if (!shouldFocusRef.current) return
+    shouldFocusRef.current = false
+    if (!focusedId) return
+    const root = svgRef.current
+    if (!root) return
+    const selector = `[data-treeitem-id="${CSS.escape(focusedId)}"]`
+    const el = root.querySelector(selector)
+    if (el instanceof SVGElement || el instanceof HTMLElement) {
+      el.focus({ preventScroll: true })
+    }
+  }, [focusedId])
+
+  const handleTreeKeyDown = useCallback(
+    (e: KeyboardEvent<SVGGElement>) => {
+      if (treeItems.length === 0) return
+      if (e.key === "Home") {
+        e.preventDefault()
+        shouldFocusRef.current = true
+        setFocusedId(treeItems[0].id)
+        return
+      }
+      if (e.key === "End") {
+        e.preventDefault()
+        shouldFocusRef.current = true
+        setFocusedId(treeItems[treeItems.length - 1].id)
+        return
+      }
+      const direction = ARROW_DIRECTIONS[e.key]
+      if (!direction) return
+      if (!focusedId) return
+      const current = treeItems.find((it) => it.id === focusedId)
+      if (!current) return
+      const next = nextInDirection(treeItems, current, direction)
+      e.preventDefault()
+      if (!next) return
+      shouldFocusRef.current = true
+      setFocusedId(next.id)
+    },
+    [focusedId, treeItems],
+  )
+
   return (
     <div
       ref={containerRef}
@@ -163,8 +264,9 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
         </defs>
         <g
           ref={gRef}
-          role="group"
-          aria-label="Family tree. Press Tab to move between people, then Enter or Space to open a profile."
+          role="tree"
+          aria-label="Family tree. Press Tab to enter, arrow keys to move between people, Home or End to jump to the first or last person, then Enter or Space to open a profile."
+          onKeyDown={handleTreeKeyDown}
         >
           {/* Edges — purely decorative connecting lines, hidden from assistive tech. */}
           {edges.map((e, i) => (
@@ -181,7 +283,13 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
 
           {/* Nodes */}
           {nodes.map((node, i) => (
-            <TreeNode key={i} node={node} onNavigate={navigateToProfile} />
+            <TreeNode
+              key={i}
+              node={node}
+              onNavigate={navigateToProfile}
+              tabbableId={focusedId ?? undefined}
+              depth={depthForNode(node.data)}
+            />
           ))}
         </g>
       </svg>
