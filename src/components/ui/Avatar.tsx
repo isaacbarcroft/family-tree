@@ -15,8 +15,8 @@ export function Avatar({ src, name, size = 40, ring = false, className = "" }: A
   const [prevSrc, setPrevSrc] = useState(src);
 
   // Reset the error flag when the caller swaps the source. Render-time pattern
-  // (matching MemoryImage / ProfileAvatar) so we don't trigger a second render
-  // from inside an effect.
+  // (matching ProfileAvatar) so we don't trigger a second render from inside
+  // an effect.
   if (src !== prevSrc) {
     setPrevSrc(src);
     setFailed(false);
