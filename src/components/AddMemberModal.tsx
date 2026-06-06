@@ -40,7 +40,7 @@ const AddMemberModal = ({ onClose, currentPersonId, onLinked }: AddMemberModalPr
   // Track the last `search` value we saw so the empty-input case can clear
   // results during render rather than from inside an effect (which would
   // cascade an extra re-render — matches the React 19 pattern from
-  // MemoryImage).
+  // ProfileAvatar).
   const [prevSearchTrim, setPrevSearchTrim] = useState("")
   const trimmed = search.trim()
   if (trimmed !== prevSearchTrim) {

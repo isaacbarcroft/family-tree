@@ -28,8 +28,8 @@ export function PhotoFrame({
   const [prevSrc, setPrevSrc] = useState(src);
 
   // Reset the error flag when the caller swaps the source. Doing this during
-  // render (React 19 pattern, matching MemoryImage / ProfileAvatar) avoids
-  // the cascading re-render a useEffect would cause.
+  // render (React 19 pattern, matching ProfileAvatar) avoids the cascading
+  // re-render a useEffect would cause.
   if (src !== prevSrc) {
     setPrevSrc(src);
     setFailed(false);
