@@ -135,14 +135,52 @@ describe("findRelationship", () => {
       expect(findRelationship("c2", "c1", map)?.label).toBe("Sibling")
     })
 
-    it("labels half-siblings as Sibling (documented limitation)", () => {
-      // c1 and c2 share only parent p1.
+    it("labels half-siblings when both kids have two recorded parents", () => {
+      // c1 and c2 share only parent p1; each has a different second parent.
       const map = makeMap(
         person({ id: "p1", childIds: ["c1", "c2"] }),
         person({ id: "p2", childIds: ["c1"] }),
         person({ id: "p3", childIds: ["c2"] }),
         person({ id: "c1", parentIds: ["p1", "p2"] }),
         person({ id: "c2", parentIds: ["p1", "p3"] }),
+      )
+      expect(findRelationship("c1", "c2", map)?.label).toBe("Half-sibling")
+      expect(findRelationship("c2", "c1", map)?.label).toBe("Half-sibling")
+    })
+
+    it("falls back to Sibling when only one kid has a recorded second parent", () => {
+      // c1 has both parents recorded, c2 only has p1. We can't prove the
+      // second parent differs because c2's other parent is unknown, so the
+      // label stays "Sibling" rather than presuming half.
+      const map = makeMap(
+        person({ id: "p1", childIds: ["c1", "c2"] }),
+        person({ id: "p2", childIds: ["c1"] }),
+        person({ id: "c1", parentIds: ["p1", "p2"] }),
+        person({ id: "c2", parentIds: ["p1"] }),
+      )
+      expect(findRelationship("c1", "c2", map)?.label).toBe("Sibling")
+      expect(findRelationship("c2", "c1", map)?.label).toBe("Sibling")
+    })
+
+    it("falls back to Sibling when neither kid has a recorded second parent", () => {
+      // Both kids only have p1 recorded. The data is ambiguous (could be full,
+      // could be half) so we under-determine to "Sibling".
+      const map = makeMap(
+        person({ id: "p1", childIds: ["c1", "c2"] }),
+        person({ id: "c1", parentIds: ["p1"] }),
+        person({ id: "c2", parentIds: ["p1"] }),
+      )
+      expect(findRelationship("c1", "c2", map)?.label).toBe("Sibling")
+    })
+
+    it("keeps full-sibling label when both shared parents are recorded", () => {
+      // Both kids list both p1 and p2. Sanity-check that adding the
+      // half-sibling check doesn't regress the canonical full-sibling case.
+      const map = makeMap(
+        person({ id: "p1", childIds: ["c1", "c2"] }),
+        person({ id: "p2", childIds: ["c1", "c2"] }),
+        person({ id: "c1", parentIds: ["p1", "p2"] }),
+        person({ id: "c2", parentIds: ["p1", "p2"] }),
       )
       expect(findRelationship("c1", "c2", map)?.label).toBe("Sibling")
     })
