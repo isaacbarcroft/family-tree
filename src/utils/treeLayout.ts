@@ -6,6 +6,14 @@ export const COUPLE_W = 360
 export const V_GAP = 120
 export const H_GAP = 40
 
+// Avatar geometry — shared so the navigation helpers can compute per-side
+// screen x coordinates without importing React component code.
+export const AVATAR_R = 22
+export const AVATAR_CY = NODE_H / 2
+export const SINGLE_AVATAR_CX = AVATAR_R + 12
+export const COUPLE_LEFT_CX = NODE_H / 2 + 8
+export const COUPLE_RIGHT_CX = COUPLE_W - NODE_H / 2 - 8
+
 export interface LayoutNode {
   x: number
   y: number

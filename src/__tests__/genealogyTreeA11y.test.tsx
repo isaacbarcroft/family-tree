@@ -67,14 +67,16 @@ describe("GenealogyTree accessibility", () => {
     }
   })
 
-  it("labels the inner tree group with role and a usage hint", () => {
+  it("labels the inner tree with role=tree and a usage hint that mentions arrow keys", () => {
     const { container } = render(<GenealogyTree treeData={tree()} />)
 
-    const labelled = container.querySelector('g[role="group"]')
+    const labelled = container.querySelector('g[role="tree"]')
     expect(labelled).not.toBeNull()
+    expect(labelled?.getAttribute("aria-orientation")).toBe("vertical")
     const label = labelled?.getAttribute("aria-label") ?? ""
     expect(label).toContain("Family tree")
     expect(label).toContain("Tab")
+    expect(label).toMatch(/arrow/i)
     expect(label).toMatch(/Enter|Space/)
   })
 
@@ -96,15 +98,29 @@ describe("GenealogyTree accessibility", () => {
     }
   })
 
-  it("keeps interactive person nodes focusable inside the labelled group", () => {
+  it("renders interactive person nodes as treeitems inside role=tree with roving tabindex", () => {
     const { container } = render(<GenealogyTree treeData={tree()} />)
 
-    const group = container.querySelector('g[role="group"]')
-    expect(group).not.toBeNull()
-    const buttons = group?.querySelectorAll('g[role="button"]')
-    expect(buttons?.length ?? 0).toBeGreaterThan(0)
-    for (const btn of Array.from(buttons ?? [])) {
-      expect(btn.getAttribute("tabindex")).toBe("0")
+    const treeGroup = container.querySelector('g[role="tree"]')
+    expect(treeGroup).not.toBeNull()
+    const treeitems = treeGroup?.querySelectorAll('g[role="treeitem"]')
+    expect(treeitems?.length ?? 0).toBeGreaterThan(0)
+    // Roving tabindex contract: exactly one treeitem is tabbable at a time.
+    const tabbable = Array.from(treeitems ?? []).filter(
+      (el) => el.getAttribute("tabindex") === "0",
+    )
+    expect(tabbable.length).toBe(1)
+  })
+
+  it("emits aria-level on every treeitem", () => {
+    const { container } = render(<GenealogyTree treeData={tree()} />)
+
+    const treeitems = container.querySelectorAll('g[role="treeitem"]')
+    expect(treeitems.length).toBeGreaterThan(0)
+    for (const item of Array.from(treeitems)) {
+      const level = item.getAttribute("aria-level")
+      expect(level).not.toBeNull()
+      expect(Number(level)).toBeGreaterThan(0)
     }
   })
 })

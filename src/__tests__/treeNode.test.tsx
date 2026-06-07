@@ -204,7 +204,7 @@ describe("TreeNode", () => {
     expect(TreeNode.displayName).toBe("TreeNode")
   })
 
-  it("exposes a single-person node as a focusable button to assistive tech", () => {
+  it("exposes a single-person node as a focusable treeitem to assistive tech", () => {
     const layout = singleLayoutNode({ id: "p1" }, "Alice Smith")
 
     const { container } = renderInSvg(
@@ -212,7 +212,7 @@ describe("TreeNode", () => {
     )
 
     const group = container.querySelector("g[transform]")
-    expect(group?.getAttribute("role")).toBe("button")
+    expect(group?.getAttribute("role")).toBe("treeitem")
     expect(group?.getAttribute("tabindex")).toBe("0")
     expect(group?.getAttribute("aria-label")).toBe(
       "Open profile for Alice Smith",
@@ -285,7 +285,7 @@ describe("TreeNode", () => {
     expect(event.defaultPrevented).toBe(true)
   })
 
-  it("does not expose a button role on the synthetic family-root label", () => {
+  it("does not expose a treeitem role on the synthetic family-root label", () => {
     const root: TreeNodeData = { name: "Smith Family", attributes: {} }
     const layout = layoutTree(root)
 
@@ -299,7 +299,7 @@ describe("TreeNode", () => {
     expect(group?.getAttribute("aria-label")).toBeNull()
   })
 
-  it("exposes both halves of a couple as focusable buttons with per-half labels", () => {
+  it("exposes both halves of a couple as focusable treeitems with per-half labels", () => {
     const layout = coupleLayoutNode(
       { id: "p1", spouseId: "p2" },
       "Alice & Bob Smith",
@@ -310,7 +310,7 @@ describe("TreeNode", () => {
     )
 
     const halves = Array.from(container.querySelectorAll("g")).filter(
-      (g) => g.getAttribute("role") === "button",
+      (g) => g.getAttribute("role") === "treeitem",
     )
     expect(halves.length).toBe(2)
     expect(halves[0].getAttribute("tabindex")).toBe("0")
@@ -331,7 +331,7 @@ describe("TreeNode", () => {
     )
 
     const halves = Array.from(container.querySelectorAll("g")).filter(
-      (g) => g.getAttribute("role") === "button",
+      (g) => g.getAttribute("role") === "treeitem",
     )
     fireEvent.keyDown(halves[0], { key: "Enter" })
     fireEvent.keyDown(halves[1], { key: "Enter" })
@@ -355,10 +355,107 @@ describe("TreeNode", () => {
     )
 
     expect(
-      c1.querySelector("g.tree-node-interactive[role='button']"),
+      c1.querySelector("g.tree-node-interactive[role='treeitem']"),
     ).not.toBeNull()
     expect(
-      c2.querySelectorAll("g.tree-node-interactive[role='button']").length,
+      c2.querySelectorAll("g.tree-node-interactive[role='treeitem']").length,
     ).toBe(2)
+  })
+
+  it("respects the tabbablePersonIds prop for roving tabindex", () => {
+    const layout = coupleLayoutNode(
+      { id: "p1", spouseId: "p2" },
+      "Alice & Bob Smith",
+    )
+    const tabbable = new Set(["p2"])
+
+    const { container } = renderInSvg(
+      <TreeNode
+        node={layout}
+        onNavigate={() => {}}
+        tabbablePersonIds={tabbable}
+      />,
+    )
+
+    const halves = Array.from(container.querySelectorAll("g")).filter(
+      (g) => g.getAttribute("role") === "treeitem",
+    )
+    expect(halves.length).toBe(2)
+    // Alice (p1) not in the tabbable set → -1; Bob (p2) is → 0.
+    expect(halves[0].getAttribute("tabindex")).toBe("-1")
+    expect(halves[1].getAttribute("tabindex")).toBe("0")
+  })
+
+  it("applies aria-level, aria-posinset, and aria-setsize from ariaMetaByPerson", () => {
+    const layout = singleLayoutNode({ id: "p1" }, "Alice Smith")
+    const meta = new Map([["p1", { level: 3, posinset: 2, setsize: 5 }]])
+
+    const { container } = renderInSvg(
+      <TreeNode
+        node={layout}
+        onNavigate={() => {}}
+        ariaMetaByPerson={meta}
+      />,
+    )
+
+    const group = container.querySelector("g[role='treeitem']")
+    expect(group?.getAttribute("aria-level")).toBe("3")
+    expect(group?.getAttribute("aria-posinset")).toBe("2")
+    expect(group?.getAttribute("aria-setsize")).toBe("5")
+  })
+
+  it("delegates key handling to onItemKeyDown when supplied", () => {
+    const onItemKeyDown = vi.fn()
+    const onNavigate = vi.fn()
+    const layout = singleLayoutNode({ id: "p1" }, "Alice Smith")
+
+    const { container } = renderInSvg(
+      <TreeNode
+        node={layout}
+        onNavigate={onNavigate}
+        onItemKeyDown={onItemKeyDown}
+      />,
+    )
+
+    const group = container.querySelector("g[role='treeitem']")
+    expect(group).not.toBeNull()
+    fireEvent.keyDown(group!, { key: "ArrowDown" })
+    fireEvent.keyDown(group!, { key: "Enter" })
+    expect(onItemKeyDown).toHaveBeenCalledTimes(2)
+    expect(onItemKeyDown).toHaveBeenNthCalledWith(
+      1,
+      "p1",
+      expect.objectContaining({ key: "ArrowDown" }),
+    )
+    expect(onItemKeyDown).toHaveBeenNthCalledWith(
+      2,
+      "p1",
+      expect.objectContaining({ key: "Enter" }),
+    )
+    // The fallback Enter/Space activation does NOT fire when onItemKeyDown is supplied.
+    expect(onNavigate).not.toHaveBeenCalled()
+  })
+
+  it("wires registerItemRef for each interactive treeitem", () => {
+    const registerItemRef = vi.fn()
+    const layout = coupleLayoutNode(
+      { id: "p1", spouseId: "p2" },
+      "Alice & Bob Smith",
+    )
+
+    renderInSvg(
+      <TreeNode
+        node={layout}
+        onNavigate={() => {}}
+        registerItemRef={registerItemRef}
+      />,
+    )
+
+    // Each interactive half registers once with its person id.
+    const registeredIds = registerItemRef.mock.calls
+      .filter(([, el]) => el !== null)
+      .map(([id]) => id)
+    expect(registeredIds).toContain("p1")
+    expect(registeredIds).toContain("p2")
   })
 })
