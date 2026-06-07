@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, useCallback } from "react"
+import { useEffect, useMemo, useRef, useState, useCallback, type KeyboardEvent } from "react"
 import { zoom as d3Zoom, zoomIdentity, type ZoomBehavior } from "d3-zoom"
 import { select } from "d3-selection"
 import type { TreeNode as TreeNodeData } from "@/utils/treeBuilder"
@@ -12,6 +12,7 @@ import {
   flattenNodes,
   layoutTree,
 } from "@/utils/treeLayout"
+import { AVATAR_R } from "@/utils/treeLayout"
 import {
   AVATAR_CY,
   CLIP_ID_COUPLE_LEFT,
@@ -22,9 +23,19 @@ import {
   SINGLE_AVATAR_CX,
   TreeNode,
 } from "@/components/TreeNode"
+import {
+  buildNavGraph,
+  buildTreeitemMetaMap,
+  findDown,
+  findEnd,
+  findHome,
+  findLeft,
+  findRight,
+  findUp,
+  type FocusableItem,
+} from "@/utils/treeNavigation"
 import { useRouter } from "next/navigation"
 
-const AVATAR_R = 22
 const FIT_PADDING = 80
 const FIT_TOP_OFFSET = 40
 
@@ -38,13 +49,42 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const zoomBehaviorRef = useRef<ZoomBehavior<SVGSVGElement, unknown> | null>(null)
   const initialFitDoneRef = useRef(false)
+  const itemRefs = useRef<Map<string, SVGGElement>>(new Map())
   const [dims, setDims] = useState({ width: 0, height: 0 })
+  const [focusedPersonId, setFocusedPersonId] = useState<string | null>(null)
   const router = useRouter()
 
   const layout = useMemo(() => layoutTree(treeData), [treeData])
   const nodes = useMemo(() => flattenNodes(layout), [layout])
   const edges = useMemo(() => collectEdges(layout), [layout])
   const bounds = useMemo(() => computeBounds(nodes), [nodes])
+  const navGraph = useMemo(() => buildNavGraph(layout), [layout])
+  const ariaMetaByPerson = useMemo(
+    () => buildTreeitemMetaMap(navGraph),
+    [navGraph],
+  )
+
+  // If a tree-data swap leaves focusedPersonId pointing at a person who no
+  // longer exists, drop it during render so tabbable falls back to the first
+  // item. The render-time prev* pattern (used elsewhere in the codebase)
+  // avoids the React 19 set-state-in-effect warning.
+  const [lastNavGraph, setLastNavGraph] = useState(navGraph)
+  if (lastNavGraph !== navGraph) {
+    setLastNavGraph(navGraph)
+    if (
+      focusedPersonId !== null &&
+      !navGraph.items.some((item) => item.personId === focusedPersonId)
+    ) {
+      setFocusedPersonId(null)
+    }
+  }
+
+  const tabbablePersonIds = useMemo(() => {
+    if (focusedPersonId) return new Set([focusedPersonId])
+    // No focus yet: make the first item tabbable so Tab into the tree lands somewhere.
+    const first = navGraph.items[0]
+    return first ? new Set([first.personId]) : new Set<string>()
+  }, [focusedPersonId, navGraph])
 
   // Reset the initial-fit flag whenever the tree data changes so the new tree gets centered.
   useEffect(() => {
@@ -130,6 +170,48 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
     [router]
   )
 
+  const registerItemRef = useCallback(
+    (personId: string, el: SVGGElement | null) => {
+      if (el) {
+        itemRefs.current.set(personId, el)
+        return
+      }
+      itemRefs.current.delete(personId)
+    },
+    [],
+  )
+
+  const moveFocusTo = useCallback((next: FocusableItem) => {
+    setFocusedPersonId(next.personId)
+    const el = itemRefs.current.get(next.personId)
+    if (!el) return
+    el.focus()
+  }, [])
+
+  const handleItemKeyDown = useCallback(
+    (personId: string, e: KeyboardEvent<SVGGElement>) => {
+      const current = navGraph.items.find((item) => item.personId === personId)
+      if (!current) return
+
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault()
+        navigateToProfile(personId)
+        return
+      }
+
+      const handler = ARROW_HANDLERS[e.key]
+      if (!handler) return
+      const next = handler(current, navGraph)
+      if (!next) {
+        e.preventDefault()
+        return
+      }
+      e.preventDefault()
+      moveFocusTo(next)
+    },
+    [moveFocusTo, navGraph, navigateToProfile],
+  )
+
   return (
     <div
       ref={containerRef}
@@ -163,8 +245,9 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
         </defs>
         <g
           ref={gRef}
-          role="group"
-          aria-label="Family tree. Press Tab to move between people, then Enter or Space to open a profile."
+          role="tree"
+          aria-orientation="vertical"
+          aria-label="Family tree. Use Tab to enter, arrow keys to move between people, Enter or Space to open a profile."
         >
           {/* Edges — purely decorative connecting lines, hidden from assistive tech. */}
           {edges.map((e, i) => (
@@ -181,10 +264,30 @@ export default function GenealogyTree({ treeData }: GenealogyTreeProps) {
 
           {/* Nodes */}
           {nodes.map((node, i) => (
-            <TreeNode key={i} node={node} onNavigate={navigateToProfile} />
+            <TreeNode
+              key={i}
+              node={node}
+              onNavigate={navigateToProfile}
+              tabbablePersonIds={tabbablePersonIds}
+              ariaMetaByPerson={ariaMetaByPerson}
+              onItemKeyDown={handleItemKeyDown}
+              registerItemRef={registerItemRef}
+            />
           ))}
         </g>
       </svg>
     </div>
   )
+}
+
+const ARROW_HANDLERS: Record<
+  string,
+  (current: FocusableItem, graph: ReturnType<typeof buildNavGraph>) => FocusableItem | null
+> = {
+  ArrowUp: findUp,
+  ArrowDown: findDown,
+  ArrowLeft: findLeft,
+  ArrowRight: findRight,
+  Home: (_current, graph) => findHome(graph),
+  End: (_current, graph) => findEnd(graph),
 }
