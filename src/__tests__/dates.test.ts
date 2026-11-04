@@ -4,6 +4,7 @@ import {
   getAge,
   getNextBirthday,
   parseLocalDate,
+  recurringDateInYear,
 } from "@/utils/dates"
 
 describe("formatDate", () => {
@@ -79,6 +80,31 @@ describe("getNextBirthday", () => {
     expect(date.getFullYear()).toBe(2026)
     expect(daysUntil).toBe(364) // 2026 is not a leap year up to Dec 31
   })
+
+  it("clamps a Feb 29 birthday to Feb 28 in a non-leap year", () => {
+    vi.setSystemTime(new Date(2026, 1, 20, 9, 0, 0)) // Feb 20 2026 (non-leap)
+    const { date, daysUntil } = getNextBirthday("1992-02-29")
+    expect(date.getFullYear()).toBe(2026)
+    expect(date.getMonth()).toBe(1) // February, not March
+    expect(date.getDate()).toBe(28)
+    expect(daysUntil).toBe(8) // Feb 20 -> Feb 28
+  })
+
+  it("keeps a Feb 29 birthday on Feb 29 in a leap year", () => {
+    vi.setSystemTime(new Date(2028, 1, 20, 9, 0, 0)) // Feb 20 2028 (leap)
+    const { date, daysUntil } = getNextBirthday("1992-02-29")
+    expect(date.getMonth()).toBe(1)
+    expect(date.getDate()).toBe(29)
+    expect(daysUntil).toBe(9) // Feb 20 -> Feb 29
+  })
+
+  it("rolls a passed Feb 29 birthday into next year, clamped when non-leap", () => {
+    vi.setSystemTime(new Date(2028, 2, 5, 9, 0, 0)) // Mar 5 2028 (past Feb 29)
+    const { date } = getNextBirthday("1992-02-29")
+    expect(date.getFullYear()).toBe(2029) // non-leap
+    expect(date.getMonth()).toBe(1)
+    expect(date.getDate()).toBe(28)
+  })
 })
 
 describe("getAge", () => {
@@ -104,5 +130,36 @@ describe("getAge", () => {
   it("handles a birthday in a later month correctly", () => {
     vi.setSystemTime(new Date(2026, 5, 1, 12, 0, 0)) // June 1
     expect(getAge("1990-11-05")).toBe(35)
+  })
+
+  it("treats Feb 28 as the birthday for a Feb 29 person in a non-leap year", () => {
+    vi.setSystemTime(new Date(2026, 1, 28, 8, 0, 0)) // Feb 28 2026 (non-leap)
+    expect(getAge("1992-02-29")).toBe(34)
+  })
+
+  it("counts a Feb 29 person as pre-birthday on Feb 27 of a non-leap year", () => {
+    vi.setSystemTime(new Date(2026, 1, 27, 8, 0, 0)) // Feb 27 2026
+    expect(getAge("1992-02-29")).toBe(33)
+  })
+})
+
+describe("recurringDateInYear", () => {
+  it("returns the exact date for a normal month/day", () => {
+    const d = recurringDateInYear(2026, 3, 16) // April 16
+    expect(d.getFullYear()).toBe(2026)
+    expect(d.getMonth()).toBe(3)
+    expect(d.getDate()).toBe(16)
+  })
+
+  it("clamps Feb 29 to Feb 28 in a non-leap year", () => {
+    const d = recurringDateInYear(2026, 1, 29)
+    expect(d.getMonth()).toBe(1) // February, not March
+    expect(d.getDate()).toBe(28)
+  })
+
+  it("keeps Feb 29 in a leap year", () => {
+    const d = recurringDateInYear(2028, 1, 29)
+    expect(d.getMonth()).toBe(1)
+    expect(d.getDate()).toBe(29)
   })
 })
