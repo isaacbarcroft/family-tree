@@ -15,7 +15,7 @@
     "d3-zoom": "^3.0.0",
     "heic-convert": "^2.1.0",
     "leaflet": "^1.9.4",
-    "next": "^16.2.2",
+    "next": "^16.4.5",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-leaflet": "^5.0.0",
